@@ -1,0 +1,42 @@
+#!/bin/bash
+set -ex
+
+if [ ! -z "${DOCKER_HOST}" ]
+then
+	PROT=$(printf ${DOCKER_HOST} | sed -En 's|^(.+)://.+$|\1|p')
+	ADDR=$(printf ${DOCKER_HOST} | sed -En 's|^.+://(.+)$|\1|p')
+	ARGS=
+
+	case $PROT in
+	tcp)
+		ADDR=$(printf ${ADDR} | sed 's/:/ /')
+		;;
+
+	unix)
+		ARGS='-f'
+		;;
+
+	*)
+		echo "${PROT} protocol not supported" >&2
+		exit 1
+		;;
+	esac
+
+	until $(nc ${ARGS} ${ADDR} < /dev/null)
+	do
+		if [ $((__++)) -eq 15 ]
+		then
+			echo "unable to connect to ${ADDR}" >&2
+			exit 1
+		fi
+
+		sleep 1
+	done
+
+	function pre-stop {
+		nc localhost 2378 < /dev/null
+	}
+	trap pre-stop EXIT INT QUIT TERM
+fi
+
+RUNNER_ALLOW_RUNASROOT=1 /opt/actions-runner/run.sh --once

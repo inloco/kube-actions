@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: ci
+  name: actions-dump
+data:
+  AWS_ACCESS_KEY_ID: AKIA46LKUWUR2SNQJWWA

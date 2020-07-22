@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: kube-actions
+  name: kube-actions
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-actions
+      app.kubernetes.io/component: operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-actions
+        app.kubernetes.io/component: operator
+    spec:
+      containers:
+        - name: operator
+          image: inloco/kube-actions:operator
+          envFrom:
+            - configMapRef:
+                name: kube-actions
+            - secretRef:
+                name: kube-actions
+          imagePullPolicy: Always
+      serviceAccountName: kube-actions
