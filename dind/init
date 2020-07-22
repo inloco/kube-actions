@@ -1,0 +1,9 @@
+#!/bin/sh
+set -ex
+
+{
+    nc -l -p 2378 > /dev/null
+    kill -s INT $(pidof dockerd || prinf ${PPID})
+} &
+
+. dockerd-entrypoint.sh "${@}"

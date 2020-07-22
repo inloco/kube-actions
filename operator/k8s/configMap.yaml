@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: kube-actions
+  name: kube-actions
+data:
+  KUBEACTIONS_GITHUB_OWNERS: inloco
+  KUBEACTIONS_GITHUB_VISIBILITIES: private
