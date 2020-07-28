@@ -1,0 +1,48 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunnerjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunnerjobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunners
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunners/status
+  verbs:
+  - get
+  - patch
+  - update

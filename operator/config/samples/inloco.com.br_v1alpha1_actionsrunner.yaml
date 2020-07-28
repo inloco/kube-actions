@@ -1,0 +1,7 @@
+apiVersion: inloco.com.br/v1alpha1
+kind: ActionsRunner
+metadata:
+  name: actionsrunner-sample
+spec:
+  # Add fields here
+  foo: bar

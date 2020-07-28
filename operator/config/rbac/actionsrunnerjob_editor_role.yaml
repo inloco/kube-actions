@@ -1,0 +1,24 @@
+# permissions for end users to edit actionsrunnerjobs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: actionsrunnerjob-editor-role
+rules:
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunnerjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunnerjobs/status
+  verbs:
+  - get
