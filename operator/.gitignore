@@ -96,6 +96,10 @@ fabric.properties
 # Local History for Visual Studio Code
 .history/
 
+# Vim
+*.swp
+*.swo
+*~
+
 # Operator SDK
-build/
-deploy/
+bin/
