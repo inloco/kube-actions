@@ -1,0 +1,140 @@
+/*
+Copyright 2020 In Loco Tecnologia da Informação S.A.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package actionsrunner
+
+import (
+	"context"
+
+	"github.com/go-logr/logr"
+	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/wire"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+)
+
+var (
+	patchOpts = []client.PatchOption{
+		client.ForceOwnership,
+		client.FieldOwner("kube-actions"),
+	}
+
+	deleteOpts = []client.DeleteOption{
+		client.PropagationPolicy(metav1.DeletePropagationForeground),
+	}
+)
+
+// Reconciler reconciles an actionsRunner object
+type Reconciler struct {
+	client.Client
+	Log    logr.Logger
+	Scheme *runtime.Scheme
+
+	watchers WatcherCollection
+	wires    wire.Collection
+}
+
+// +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunners,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunners/status,verbs=get;update;patch
+
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.watchers.Init(r.Client)
+	r.wires.Init()
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&inlocov1alpha1.ActionsRunner{}).
+		Owns(&inlocov1alpha1.ActionsRunnerJob{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&batchv1.Job{}).
+		Watches(r.watchers.EventSource(), &handler.EnqueueRequestForObject{}).
+		Watches(r.wires.EventSource(), &handler.EnqueueRequestForObject{}).
+		Complete(r)
+}
+
+func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	ctx := context.Background()
+	log := r.Log.WithValues("actionsrunner", req.NamespacedName)
+
+	var actionsRunner inlocov1alpha1.ActionsRunner
+	if err := r.Get(ctx, req.NamespacedName, &actionsRunner); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
+	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
+	case err == nil:
+		r.watchers.Watch(ctx, log, &actionsRunnerJob, nil)
+		return ctrl.Result{}, nil
+	case !apierrors.IsNotFound(err):
+		return ctrl.Result{}, err
+	}
+
+	var configMap corev1.ConfigMap
+	if err := r.Get(ctx, req.NamespacedName, &configMap); client.IgnoreNotFound(err) != nil {
+		return ctrl.Result{}, err
+	}
+
+	var secret corev1.Secret
+	if err := r.Get(ctx, req.NamespacedName, &secret); client.IgnoreNotFound(err) != nil {
+		return ctrl.Result{}, err
+	}
+
+	dotFiles := util.ToDotFiles(&configMap, &secret)
+
+	wire, err := r.wires.WireFor(ctx, log, &actionsRunner, dotFiles)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	desiredConfigMap, err := util.ToConfigMap(dotFiles, &actionsRunner, r.Scheme)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.Patch(ctx, desiredConfigMap, client.Apply, patchOpts...); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	desiredSecret, err := util.ToSecret(dotFiles, &actionsRunner, r.Scheme)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.Patch(ctx, desiredSecret, client.Apply, patchOpts...); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	consumer := &Consumer{
+		Client: r.Client,
+		Log:    r.Log,
+		Scheme: r.Scheme,
+
+		wire:  wire,
+		watch: func(job *inlocov1alpha1.ActionsRunnerJob, ack <-chan struct{}) { r.watchers.Watch(ctx, log, job, ack) },
+	}
+	if err := consumer.Consume(ctx); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
+}
