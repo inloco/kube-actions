@@ -1,8 +1,8 @@
-ARG UBUNTU_VERSION=focal
+ARG UBUNTU_VERSION
 
 FROM ubuntu:${UBUNTU_VERSION}
 
-ARG RUNNER_VERSION=2.272.0
+ARG RUNNER_VERSION
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -29,4 +29,4 @@ RUN apt-get update -y && \
 
 COPY ./init /init
 
-CMD [ "/init" ]
+CMD ["/init"]
