@@ -1,9 +1,8 @@
 module github.com/inloco/kube-actions/operator
 
-go 1.13
+go 1.14
 
 require (
-	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a // indirect
 	github.com/go-logr/logr v0.1.0
 	github.com/google/go-github/v32 v32.1.0
 	github.com/google/uuid v1.1.1
