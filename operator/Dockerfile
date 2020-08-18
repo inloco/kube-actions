@@ -1,4 +1,4 @@
-FROM golang:1.14 AS build
+FROM golang:1.15 AS build
 WORKDIR /go/src/github.com/inloco/kube-actions/operator
 COPY ./go.mod ./go.mod
 COPY ./go.sum ./go.sum
