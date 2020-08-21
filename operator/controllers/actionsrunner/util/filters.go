@@ -45,3 +45,21 @@ func FilterEnv(oldEnv []corev1.EnvVar, predicate func(corev1.EnvVar) bool) []cor
 
 	return newEnv
 }
+
+func FilterResources(source corev1.ResourceRequirements, resourceNames ...corev1.ResourceName) corev1.ResourceRequirements {
+	resourceRequirements := corev1.ResourceRequirements{
+		Limits:   corev1.ResourceList{},
+		Requests: corev1.ResourceList{},
+	}
+
+	for _, resourceName := range resourceNames {
+		if val, ok := source.Limits[resourceName]; ok {
+			resourceRequirements.Limits[resourceName] = val
+		}
+		if val, ok := source.Requests[resourceName]; ok {
+			resourceRequirements.Requests[resourceName] = val
+		}
+	}
+
+	return resourceRequirements
+}

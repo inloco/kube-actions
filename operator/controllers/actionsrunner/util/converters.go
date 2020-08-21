@@ -228,7 +228,7 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
-			Resources: filterResourceRequirements(actionsRunner.Spec.Resources, corev1.ResourceStorage),
+			Resources: FilterResources(actionsRunner.Spec.Resources, corev1.ResourceStorage),
 		},
 	}
 
@@ -306,7 +306,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 							Env: FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
 								return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
 							}),
-							Resources: filterResourceRequirements(actionsRunner.Spec.Resources, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
+							Resources: FilterResources(actionsRunner.Spec.Resources, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
 							VolumeMounts: []corev1.VolumeMount{
 								corev1.VolumeMount{
 									Name:      "config-map",
@@ -358,24 +358,6 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 	}
 
 	return &job, nil
-}
-
-func filterResourceRequirements(source corev1.ResourceRequirements, resourceNames ...corev1.ResourceName) corev1.ResourceRequirements {
-	resourceRequirements := corev1.ResourceRequirements{
-		Limits:   corev1.ResourceList{},
-		Requests: corev1.ResourceList{},
-	}
-
-	for _, resourceName := range resourceNames {
-		if val, ok := source.Limits[resourceName]; ok {
-			resourceRequirements.Limits[resourceName] = val
-		}
-		if val, ok := source.Requests[resourceName]; ok {
-			resourceRequirements.Requests[resourceName] = val
-		}
-	}
-
-	return resourceRequirements
 }
 
 func withRuntimeAffinity(affinity *corev1.Affinity) *corev1.Affinity {
