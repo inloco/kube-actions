@@ -54,7 +54,7 @@ func (c *Collection) WireFor(ctx context.Context, log logr.Logger, actionsRunner
 		Name:      actionsRunner.GetName(),
 	}
 
-	if wire, ok := c.wireRegistry[namespacedName]; ok {
+	if wire, ok := c.wireRegistry[namespacedName]; ok && !wire.gone {
 		return wire, nil
 	}
 
