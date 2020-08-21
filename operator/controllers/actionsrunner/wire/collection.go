@@ -49,10 +49,6 @@ func (c *Collection) WireFor(ctx context.Context, log logr.Logger, actionsRunner
 		return nil, errors.New("ActionsRunner == nil")
 	}
 
-	if dotFiles == nil {
-		return nil, errors.New("DotFiles == nil")
-	}
-
 	namespacedName := client.ObjectKey{
 		Namespace: actionsRunner.GetNamespace(),
 		Name:      actionsRunner.GetName(),
