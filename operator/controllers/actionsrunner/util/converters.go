@@ -334,7 +334,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 					},
 					RestartPolicy:                corev1.RestartPolicyNever,
 					AutomountServiceAccountToken: pointer.BoolPtr(false),
-					Affinity:                     actionsRunner.Spec.Affinity,
+					Affinity:                     withRuntimeAffinity(actionsRunner.Spec.Affinity),
 					Tolerations:                  actionsRunner.Spec.Tolerations,
 				},
 			},
@@ -376,6 +376,43 @@ func filterResourceRequirements(source corev1.ResourceRequirements, resourceName
 	}
 
 	return resourceRequirements
+}
+
+func withRuntimeAffinity(affinity *corev1.Affinity) *corev1.Affinity {
+	if affinity == nil {
+		affinity = &corev1.Affinity{}
+	}
+
+	if affinity.NodeAffinity == nil {
+		affinity.NodeAffinity = &corev1.NodeAffinity{}
+	}
+	nodeAffinity := affinity.NodeAffinity
+
+	if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+	}
+	nodeSelector := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+
+	nodeSelector.NodeSelectorTerms = append(nodeSelector.NodeSelectorTerms, corev1.NodeSelectorTerm{
+		MatchExpressions: []corev1.NodeSelectorRequirement{
+			corev1.NodeSelectorRequirement{
+				Key:      "kubernetes.io/os",
+				Operator: corev1.NodeSelectorOpIn,
+				Values: []string{
+					constants.OS(),
+				},
+			},
+			corev1.NodeSelectorRequirement{
+				Key:      "kubernetes.io/arch",
+				Operator: corev1.NodeSelectorOpIn,
+				Values: []string{
+					constants.Arch(),
+				},
+			},
+		},
+	})
+
+	return affinity
 }
 
 func addSecretCapability(job *batchv1.Job, actionsRunner *inlocov1alpha1.ActionsRunner) {
