@@ -1,4 +1,4 @@
-ARG DOCKER_VERSION=19.03
+ARG DOCKER_VERSION
 
 FROM docker:${DOCKER_VERSION}-dind-rootless
 
@@ -12,4 +12,4 @@ USER rootless
 
 COPY ./init /init
 
-ENTRYPOINT [ "/init" ]
+ENTRYPOINT ["/init"]
