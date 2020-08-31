@@ -108,7 +108,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	desiredConfigMap, err := util.ToConfigMap(dotFiles, &actionsRunner, r.Scheme)
+	desiredConfigMap, err := util.ToConfigMap(wire.DotFiles, &actionsRunner, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -116,7 +116,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	desiredSecret, err := util.ToSecret(dotFiles, &actionsRunner, r.Scheme)
+	desiredSecret, err := util.ToSecret(wire.DotFiles, &actionsRunner, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
