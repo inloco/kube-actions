@@ -43,6 +43,8 @@ type Wire struct {
 	loopAck      chan struct{}
 	loopMessages chan Message
 	loopErrors   chan error
+
+	gone bool
 }
 
 func (w *Wire) Init(ctx context.Context) error {
@@ -111,6 +113,7 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <
 	}
 
 	w.loopClose = make(chan struct{})
+	w.log.Info("Wire Opened")
 
 	go func() {
 		genericEvent := event.GenericEvent{
@@ -121,11 +124,16 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <
 			if r := recover(); r != nil {
 				w.events <- genericEvent
 				w.loopErrors <- fmt.Errorf("%v", r)
+
 				w.Close()
+				w.log.Info("Wire Closed")
 			}
 		}()
 
 		if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
+			w.gone = true
+			w.log.Info("Wire Gone")
+
 			panic(err)
 		}
 		defer w.adoFacade.DeinitAzureDevOpsTaskAgentSession(ctx)
