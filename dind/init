@@ -3,7 +3,8 @@ set -ex
 
 {
     nc -l -p 2378 > /dev/null
-    kill -s INT $(pidof dockerd || prinf ${PPID})
+    kill -s INT $(pidof dockerd || printf ${PPID})
 } &
 
-. dockerd-entrypoint.sh "${@}"
+set -- ${DOCKERD_ENTRYPOINT_ARGS} "${@}"
+. /usr/local/bin/dockerd-entrypoint.sh "${@}"
