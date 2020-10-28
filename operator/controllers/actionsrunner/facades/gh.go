@@ -18,13 +18,29 @@ package facades
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"log"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v32/github"
+	"github.com/square/go-jose/v3"
+	"github.com/square/go-jose/v3/jwt"
 	"golang.org/x/oauth2"
+)
+
+const (
+	typJWT = "JWT"
+	expJWT = 10 * time.Minute
+)
+
+var (
+	pem2base64 = regexp.MustCompile(`(-----.+?-----)|[\n ]`)
 )
 
 type repositoryVisibility uint8
@@ -35,7 +51,10 @@ const (
 )
 
 var (
-	githubPAT = os.Getenv("KUBEACTIONS_GITHUB_PAT")
+	githubPAT     = os.Getenv("KUBEACTIONS_GITHUB_PAT")
+	githubAppId   = os.Getenv("KUBEACTIONS_GITHUB_APP_ID")
+	githubAppPK   = os.Getenv("KUBEACTIONS_GITHUB_APP_PK")
+	githubInstlId = os.Getenv("KUBEACTIONS_GITHUB_INSTL_ID")
 
 	githubOwners = func() map[string]struct{} {
 		allowed := make(map[string]struct{})
@@ -70,6 +89,8 @@ var (
 )
 
 type GitHub struct {
+	AppClient *github.Client
+
 	Client     *github.Client
 	Repository *github.Repository
 
@@ -77,7 +98,11 @@ type GitHub struct {
 }
 
 func (gh *GitHub) Init(ctx context.Context, repoOwner string, repoName string) error {
-	if err := gh.initGitHubClient(ctx, githubPAT); err != nil {
+	if err := gh.initGitHubAppClient(ctx); err != nil {
+		log.Print(err)
+	}
+
+	if err := gh.initGitHubClient(ctx); err != nil {
 		return err
 	}
 
@@ -92,9 +117,117 @@ func (gh *GitHub) Init(ctx context.Context, repoOwner string, repoName string) e
 	return nil
 }
 
-func (gh *GitHub) initGitHubClient(ctx context.Context, token string) error {
+func (gh *GitHub) GetGitHubAppToken() (string, error) {
+	if githubAppId == "" {
+		return "", errors.New(`githubAppId == ""`)
+	}
+
+	if githubAppPK == "" {
+		return "", errors.New(`githubAppPK == ""`)
+	}
+
+	der, err := base64.StdEncoding.DecodeString(string(pem2base64.ReplaceAll([]byte(githubAppPK), []byte{})))
+	if err != nil {
+		return "", err
+	}
+
+	privateKey, err := x509.ParsePKCS1PrivateKey(der)
+	if err != nil {
+		return "", err
+	}
+
+	signer, err := jose.NewSigner(
+		jose.SigningKey{
+			Algorithm: jose.RS256,
+			Key:       privateKey,
+		},
+		new(jose.SignerOptions).WithType(typJWT),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	now := time.Now()
+	claims := jwt.Claims{
+		Issuer:   githubAppId,
+		Expiry:   jwt.NewNumericDate(now.Add(expJWT)),
+		IssuedAt: jwt.NewNumericDate(now),
+	}
+
+	token, err := jwt.Signed(signer).Claims(claims).CompactSerialize()
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+func (gh *GitHub) initGitHubAppClient(ctx context.Context) error {
+	token, err := gh.GetGitHubAppToken()
+	if err != nil {
+		return err
+	}
+
+	gh.AppClient = github.NewClient(
+		oauth2.NewClient(
+			ctx,
+			oauth2.StaticTokenSource(
+				&oauth2.Token{
+					AccessToken: token,
+				},
+			),
+		),
+	)
+	return nil
+}
+
+func (gh *GitHub) GetGitHubInstallationToken(ctx context.Context) (string, error) {
+	if gh.AppClient == nil {
+		return "", errors.New(".AppClient == nil")
+	}
+
+	var installationId int64
+	if githubInstlId != "" {
+		id, err := strconv.ParseInt(githubInstlId, 10, 0)
+		if err != nil {
+			return "", err
+		}
+
+		installationId = id
+	} else {
+		log.Print(`githubInstlId == ""`)
+
+		installations, _, err := gh.AppClient.Apps.ListInstallations(ctx, nil)
+		if err != nil {
+			return "", err
+		}
+
+		if len(installations) != 1 {
+			return "", errors.New("len(installations) != 1")
+		}
+
+		installationId = installations[0].GetID()
+	}
+
+	installationToken, _, err := gh.AppClient.Apps.CreateInstallationToken(ctx, installationId, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return installationToken.GetToken(), nil
+}
+
+func (gh *GitHub) initGitHubClient(ctx context.Context) error {
+	token := githubPAT
 	if token == "" {
-		return errors.New(`token == ""`)
+		log.Print(`githubPAT == ""`)
+
+		githubIAT, err := gh.GetGitHubInstallationToken(ctx)
+		if err != nil {
+			return err
+		}
+
+		token = githubIAT
 	}
 
 	gh.Client = github.NewClient(
