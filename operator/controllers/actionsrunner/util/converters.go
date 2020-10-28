@@ -328,14 +328,30 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 									MountPath: "/opt/actions-runner/_work",
 									SubPath:   "runner",
 								},
+								corev1.VolumeMount{
+									Name:      "persistent-volume-claim",
+									MountPath: "/root",
+									SubPath:   "root",
+								},
+								corev1.VolumeMount{
+									Name:      "persistent-volume-claim",
+									MountPath: "/home",
+									SubPath:   "home",
+								},
 							},
 							ImagePullPolicy: corev1.PullAlways,
 						},
 					},
 					RestartPolicy:                corev1.RestartPolicyNever,
 					AutomountServiceAccountToken: pointer.BoolPtr(false),
-					Affinity:                     withRuntimeAffinity(actionsRunner.Spec.Affinity),
-					Tolerations:                  actionsRunner.Spec.Tolerations,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsUser:    pointer.Int64Ptr(1000),
+						RunAsGroup:   pointer.Int64Ptr(1000),
+						RunAsNonRoot: pointer.BoolPtr(true),
+						FSGroup:      pointer.Int64Ptr(1000),
+					},
+					Affinity:    withRuntimeAffinity(actionsRunner.Spec.Affinity),
+					Tolerations: actionsRunner.Spec.Tolerations,
 				},
 			},
 			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
@@ -465,21 +481,6 @@ func addDockerCapability(job *batchv1.Job) {
 		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: pointer.BoolPtr(true),
-		},
-	})
-
-	podSpec.InitContainers = append(podSpec.InitContainers, corev1.Container{
-		Name:  "init",
-		Image: "busybox",
-		Command: []string{
-			"sh",
-			"-c", "mkdir -p /mnt/dind && chown -R 1000:1000 /mnt/dind",
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			corev1.VolumeMount{
-				Name:      "persistent-volume-claim",
-				MountPath: "/mnt",
-			},
 		},
 	})
 }
