@@ -40,7 +40,7 @@ import (
 var (
 	agentNameTemplate = "KA %v %v"
 
-	agentVersion = "2.272.0"
+	agentVersion = "2.273.4"
 
 	agentLabelsBase = []string{
 		"self-hosted",
@@ -409,7 +409,7 @@ func (ado *AzureDevOps) DeinitAzureDevOpsTaskAgentSession(ctx context.Context) e
 	return nil
 }
 
-func (ado *AzureDevOps) GetMessage(ctx context.Context) (*taskagent.TaskAgentMessage, error) {
+func (ado *AzureDevOps) GetMessage(ctx context.Context, lastMessageId *uint64) (*taskagent.TaskAgentMessage, error) {
 	if ado.TaskAgentBridgeClient == nil {
 		return nil, errors.New(".TaskAgentBridgeClient == nil")
 	}
@@ -419,8 +419,9 @@ func (ado *AzureDevOps) GetMessage(ctx context.Context) (*taskagent.TaskAgentMes
 	}
 
 	message, err := ado.TaskAgentBridgeClient.GetMessage(ctx, taskagent.GetMessageArgs{
-		PoolId:    &poolId,
-		SessionId: ado.TaskAgentSession.SessionId,
+		PoolId:        &poolId,
+		SessionId:     ado.TaskAgentSession.SessionId,
+		LastMessageId: lastMessageId,
 	})
 	if err != nil {
 		return nil, err
