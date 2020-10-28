@@ -228,7 +228,7 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
-			Resources: filterResourceRequirements(actionsRunner.Spec.Resources, corev1.ResourceStorage),
+			Resources: FilterResources(actionsRunner.Spec.Resources, corev1.ResourceStorage),
 		},
 	}
 
@@ -306,7 +306,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 							Env: FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
 								return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
 							}),
-							Resources: filterResourceRequirements(actionsRunner.Spec.Resources, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
+							Resources: FilterResources(actionsRunner.Spec.Resources, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
 							VolumeMounts: []corev1.VolumeMount{
 								corev1.VolumeMount{
 									Name:      "config-map",
@@ -334,7 +334,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 					},
 					RestartPolicy:                corev1.RestartPolicyNever,
 					AutomountServiceAccountToken: pointer.BoolPtr(false),
-					Affinity:                     actionsRunner.Spec.Affinity,
+					Affinity:                     withRuntimeAffinity(actionsRunner.Spec.Affinity),
 					Tolerations:                  actionsRunner.Spec.Tolerations,
 				},
 			},
@@ -360,22 +360,47 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 	return &job, nil
 }
 
-func filterResourceRequirements(source corev1.ResourceRequirements, resourceNames ...corev1.ResourceName) corev1.ResourceRequirements {
-	resourceRequirements := corev1.ResourceRequirements{
-		Limits:   corev1.ResourceList{},
-		Requests: corev1.ResourceList{},
+func withRuntimeAffinity(affinity *corev1.Affinity) *corev1.Affinity {
+	if affinity == nil {
+		affinity = &corev1.Affinity{}
 	}
 
-	for _, resourceName := range resourceNames {
-		if val, ok := source.Limits[resourceName]; ok {
-			resourceRequirements.Limits[resourceName] = val
-		}
-		if val, ok := source.Requests[resourceName]; ok {
-			resourceRequirements.Requests[resourceName] = val
-		}
+	if affinity.NodeAffinity == nil {
+		affinity.NodeAffinity = &corev1.NodeAffinity{}
+	}
+	nodeAffinity := affinity.NodeAffinity
+
+	if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+	}
+	nodeSelector := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+
+	if len(nodeSelector.NodeSelectorTerms) == 0 {
+		nodeSelector.NodeSelectorTerms = append(nodeSelector.NodeSelectorTerms, corev1.NodeSelectorTerm{})
+	}
+	nodeSelectorTerms := nodeSelector.NodeSelectorTerms
+
+	for i, nodeSelectorTerm := range nodeSelectorTerms {
+		nodeSelectorTerms[i].MatchExpressions = append(
+			nodeSelectorTerm.MatchExpressions,
+			corev1.NodeSelectorRequirement{
+				Key:      "kubernetes.io/os",
+				Operator: corev1.NodeSelectorOpIn,
+				Values: []string{
+					constants.OS(),
+				},
+			},
+			corev1.NodeSelectorRequirement{
+				Key:      "kubernetes.io/arch",
+				Operator: corev1.NodeSelectorOpIn,
+				Values: []string{
+					constants.Arch(),
+				},
+			},
+		)
 	}
 
-	return resourceRequirements
+	return affinity
 }
 
 func addSecretCapability(job *batchv1.Job, actionsRunner *inlocov1alpha1.ActionsRunner) {
