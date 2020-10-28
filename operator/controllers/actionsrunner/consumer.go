@@ -105,7 +105,7 @@ func (c *Consumer) onJobCancellation(ctx context.Context, ack <-chan struct{}, m
 		return err
 	}
 
-	if err := c.Delete(ctx, actionsRunnerJob, deleteOpts...); err != nil {
+	if err := c.Delete(ctx, actionsRunnerJob, deleteOpts...); client.IgnoreNotFound(err) != nil {
 		c.Log.Error(err, "c.Delete")
 	}
 
