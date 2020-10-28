@@ -1,6 +1,9 @@
 #!/bin/bash
 set -ex
 
+git config --global user.name github-actions[bot]
+git config --global user.email 41898282+github-actions[bot]@users.noreply.github.com
+
 if [ ! -z "${DOCKER_HOST}" ]
 then
 	PROT=$(printf ${DOCKER_HOST} | sed -En 's|^(.+)://.+$|\1|p')
@@ -37,6 +40,28 @@ then
 		nc localhost 2378 < /dev/null
 	}
 	trap pre-stop EXIT INT QUIT TERM
+
+	DOCKER_CONFIG=${DOCKER_CONFIG:-${HOME}/.docker}
+	if [ ! -d ${DOCKER_CONFIG} ]
+	then
+		mkdir -p ${DOCKER_CONFIG}
+	fi
+
+	CONF=${DOCKER_CONFIG}/config.json
+	if [ ! -f ${CONF} ]
+	then
+		echo '{}' > ${CONF}
+	fi
+
+	if [ ! -z "${DOCKER_CREDENTIAL_HELPERS}" ]
+	then
+		cat <<< $(jq --argjson _ "${DOCKER_CREDENTIAL_HELPERS}" '.credHelpers |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
+	fi
+
+	if [ ! -z "${DOCKER_PLUGINS}" ]
+	then
+		cat <<< $(jq --argjson _ "${DOCKER_PLUGINS}" '.plugins |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
+	fi
 fi
 
-RUNNER_ALLOW_RUNASROOT=1 /opt/actions-runner/run.sh --once
+. /opt/actions-runner/run.sh --once
