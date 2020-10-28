@@ -1,5 +1,5 @@
 IMAGE_NAME ?= inloco/kube-actions
-IMAGE_VERSION ?= $(shell git describe --dirty --broken)
+IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -operator
 
 # Default rule
@@ -27,7 +27,7 @@ uninstall: manifests
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
-	cd ./config/manager && kustomize edit set image controller=$(IMAGE_REPOSITORY):$(IMAGE_VERSION)$(IMAGE_VARIANT)
+	cd ./config/manager && kustomize edit set image controller=$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
 	kustomize build ./config/default | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
@@ -51,13 +51,13 @@ docker: docker-build docker-tag docker-push
 
 # Build the docker image
 docker-build:
-	docker build --tag $(IMAGE_REPOSITORY):$(IMAGE_VERSION)$(IMAGE_VARIANT) .
+	docker build --build-arg VER=$(IMAGE_VERSION) --tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT) .
 
 # Tag the docker image
 docker-tag:
-	docker tag $(IMAGE_REPOSITORY):$(IMAGE_VERSION)$(IMAGE_VARIANT) $(IMAGE_REPOSITORY):$(IMAGE_VERSION)
+	docker tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT) $(IMAGE_NAME):$(IMAGE_VERSION)
 
 # Push the docker image
 docker-push:
-	docker push $(IMAGE_REPOSITORY):$(IMAGE_VERSION)$(IMAGE_VARIANT)
-	docker push $(IMAGE_REPOSITORY):$(IMAGE_VERSION)
+	docker push $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
+	docker push $(IMAGE_NAME):$(IMAGE_VERSION)
