@@ -184,11 +184,14 @@ func getNewContainersInfo(docker *client.Client) chan containerInfo {
 						info, ok := containerInfoByID[msg.ID]
 						if !ok {
 							fmt.Printf("Uknown container event: %s\n", msg.ID)
+						} else {
+							if kind == containerDestroy {
+								delete(containerInfoByID, msg.ID)
+							}
+
+							info.kind = kind
+							c <- info
 						}
-						if kind == containerDestroy {
-							delete(containerInfoByID, msg.ID)
-						}
-						c <- info
 					}
 				}
 			}
