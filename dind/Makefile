@@ -1,5 +1,6 @@
-IMAGE_REPOSITORY ?= inloco/kube-actions
-IMAGE_VERSION ?= 0.0.1
+IMAGE_NAME ?= inloco/kube-actions
+IMAGE_VERSION ?= $(shell git describe --dirty --broken)
+IMAGE_VARIANT ?= -dind
 
 DOCKER_VERSION ?= 19.03
 
@@ -8,13 +9,13 @@ docker: docker-build docker-tag docker-push
 
 # Build the docker image
 docker-build:
-	docker build --build-arg DOCKER_VERSION=$(DOCKER_VERSION) --tag $(IMAGE_REPOSITORY):$(IMAGE_VERSION)-dind-$(DOCKER_VERSION) .
+	docker build --build-arg DOCKER_VERSION=$(DOCKER_VERSION) --tag $(IMAGE_REPOSITORY):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION) .
 
 # Tag the docker image
 docker-tag:
-	docker tag $(IMAGE_REPOSITORY):$(IMAGE_VERSION)-dind-$(DOCKER_VERSION) $(IMAGE_REPOSITORY):$(IMAGE_VERSION)-dind
+	docker tag $(IMAGE_REPOSITORY):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION) $(IMAGE_REPOSITORY):$(IMAGE_VERSION)$(IMAGE_VARIANT)
 
 # Push the docker image
 docker-push:
-	docker push $(IMAGE_REPOSITORY):$(IMAGE_VERSION)-dind-$(DOCKER_VERSION)
-	docker push $(IMAGE_REPOSITORY):$(IMAGE_VERSION)-dind
+	docker push $(IMAGE_REPOSITORY):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION)
+	docker push $(IMAGE_REPOSITORY):$(IMAGE_VERSION)$(IMAGE_VARIANT)
