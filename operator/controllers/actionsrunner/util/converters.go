@@ -19,8 +19,10 @@ package util
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"github.com/inloco/kube-actions/operator/constants"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
+)
+
+var (
+	runnerImageName    = EnvVar("KUBEACTIONS_RUNNER_IMAGE_NAME", "inloco/kube-actions")
+	runnerImageVersion = EnvVar("KUBEACTIONS_RUNNER_IMAGE_VERSION", constants.Ver())
+	runnerImageVariant = EnvVar("KUBEACTIONS_RUNNER_IMAGE_VARIANT", "-runner")
+
+	dindImageName    = EnvVar("KUBEACTIONS_DIND_IMAGE_NAME", "inloco/kube-actions")
+	dindImageVersion = EnvVar("KUBEACTIONS_DIND_IMAGE_VERSION", constants.Ver())
+	dindImageVariant = EnvVar("KUBEACTIONS_DIND_IMAGE_VARIANT", "-dind")
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -287,7 +299,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 					Containers: []corev1.Container{
 						corev1.Container{
 							Name:  "runner",
-							Image: "inloco/kube-actions:runner",
+							Image: fmt.Sprintf("%s:%s%s", runnerImageName, runnerImageVersion, runnerImageVariant),
 							EnvFrom: FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
 								return envFromSource.SecretRef == nil
 							}),
@@ -395,7 +407,7 @@ func addDockerCapability(job *batchv1.Job) {
 
 	podSpec.Containers = append(podSpec.Containers, corev1.Container{
 		Name:  "dind",
-		Image: "inloco/kube-actions:dind",
+		Image: fmt.Sprintf("%s:%s%s", dindImageName, dindImageVersion, dindImageVariant),
 		Args: []string{
 			"--add-runtime", "crun=/usr/local/bin/crun",
 			"--default-runtime", "crun",
