@@ -335,8 +335,8 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 								},
 								corev1.VolumeMount{
 									Name:      "persistent-volume-claim",
-									MountPath: "/home",
-									SubPath:   "home",
+									MountPath: "/home/user",
+									SubPath:   "user",
 								},
 							},
 							ImagePullPolicy: corev1.PullAlways,
@@ -449,11 +449,6 @@ func addDockerCapability(job *batchv1.Job) {
 	podSpec.Containers = append(podSpec.Containers, corev1.Container{
 		Name:  "dind",
 		Image: fmt.Sprintf("%s:%s%s", dindImageName, dindImageVersion, dindImageVariant),
-		Args: []string{
-			"--add-runtime", "crun=/usr/local/bin/crun",
-			"--default-runtime", "crun",
-			"--experimental",
-		},
 		Env: []corev1.EnvVar{
 			corev1.EnvVar{
 				Name:  "DOCKER_TLS_CERTDIR",

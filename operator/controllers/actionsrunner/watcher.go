@@ -92,6 +92,16 @@ func (wc *WatcherCollection) watch(ctx context.Context, log logr.Logger, actions
 
 	log.Info("Job Completed")
 
+	var job batchv1.Job
+	if err := wc.Get(ctx, objectKey, &job); client.IgnoreNotFound(err) != nil {
+		log.Error(err, "wc.Get")
+	}
+
+	if job.Status.Failed > 0 {
+		log.Info("Recovering from Failed Job")
+		time.Sleep(time.Minute)
+	}
+
 	if err := wc.Delete(ctx, actionsRunnerJob, deleteOpts...); err != nil {
 		log.Error(err, "wc.Delete")
 	}
