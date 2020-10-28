@@ -375,8 +375,14 @@ func withRuntimeAffinity(affinity *corev1.Affinity) *corev1.Affinity {
 	}
 	nodeSelector := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 
-	nodeSelector.NodeSelectorTerms = append(nodeSelector.NodeSelectorTerms, corev1.NodeSelectorTerm{
-		MatchExpressions: []corev1.NodeSelectorRequirement{
+	if len(nodeSelector.NodeSelectorTerms) == 0 {
+		nodeSelector.NodeSelectorTerms = append(nodeSelector.NodeSelectorTerms, corev1.NodeSelectorTerm{})
+	}
+	nodeSelectorTerms := nodeSelector.NodeSelectorTerms
+
+	for i, nodeSelectorTerm := range nodeSelectorTerms {
+		nodeSelectorTerms[i].MatchExpressions = append(
+			nodeSelectorTerm.MatchExpressions,
 			corev1.NodeSelectorRequirement{
 				Key:      "kubernetes.io/os",
 				Operator: corev1.NodeSelectorOpIn,
@@ -391,8 +397,8 @@ func withRuntimeAffinity(affinity *corev1.Affinity) *corev1.Affinity {
 					constants.Arch(),
 				},
 			},
-		},
-	})
+		)
+	}
 
 	return affinity
 }
