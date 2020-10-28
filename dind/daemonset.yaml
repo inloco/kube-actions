@@ -19,7 +19,7 @@ spec:
           image: multiarch/qemu-user-static
           args:
             - --reset
-            - -p
+            - --persistent
             - 'yes'
           resources:
             requests:
