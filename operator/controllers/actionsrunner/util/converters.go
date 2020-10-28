@@ -335,8 +335,8 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 								},
 								corev1.VolumeMount{
 									Name:      "persistent-volume-claim",
-									MountPath: "/home",
-									SubPath:   "home",
+									MountPath: "/home/user",
+									SubPath:   "user",
 								},
 							},
 							ImagePullPolicy: corev1.PullAlways,
