@@ -138,16 +138,19 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <
 		}
 		defer w.adoFacade.DeinitAzureDevOpsTaskAgentSession(ctx)
 
+		var lastMessageId *uint64
 		for !w.isClosed() {
 			w.log.Info("Getting Message")
 
-			taMessage, err := w.adoFacade.GetMessage(ctx)
+			taMessage, err := w.adoFacade.GetMessage(ctx, lastMessageId)
 			if err != nil {
 				panic(err)
 			}
 			if taMessage == nil {
 				continue
 			}
+
+			lastMessageId = taMessage.MessageId
 
 			message, err := toMessage(*taMessage)
 			if err != nil {
