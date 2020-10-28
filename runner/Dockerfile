@@ -7,7 +7,7 @@ ARG RUNNER_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
-    apt-get install -y apt-transport-https busybox ca-certificates curl git gnupg-agent iputils-ping jq software-properties-common && \
+    apt-get install -y apt-transport-https busybox ca-certificates curl git gnupg-agent iputils-ping jq software-properties-common zstd && \
     busybox --install && \
     curl -L https://download.docker.com/linux/ubuntu/gpg | \
     apt-key add - && \
