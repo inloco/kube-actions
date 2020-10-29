@@ -53,6 +53,11 @@ then
 		echo '{}' > ${CONF}
 	fi
 
+	if [ ! -z "${DOCKER_AUTHS}" ]
+	then
+		cat <<< $(jq --argjson _ "${DOCKER_AUTHS}" '.auths |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
+	fi
+
 	if [ ! -z "${DOCKER_CREDENTIAL_HELPERS}" ]
 	then
 		cat <<< $(jq --argjson _ "${DOCKER_CREDENTIAL_HELPERS}" '.credHelpers |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
