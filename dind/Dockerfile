@@ -21,6 +21,6 @@ USER rootless
 
 ENV DOCKERD_ROOTLESS_ROOTLESSKIT_NET slirp4netns
 ENV DOCKERD_ROOTLESS_ROOTLESSKIT_MTU 65520
-ENV DOCKERD_ENTRYPOINT_ARGS --add-runtime crun=/usr/local/bin/crun --default-runtime crun --experimental
+ENV DOCKERD_ENTRYPOINT_ARGS --add-runtime crun=/usr/local/bin/crun --default-runtime crun --experimental --registry-mirror=https://mirror.gcr.io
 
 ENTRYPOINT ["/sbin/init"]
