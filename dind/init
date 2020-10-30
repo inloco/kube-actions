@@ -8,7 +8,7 @@ set -ex
 } &
 
 
-# create iptables rules to make port-exporting containers reachable by any IP
+# create iptables rules and use socat proxy to make containers reachable by their IPs
 /sbin/docker-iptables-glue &
 
 set -- ${DOCKERD_ENTRYPOINT_ARGS} "${@}"
