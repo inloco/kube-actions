@@ -27,7 +27,8 @@ COPY --from=build /build/docker-iptables-glue /sbin/
 RUN chmod u+s /sbin/docker-iptables-glue
 
 USER rootless
-ENV DOCKERD_ROOTLESS_ROOTLESSKIT_NET=slirp4netns \
+ENV DOCKER_HOST=tcp://localhost:2375 \
+    DOCKERD_ROOTLESS_ROOTLESSKIT_NET=slirp4netns \
     DOCKERD_ROOTLESS_ROOTLESSKIT_MTU=65520 \
     DOCKERD_ENTRYPOINT_ARGS="--add-runtime crun=/usr/local/bin/crun --default-runtime crun --experimental --registry-mirror https://mirror.gcr.io"
 
