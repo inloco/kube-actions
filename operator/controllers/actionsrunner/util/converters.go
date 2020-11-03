@@ -451,10 +451,6 @@ func addDockerCapability(job *batchv1.Job) {
 		Image: fmt.Sprintf("%s:%s%s", dindImageName, dindImageVersion, dindImageVariant),
 		Env: []corev1.EnvVar{
 			corev1.EnvVar{
-				Name: "DOCKER_HOST",
-				Value: "tcp://localhost:2375",
-			},
-			corev1.EnvVar{
 				Name:  "DOCKER_TLS_CERTDIR",
 				Value: "",
 			},
