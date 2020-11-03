@@ -13,19 +13,17 @@ var (
 	logger = log.New(os.Stdout, "inloco-docker-agent: portproxy: ", 0)
 )
 
-type PID int
-
 type AddPortProxyRequest struct {
 	Proto     string
 	HostIP    string
 	HostPort  int
-	ChildPID  PID
+	ChildPID  int
 	ChildPort int
 }
 
 type Client interface {
-	AddPortProxy(request AddPortProxyRequest) (PID, error)
-	RemovePortProxy(pid PID) error
+	AddPortProxy(request AddPortProxyRequest) (int, error)
+	RemovePortProxy(pid int) error
 }
 
 type client struct {
@@ -35,10 +33,10 @@ func New() Client {
 	return &client{}
 }
 
-func (c *client) AddPortProxy(request AddPortProxyRequest) (PID, error) {
+func (c *client) AddPortProxy(request AddPortProxyRequest) (int, error) {
 	cmd := createSocatCommand(request)
 
-	pidc := make(chan PID)
+	pidc := make(chan int)
 	errc := make(chan error)
 
 	go func(cmd *exec.Cmd) {
@@ -46,7 +44,7 @@ func (c *client) AddPortProxy(request AddPortProxyRequest) (PID, error) {
 			errc <- err
 		}
 
-		pidc <- PID(cmd.Process.Pid)
+		pidc <- int(cmd.Process.Pid)
 		cmd.Wait()
 	}(cmd)
 
@@ -58,7 +56,7 @@ func (c *client) AddPortProxy(request AddPortProxyRequest) (PID, error) {
 	}
 }
 
-func (c *client) RemovePortProxy(pid PID) error {
+func (c *client) RemovePortProxy(pid int) error {
 	return syscall.Kill(int(pid), syscall.SIGKILL)
 }
 
