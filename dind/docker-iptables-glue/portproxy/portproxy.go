@@ -42,6 +42,7 @@ func (c *client) AddPortProxy(request AddPortProxyRequest) (int, error) {
 	go func(cmd *exec.Cmd) {
 		if err := cmd.Start(); err != nil {
 			errc <- err
+			return
 		}
 
 		pidc <- int(cmd.Process.Pid)
