@@ -13,7 +13,7 @@ USER root
 ENV CRUN_BASE_DOWNLOAD_PATH=https://github.com/containers/crun/releases/download \
     SLIRP4NETNS_BASE_DOWNLOAD_PATH=https://github.com/rootless-containers/slirp4netns/releases/download
 
-RUN apk add --no-cache iproute2 jq && \
+RUN apk add --no-cache iproute2 socat jq && \
     export CRUN_LATEST=$(wget -qO- https://api.github.com/repos/containers/crun/releases/latest | jq -r .tag_name) && \
     wget -qO /usr/local/bin/crun "${CRUN_BASE_DOWNLOAD_PATH}/${CRUN_LATEST}/crun-${CRUN_LATEST}-linux-amd64" && \
     export SLIRP4NETNS_LATEST=$(wget -qO- https://api.github.com/repos/rootless-containers/slirp4netns/releases/latest | jq -r .tag_name) && \
