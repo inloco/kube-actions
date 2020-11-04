@@ -220,8 +220,6 @@ func (gh *GitHub) GetGitHubInstallationToken(ctx context.Context) (string, error
 func (gh *GitHub) initGitHubClient(ctx context.Context) error {
 	token := githubPAT
 	if token == "" {
-		log.Print(`githubPAT == ""`)
-
 		githubIAT, err := gh.GetGitHubInstallationToken(ctx)
 		if err != nil {
 			return err

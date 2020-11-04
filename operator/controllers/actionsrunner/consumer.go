@@ -39,7 +39,7 @@ type Consumer struct {
 }
 
 func (c *Consumer) Consume(ctx context.Context) error {
-	ack, msg, err := c.wire.Channels(ctx)
+	ack, msg := c.wire.Channels(ctx)
 	select {
 	case msg := <-msg:
 		switch typ := msg.Type; typ {
@@ -52,8 +52,6 @@ func (c *Consumer) Consume(ctx context.Context) error {
 		default:
 			return fmt.Errorf("unknown MessageType(%s)", typ)
 		}
-	case err := <-err:
-		return err
 	default:
 		// don't wait for channels and return if there's nothing to be consumed
 		return nil

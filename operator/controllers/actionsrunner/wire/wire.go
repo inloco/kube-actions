@@ -42,7 +42,6 @@ type Wire struct {
 	loopClose    chan struct{}
 	loopAck      chan struct{}
 	loopMessages chan Message
-	loopErrors   chan error
 
 	gone bool
 }
@@ -75,10 +74,6 @@ func (w *Wire) Init(ctx context.Context) error {
 		w.loopMessages = make(chan Message)
 	}
 
-	if w.loopErrors == nil {
-		w.loopErrors = make(chan error)
-	}
-
 	return nil
 }
 
@@ -107,9 +102,9 @@ func (w *Wire) initDotFiles() error {
 	return nil
 }
 
-func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <-chan error) {
+func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 	if !w.isClosed() {
-		return w.loopAck, w.loopMessages, w.loopErrors
+		return w.loopAck, w.loopMessages
 	}
 
 	w.loopClose = make(chan struct{})
@@ -188,7 +183,7 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <
 		}
 	}()
 
-	return w.loopAck, w.loopMessages, w.loopErrors
+	return w.loopAck, w.loopMessages
 }
 
 func (w *Wire) Close() error {
