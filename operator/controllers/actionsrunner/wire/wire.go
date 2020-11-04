@@ -122,11 +122,12 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <
 
 		defer func() {
 			if r := recover(); r != nil {
+				err := fmt.Errorf("%v", r)
+				w.log.Error(err, err.Error())
+
 				w.events <- genericEvent
-				w.loopErrors <- fmt.Errorf("%v", r)
 
 				w.Close()
-				w.log.Info("Wire Closed")
 			}
 		}()
 
@@ -167,6 +168,10 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <
 			w.loopMessages <- *message
 			w.loopAck <- struct{}{}
 
+			if w.isClosed() {
+				break
+			}
+
 			if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
 				panic(err)
 			}
@@ -192,6 +197,9 @@ func (w *Wire) Close() error {
 	}
 
 	close(w.loopClose)
+	w.adoFacade.DeinitAzureDevOpsTaskAgentSession(context.Background())
+
+	w.log.Info("Wire Closed")
 	return nil
 }
 
