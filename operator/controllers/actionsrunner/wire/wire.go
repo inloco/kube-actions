@@ -180,6 +180,18 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 
 				w.log.Info("Message Deleted", "id", message.Id, "type", message.Type)
 			}
+
+			if message.Type == MessageTypeAgentRefresh {
+				w.log.Info("Deleting Agent", "id", message.Id, "type", message.Type)
+
+				if err := w.adoFacade.DeleteAgent(ctx); err != nil {
+					panic(err)
+				}
+
+				w.log.Info("Agent Deleted", "id", message.Id, "type", message.Type)
+
+				break
+			}
 		}
 	}()
 
