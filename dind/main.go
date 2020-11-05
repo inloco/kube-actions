@@ -4,31 +4,17 @@ import (
 	"log"
 	"os"
 
-	"github.com/inloco/docker-iptables-glue/docker"
-	"github.com/inloco/docker-iptables-glue/portproxy"
-	"github.com/inloco/docker-iptables-glue/common"
-
 	"github.com/coreos/go-iptables/iptables"
 )
 
-const (
-	resourceKindNetwork = iota
-	resourceKindContainer
-
-	resourceActionCreate
-	resourceActionDestroy
-	resourceActionStart
-	resourceActionStop
-)
-
 var (
-	cache = common.NewCache()
+	cache  = NewCache()
 	logger = log.New(os.Stdout, "inloco-docker-agent: ", 0)
 )
 
 func main() {
 	logger.Println("creating docker client")
-	docker, err := docker.New(logger, cache)
+	docker, err := NewDockerClient(logger, cache)
 	if err != nil {
 		logger.Panic(err)
 	}
@@ -46,7 +32,7 @@ func main() {
 	}
 
 	logger.Println("creating socat port proxy")
-	portProxy := portproxy.New()
+	portProxy := NewPortProxyClient()
 
 	logger.Println("waiting docker events")
 	networks, containers := docker.GetResourcesInfoFromEvents()
@@ -100,7 +86,7 @@ func main() {
 	}
 }
 
-func setupNetworkPortForward(iptables *iptables.IPTables, info common.NetworkInfo) error {
+func setupNetworkPortForward(iptables *iptables.IPTables, info NetworkInfo) error {
 	for _, subnet := range info.Subnets {
 		// iptables -t nat -A OUTPUT -d 172.16.0.0/16 -j NETMAP --to 127.1.0.0/16
 		if err := iptables.AppendUnique("nat", "OUTPUT", "-d", subnet.DockerSubnet, "-j", "NETMAP", "--to", subnet.HostProxySubnet); err != nil {
@@ -111,7 +97,7 @@ func setupNetworkPortForward(iptables *iptables.IPTables, info common.NetworkInf
 	return nil
 }
 
-func setdownNetworkPortForward(iptables *iptables.IPTables, info common.NetworkInfo) error {
+func setdownNetworkPortForward(iptables *iptables.IPTables, info NetworkInfo) error {
 	for _, subnet := range info.Subnets {
 		// iptables -t nat -D OUTPUT -d 172.16.0.0/16 -j NETMAP --to 127.1.0.0/16
 		if err := iptables.Delete("nat", "OUTPUT", "-d", subnet.DockerSubnet, "-j", "NETMAP", "--to", subnet.HostProxySubnet); err != nil {
@@ -122,10 +108,10 @@ func setdownNetworkPortForward(iptables *iptables.IPTables, info common.NetworkI
 	return nil
 }
 
-func setupContainerPortProxy(portProxy portproxy.Client, info common.ContainerInfo) error {
+func setupContainerPortProxy(portProxy *PortProxyClient, info ContainerInfo) error {
 	for _, ip := range info.IPs {
 		for _, spec := range info.Ports {
-			request := portproxy.AddPortProxyRequest{
+			request := AddPortProxyRequest{
 				Proto:     spec.Proto,
 				HostIP:    ip,
 				HostPort:  spec.Port,
@@ -146,7 +132,7 @@ func setupContainerPortProxy(portProxy portproxy.Client, info common.ContainerIn
 	return nil
 }
 
-func setdownContainerPortProxy(portProxy portproxy.Client, info common.ContainerInfo) error {
+func setdownContainerPortProxy(portProxy *PortProxyClient, info ContainerInfo) error {
 	for _, pid := range cache.GetProxyPortPIDs(info.ID) {
 		logger.Printf("portproxy: sending RemovePortProxy(%d) request\n", pid)
 		if err := portProxy.RemovePortProxy(pid); err != nil {

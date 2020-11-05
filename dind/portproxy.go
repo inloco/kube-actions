@@ -1,16 +1,11 @@
-package portproxy
+package main
 
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"syscall"
-)
-
-var (
-	logger = log.New(os.Stdout, "inloco-docker-agent: portproxy: ", 0)
 )
 
 type AddPortProxyRequest struct {
@@ -21,19 +16,14 @@ type AddPortProxyRequest struct {
 	ChildPort int
 }
 
-type Client interface {
-	AddPortProxy(request AddPortProxyRequest) (int, error)
-	RemovePortProxy(pid int) error
+type PortProxyClient struct {
 }
 
-type client struct {
+func NewPortProxyClient() *PortProxyClient {
+	return &PortProxyClient{}
 }
 
-func New() Client {
-	return &client{}
-}
-
-func (c *client) AddPortProxy(request AddPortProxyRequest) (int, error) {
+func (c *PortProxyClient) AddPortProxy(request AddPortProxyRequest) (int, error) {
 	cmd := createSocatCommand(request)
 
 	pidc := make(chan int)
@@ -57,7 +47,7 @@ func (c *client) AddPortProxy(request AddPortProxyRequest) (int, error) {
 	}
 }
 
-func (c *client) RemovePortProxy(pid int) error {
+func (c *PortProxyClient) RemovePortProxy(pid int) error {
 	return syscall.Kill(int(pid), syscall.SIGKILL)
 }
 
