@@ -1,11 +1,11 @@
 ARG DOCKER_VERSION
 
 FROM golang:1.15-alpine AS build
-WORKDIR /build
-COPY go.* ./
+WORKDIR /go/src/github.com/inloco/kube-actions/dind
+COPY go.mod go.sum ./
 RUN go mod download
-COPY . ./
-RUN CGO_ENABLED=0 GOOS=linux go build
+COPY ./*.go ./
+RUN CGO_ENABLED=0 go install -a -gcflags 'all=-N -l' -ldflags '-d -extldflags "-fno-PIC -static"' -tags 'netgo osusergo static_build' -trimpath -v ./...
 
 FROM docker:${DOCKER_VERSION}-dind-rootless
 USER root
@@ -22,7 +22,7 @@ RUN export CRUN_BASE_DOWNLOAD_PATH=https://github.com/containers/crun/releases/d
     chown rootless:rootless /opt/containerd /run/netns
 
 COPY ./init /sbin/
-COPY --from=build /build/dind /sbin/
+COPY --from=build /go/bin/dind /sbin/
 RUN chmod u+s /sbin/dind
 
 USER rootless
