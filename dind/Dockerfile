@@ -2,9 +2,9 @@ ARG DOCKER_VERSION
 
 FROM golang:alpine AS build
 WORKDIR /build
-COPY docker-iptables-glue/go.* ./
+COPY go.* ./
 RUN go mod download
-COPY docker-iptables-glue/ ./
+COPY . ./
 RUN CGO_ENABLED=0 GOOS=linux go build
 
 FROM docker:${DOCKER_VERSION}-dind-rootless
@@ -23,8 +23,8 @@ RUN apk add --no-cache iproute2 socat jq && \
     chown rootless:rootless /opt/containerd /run/netns
 
 COPY ./init /sbin/
-COPY --from=build /build/docker-iptables-glue /sbin/
-RUN chmod u+s /sbin/docker-iptables-glue
+COPY --from=build /build/dind /sbin/
+RUN chmod u+s /sbin/dind
 
 USER rootless
 ENV DOCKER_HOST=tcp://localhost:2375 \

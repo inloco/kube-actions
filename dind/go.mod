@@ -1,4 +1,4 @@
-module github.com/inloco/docker-iptables-glue
+module github.com/inloco/kube-actions/dind
 
 go 1.14
 

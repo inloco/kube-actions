@@ -1,4 +1,4 @@
-package docker
+package main
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 
 	dockerTypes "github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
-	"github.com/inloco/docker-iptables-glue/common"
 )
 
 const (
@@ -48,18 +47,13 @@ var (
 	dockerSubnetOctetReplRegex = regexp.MustCompile(`^[0-9]{1,3}\.[0-9]{1,3}`)
 )
 
-type Client interface {
-	WaitForDockerd() error
-	GetResourcesInfoFromEvents() (chan common.NetworkInfo, chan common.ContainerInfo)
-}
-
-type client struct {
+type DockerClient struct {
 	logger *log.Logger
-	cache  common.Cache
+	cache  *Cache
 	docker *docker.Client
 }
 
-func New(logger *log.Logger, cache common.Cache) (Client, error) {
+func NewDockerClient(logger *log.Logger, cache *Cache) (*DockerClient, error) {
 	if dockerHost == "" {
 		return nil, errors.New("empty DOCKER_HOST")
 	}
@@ -70,14 +64,14 @@ func New(logger *log.Logger, cache common.Cache) (Client, error) {
 		return nil, err
 	}
 
-	return &client{
+	return &DockerClient{
 		logger: logger,
-		cache: cache,
+		cache:  cache,
 		docker: docker,
 	}, nil
 }
 
-func (c *client) WaitForDockerd() error {
+func (c *DockerClient) WaitForDockerd() error {
 	if !strings.HasPrefix(dockerHost, "tcp://") {
 		return errors.New("DOCKER_HOST not tcp://")
 	}
@@ -103,9 +97,9 @@ func (c *client) WaitForDockerd() error {
 	return nil
 }
 
-func (c *client) GetResourcesInfoFromEvents() (chan common.NetworkInfo, chan common.ContainerInfo) {
-	networks := make(chan common.NetworkInfo)
-	containers := make(chan common.ContainerInfo)
+func (c *DockerClient) GetResourcesInfoFromEvents() (chan NetworkInfo, chan ContainerInfo) {
+	networks := make(chan NetworkInfo)
+	containers := make(chan ContainerInfo)
 
 	go func() {
 		for {
@@ -142,16 +136,16 @@ func (c *client) GetResourcesInfoFromEvents() (chan common.NetworkInfo, chan com
 								c.logger.Printf("error inspecting network '%s': %+v\n", id, err)
 							}
 
-							subnets := []common.Subnet{}
+							subnets := []Subnet{}
 							for _, dockerSubnet := range dockerSubnets {
 								nextSecondOctet := c.markAndGetFirstAvailableHostSecondOctet()
 								hostProxyTwoOctets := fmt.Sprintf("%d.%d", hostProxySubnetFirstOctet, nextSecondOctet)
 								proxySubnet := dockerSubnetOctetReplRegex.ReplaceAllLiteralString(dockerSubnet, hostProxyTwoOctets)
-								subnet := common.Subnet{DockerSubnet: dockerSubnet, HostProxySubnet: proxySubnet, SecondOctet: nextSecondOctet}
+								subnet := Subnet{DockerSubnet: dockerSubnet, HostProxySubnet: proxySubnet, SecondOctet: nextSecondOctet}
 								subnets = append(subnets, subnet)
 							}
 
-							networkInfo := common.NetworkInfo{ID: id, Action: action, Subnets: subnets}
+							networkInfo := NetworkInfo{ID: id, Action: action, Subnets: subnets}
 							c.cache.AddNetworkInfo(networkInfo)
 							networks <- networkInfo
 							break
@@ -198,7 +192,7 @@ func (c *client) GetResourcesInfoFromEvents() (chan common.NetworkInfo, chan com
 								}
 							}
 
-							containerInfo := common.ContainerInfo{ID: id, Action: action, Pid: inspectInfo.Pid, Ports: inspectInfo.Ports, IPs: ips}
+							containerInfo := ContainerInfo{ID: id, Action: action, Pid: inspectInfo.Pid, Ports: inspectInfo.Ports, IPs: ips}
 							c.cache.AddContainerInfo(containerInfo)
 							containers <- containerInfo
 							break
@@ -220,7 +214,7 @@ func (c *client) GetResourcesInfoFromEvents() (chan common.NetworkInfo, chan com
 	return networks, containers
 }
 
-func (c *client) getNetworkSubnets(id string) ([]string, error) {
+func (c *DockerClient) getNetworkSubnets(id string) ([]string, error) {
 	info, err := c.docker.NetworkInspect(context.Background(), id)
 	if err != nil {
 		return nil, err
@@ -236,7 +230,7 @@ func (c *client) getNetworkSubnets(id string) ([]string, error) {
 	return subnets, nil
 }
 
-func (c *client) markAndGetFirstAvailableHostSecondOctet() int {
+func (c *DockerClient) markAndGetFirstAvailableHostSecondOctet() int {
 	available := false
 	i := 1
 
@@ -254,21 +248,21 @@ func (c *client) markAndGetFirstAvailableHostSecondOctet() int {
 	return i
 }
 
-func (c *client) getContainerInspectInfo(id string) (common.ContainerInspectInfo, error) {
+func (c *DockerClient) getContainerInspectInfo(id string) (ContainerInspectInfo, error) {
 	inspect, err := c.docker.ContainerInspect(context.Background(), id)
 	if err != nil {
-		return common.ContainerInspectInfo{}, err
+		return ContainerInspectInfo{}, err
 	}
 
-	ports := []common.Port{}
+	ports := []Port{}
 	for port := range inspect.NetworkSettings.Ports {
-		ports = append(ports, common.Port{
+		ports = append(ports, Port{
 			Proto: port.Proto(),
 			Port:  port.Int(),
 		})
 	}
 
-	info := common.ContainerInspectInfo{
+	info := ContainerInspectInfo{
 		Pid:   inspect.State.Pid,
 		Ports: ports,
 		Networks: []struct {
