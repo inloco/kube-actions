@@ -18,6 +18,9 @@ package actionsrunner
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/go-logr/logr"
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
@@ -52,6 +55,8 @@ type Reconciler struct {
 
 	watchers WatcherCollection
 	wires    wire.Collection
+
+	gone bool
 }
 
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunners,verbs=get;list;watch;create;update;patch;delete
@@ -69,6 +74,17 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.watchers.Init(r.Client)
 	r.wires.Init()
 
+	go func() {
+		stop := make(chan os.Signal)
+		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+		<-stop
+		close(stop)
+
+		r.gone = true
+		r.wires.Deinit()
+		r.watchers.Deinit()
+	}()
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&inlocov1alpha1.ActionsRunner{}).
 		Owns(&inlocov1alpha1.ActionsRunnerJob{}).
@@ -82,6 +98,11 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	if r.gone {
+		r.Log.Info("Reconciler Gone")
+		return ctrl.Result{}, nil
+	}
+
 	ctx := context.Background()
 	log := r.Log.WithValues("actionsrunner", req.NamespacedName)
 

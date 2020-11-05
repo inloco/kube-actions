@@ -41,6 +41,10 @@ func (wc *WatcherCollection) Init(client client.Client) {
 	wc.events = make(chan event.GenericEvent)
 }
 
+func (wc *WatcherCollection) Deinit() {
+	close(wc.events)
+}
+
 func (wc *WatcherCollection) EventSource() source.Source {
 	return &source.Channel{
 		Source: wc.events,
