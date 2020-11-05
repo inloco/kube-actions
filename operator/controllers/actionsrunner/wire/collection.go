@@ -38,6 +38,16 @@ func (c *Collection) Init() {
 	c.wireRegistry = make(map[client.ObjectKey]*Wire)
 }
 
+func (c *Collection) Deinit() {
+	close(c.eventChannel)
+
+	for _, wire := range c.wireRegistry {
+		if err := wire.Close(); err != nil {
+			wire.log.Error(err, err.Error())
+		}
+	}
+}
+
 func (c *Collection) EventSource() source.Source {
 	return &source.Channel{
 		Source: c.eventChannel,

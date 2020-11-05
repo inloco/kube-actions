@@ -42,7 +42,6 @@ type Wire struct {
 	loopClose    chan struct{}
 	loopAck      chan struct{}
 	loopMessages chan Message
-	loopErrors   chan error
 
 	gone bool
 }
@@ -75,10 +74,6 @@ func (w *Wire) Init(ctx context.Context) error {
 		w.loopMessages = make(chan Message)
 	}
 
-	if w.loopErrors == nil {
-		w.loopErrors = make(chan error)
-	}
-
 	return nil
 }
 
@@ -107,9 +102,9 @@ func (w *Wire) initDotFiles() error {
 	return nil
 }
 
-func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <-chan error) {
+func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 	if !w.isClosed() {
-		return w.loopAck, w.loopMessages, w.loopErrors
+		return w.loopAck, w.loopMessages
 	}
 
 	w.loopClose = make(chan struct{})
@@ -122,11 +117,12 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <
 
 		defer func() {
 			if r := recover(); r != nil {
+				err := fmt.Errorf("%v", r)
+				w.log.Error(err, err.Error())
+
 				w.events <- genericEvent
-				w.loopErrors <- fmt.Errorf("%v", r)
 
 				w.Close()
-				w.log.Info("Wire Closed")
 			}
 		}()
 
@@ -167,6 +163,10 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <
 			w.loopMessages <- *message
 			w.loopAck <- struct{}{}
 
+			if w.isClosed() {
+				break
+			}
+
 			if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
 				panic(err)
 			}
@@ -180,10 +180,22 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message, <
 
 				w.log.Info("Message Deleted", "id", message.Id, "type", message.Type)
 			}
+
+			if message.Type == MessageTypeAgentRefresh {
+				w.log.Info("Deleting Agent", "id", message.Id, "type", message.Type)
+
+				if err := w.adoFacade.DeleteAgent(ctx); err != nil {
+					panic(err)
+				}
+
+				w.log.Info("Agent Deleted", "id", message.Id, "type", message.Type)
+
+				break
+			}
 		}
 	}()
 
-	return w.loopAck, w.loopMessages, w.loopErrors
+	return w.loopAck, w.loopMessages
 }
 
 func (w *Wire) Close() error {
@@ -192,6 +204,9 @@ func (w *Wire) Close() error {
 	}
 
 	close(w.loopClose)
+	w.adoFacade.DeinitAzureDevOpsTaskAgentSession(context.Background())
+
+	w.log.Info("Wire Closed")
 	return nil
 }
 
