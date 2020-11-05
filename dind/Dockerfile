@@ -1,6 +1,6 @@
 ARG DOCKER_VERSION
 
-FROM golang:alpine AS build
+FROM golang:1.15-alpine AS build
 WORKDIR /build
 COPY go.* ./
 RUN go mod download
