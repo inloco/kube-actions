@@ -40,7 +40,7 @@ import (
 var (
 	agentNameTemplate = "KA %v %v"
 
-	agentVersion = "2.273.6"
+	agentVersion = "2.274.1"
 
 	agentLabelsBase = []string{
 		"self-hosted",
