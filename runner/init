@@ -48,7 +48,7 @@ then
 	}
 	trap pre-stop EXIT INT QUIT TERM
 
-	DOCKER_CONFIG=${DOCKER_CONFIG:-${HOME}/.docker}
+	export DOCKER_CONFIG=${DOCKER_CONFIG:-${HOME}/.docker}
 	if [ ! -d ${DOCKER_CONFIG} ]
 	then
 		mkdir -p ${DOCKER_CONFIG}
@@ -62,17 +62,17 @@ then
 
 	if [ ! -z "${DOCKER_AUTHS}" ]
 	then
-		cat <<< $(jq --argjson _ "${DOCKER_AUTHS}" '.auths |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
+		envsubst <<< $(jq --argjson _ "${DOCKER_AUTHS}" '.auths |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
 	fi
 
 	if [ ! -z "${DOCKER_CREDENTIAL_HELPERS}" ]
 	then
-		cat <<< $(jq --argjson _ "${DOCKER_CREDENTIAL_HELPERS}" '.credHelpers |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
+		envsubst <<< $(jq --argjson _ "${DOCKER_CREDENTIAL_HELPERS}" '.credHelpers |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
 	fi
 
 	if [ ! -z "${DOCKER_PLUGINS}" ]
 	then
-		cat <<< $(jq --argjson _ "${DOCKER_PLUGINS}" '.plugins |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
+		envsubst <<< $(jq --argjson _ "${DOCKER_PLUGINS}" '.plugins |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
 	fi
 fi
 
