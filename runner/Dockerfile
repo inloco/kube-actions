@@ -9,7 +9,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     export $(cat /etc/os-release | sed 's/"//g') && \
     unset IFS && \
     apt-get update && \
-    apt-get install -y apt-transport-https busybox ca-certificates curl git gnupg-agent iputils-ping jq make python3 python3-distutils software-properties-common sudo zstd && \
+    apt-get install -y apt-transport-https busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make python3 python3-distutils software-properties-common sudo zstd && \
     curl -Lf https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
     curl -Lf "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/Release.key" | sudo apt-key add - && \
