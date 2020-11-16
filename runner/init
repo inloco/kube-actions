@@ -4,6 +4,13 @@ set -ex
 git config --global user.name github-actions[bot]
 git config --global user.email 41898282+github-actions[bot]@users.noreply.github.com
 
+if RESP=$(aws sts get-caller-identity 2> /dev/null)
+then
+	export AWS_STS_CALLER_ACCOUNT=$(printf ${RESP} | jq -r '.Account')
+	export AWS_STS_CALLER_ARN=$(printf ${RESP} | jq -r '.Arn')
+	export AWS_STS_CALLER_ID=$(printf ${RESP} | jq -r '.UserId')
+fi
+
 if [ ! -z "${DOCKER_HOST}" ]
 then
 	PROT=$(printf ${DOCKER_HOST} | sed -En 's|^(.+)://.+$|\1|p')
