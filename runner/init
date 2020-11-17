@@ -6,9 +6,9 @@ git config --global user.email 41898282+github-actions[bot]@users.noreply.github
 
 if RESP=$(aws sts get-caller-identity 2> /dev/null)
 then
-	export AWS_ACCOUNT=$(printf ${RESP} | jq -r '.Account')
-	export AWS_CALLER_ARN=$(printf ${RESP} | jq -r '.Arn')
-	export AWS_CALLER_ID=$(printf ${RESP} | jq -r '.UserId')
+	export AWS_ACCOUNT=$(printf "${RESP}" | jq -r '.Account')
+	export AWS_CALLER_ARN=$(printf "${RESP}" | jq -r '.Arn')
+	export AWS_CALLER_ID=$(printf "${RESP}" | jq -r '.UserId')
 fi
 
 if [ ! -z "${DOCKER_HOST}" ]
