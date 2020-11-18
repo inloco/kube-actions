@@ -24,3 +24,13 @@ docker-push:
 	docker push $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(RUNNER_VERSION)
 	docker push $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(UBUNTU_VERSION)
 	docker push $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
+
+docker-save:
+	docker save $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(RUNNER_VERSION)-$(UBUNTU_VERSION) > ./image.tar
+
+docker-load:
+	docker load < ./image.tar
+
+continuous-build: docker-build docker-save
+
+continuous-push: docker-load docker-tag docker-push
