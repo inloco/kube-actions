@@ -9,7 +9,7 @@ set -ex
 
 
 # create iptables rules and use socat proxy to make containers reachable by their IPs
-/sbin/docker-iptables-glue &
+/sbin/dind &
 
 set -- ${DOCKERD_ENTRYPOINT_ARGS} "${@}"
 . /usr/local/bin/dockerd-entrypoint.sh "${@}"
