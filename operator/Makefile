@@ -61,3 +61,13 @@ docker-tag:
 docker-push:
 	docker push $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
 	docker push $(IMAGE_NAME):$(IMAGE_VERSION)
+
+docker-save:
+	docker save $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT) > ./image.tar
+
+docker-load:
+	docker load < ./image.tar
+
+continuous-build: docker-build docker-save
+
+continuous-push: docker-load docker-tag docker-push
