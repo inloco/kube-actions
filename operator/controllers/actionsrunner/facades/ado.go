@@ -29,6 +29,7 @@ import (
 	"runtime"
 
 	"github.com/google/uuid"
+	"github.com/inloco/kube-actions/operator/constants"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
@@ -40,7 +41,7 @@ import (
 var (
 	agentNameTemplate = "KA %v %v"
 
-	agentVersion = "2.274.2"
+	agentVersion = constants.API()
 
 	agentLabelsBase = []string{
 		"self-hosted",
