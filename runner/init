@@ -4,6 +4,11 @@ set -ex
 git config --global user.name github-actions[bot]
 git config --global user.email 41898282+github-actions[bot]@users.noreply.github.com
 
+if [ -z "${AWS_REGION}" ]
+then
+	export AWS_REGION=$(curl -Lf http://169.254.169.254/latest/meta-data/placement/region)
+fi
+
 if RESP=$(aws sts get-caller-identity 2> /dev/null)
 then
 	export AWS_ACCOUNT=$(printf "${RESP}" | jq -r '.Account')
