@@ -463,6 +463,11 @@ func addDockerCapability(job *batchv1.Job) {
 			},
 			corev1.VolumeMount{
 				Name:      "persistent-volume-claim",
+				MountPath: "/home/rootless/.local/share/docker",
+				SubPath:   "dind/.local/share/docker",
+			},
+			corev1.VolumeMount{
+				Name:      "persistent-volume-claim",
 				MountPath: "/opt/actions-runner/_work",
 				SubPath:   "runner",
 			},
