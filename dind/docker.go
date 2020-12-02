@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
+	"os/exec"
+	"os/signal"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	dockerTypes "github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/mount"
 )
 
 const (
@@ -71,30 +74,85 @@ func NewDockerClient(logger *log.Logger, cache *Cache) (*DockerClient, error) {
 	}, nil
 }
 
-func (c *DockerClient) WaitForDockerd() error {
-	if !strings.HasPrefix(dockerHost, "tcp://") {
-		return errors.New("DOCKER_HOST not tcp://")
-	}
-
-	connected := false
-	ipAndPort := strings.TrimPrefix(dockerHost, "tcp://")
-	for i := 0; i < 15; i++ {
-		c.logger.Printf("trying to connect to dockerd on %s\n", ipAndPort)
-		conn, err := net.DialTimeout("tcp", ipAndPort, time.Second)
-		if err == nil && conn != nil {
-			defer conn.Close()
-			c.logger.Printf("connected to dockerd successfully")
-			connected = true
-			break
+func (c *DockerClient) PatchRuntimeDirs() error {
+	for _, dir := range []string{"/var/lib/docker", "/home/rootless/.local/share/docker"} {
+		if err := mount.Unmount(dir); err != nil {
+			return err
 		}
-		time.Sleep(time.Second)
-	}
 
-	if !connected {
-		return fmt.Errorf("connection to dockerd on %s failed", ipAndPort)
+		if err := os.Chown(dir, os.Getuid(), os.Getgid()); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func (c *DockerClient) StartDockerd() (chan error, error) {
+	logger.Println("looking for dockerd-entrypoint.sh")
+	path, err := exec.LookPath("dockerd-entrypoint.sh")
+	if err != nil {
+		return nil, err
+	}
+
+	args := append([]string{path}, os.Args[1:]...)
+
+	logger.Println("looking for DOCKERD_ENTRYPOINT_ARGS")
+	env, ok := os.LookupEnv("DOCKERD_ENTRYPOINT_ARGS")
+	if ok {
+		args = append(args, strings.Split(env, " ")...)
+	}
+
+	logger.Println("starting dockerd-entrypoint.sh")
+	cmd := exec.Cmd{
+		Path:   path,
+		Args:   args,
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+
+		SysProcAttr: &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid: uint32(syscall.Getuid()),
+				Gid: uint32(syscall.Getgid()),
+			},
+			Pdeathsig: syscall.SIGINT,
+		},
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	wait := make(chan error)
+	go func() {
+		wait <- cmd.Wait()
+	}()
+
+	signals := make(chan os.Signal, 1)
+	go func() {
+		for sig := range signals {
+			if err := cmd.Process.Signal(sig); err != nil {
+				logger.Print(err)
+			}
+		}
+	}()
+	signal.Notify(signals)
+
+	return wait, nil
+}
+
+func (c *DockerClient) WaitForDockerd() error {
+	var err error
+	for i := 0; i < 15; i++ {
+		_, err = c.docker.ServerVersion(context.Background())
+		if err == nil {
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	return err
 }
 
 func (c *DockerClient) GetResourcesInfoFromEvents() (chan NetworkInfo, chan ContainerInfo) {

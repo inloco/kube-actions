@@ -1,89 +1,135 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"log"
+	"net"
 	"os"
+	"os/exec"
+	"syscall"
 
 	"github.com/coreos/go-iptables/iptables"
 )
 
 var (
 	cache  = NewCache()
-	logger = log.New(os.Stdout, "inloco-docker-agent: ", 0)
+	logger = log.New(os.Stdout, "kube-actions[dind]: ", log.LstdFlags)
 )
 
 func main() {
+	logger.Println("listening for interrupt")
+	if err := listenForInterrupt(); err != nil {
+		logger.Panic(err)
+	}
+
 	logger.Println("creating docker client")
 	docker, err := NewDockerClient(logger, cache)
 	if err != nil {
 		logger.Panic(err)
 	}
 
-	logger.Println("waiting for dockerd")
-	err = docker.WaitForDockerd()
+	logger.Println("patching runtime dirs")
+	if err := docker.PatchRuntimeDirs(); err != nil {
+		logger.Panic(err)
+	}
+
+	logger.Println("starting dockerd")
+	cmdWait, err := docker.StartDockerd()
 	if err != nil {
 		logger.Panic(err)
 	}
 
-	logger.Println("creating iptables handle")
+	logger.Println("waiting for dockerd")
+	if err := docker.WaitForDockerd(); err != nil {
+		logger.Panic(err)
+	}
+
+	logger.Println("creating iptables client")
 	iptables, err := iptables.New()
 	if err != nil {
 		logger.Panic(err)
 	}
 
-	logger.Println("creating socat port proxy")
+	logger.Println("creating port proxy")
 	portProxy := NewPortProxyClient()
 
-	logger.Println("waiting docker events")
+	logger.Println("waiting for docker events")
 	networks, containers := docker.GetResourcesInfoFromEvents()
-	for networks != nil && containers != nil {
+
+Loop:
+	for {
 		select {
+		case err := <-cmdWait:
+			if err == nil {
+				break Loop
+			}
+			if exitError, ok := err.(*exec.ExitError); ok {
+				if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
+					os.Exit(waitStatus.ExitStatus())
+				}
+			}
+			logger.Panic(err)
+
 		case networkInfo, ok := <-networks:
 			if !ok {
-				networks = nil
-				continue
+				break Loop
 			}
-
 			switch networkInfo.Action {
 			case resourceActionCreate:
 				logger.Printf("network created: %+v\n", networkInfo)
 				if err := setupNetworkPortForward(iptables, networkInfo); err != nil {
-					logger.Printf("error in network port-forward setup: %+v\n", err)
+					logger.Panic(fmt.Errorf("error in network port-forward setup: %w", err))
 				}
-				break
-
 			case resourceActionDestroy:
 				logger.Printf("network destroyed: %+v\n", networkInfo)
 				if err := setdownNetworkPortForward(iptables, networkInfo); err != nil {
-					logger.Printf("error in network port-forward setdown: %+v\n", err)
+					logger.Print(fmt.Errorf("error in network port-forward setdown: %w", err))
 				}
-				break
 			}
-			break
 
 		case containerInfo, ok := <-containers:
 			if !ok {
-				containers = nil
-				continue
+				break Loop
 			}
-
 			switch containerInfo.Action {
 			case resourceActionStart:
 				logger.Printf("container started: %+v\n", containerInfo)
 				if err := setupContainerPortProxy(portProxy, containerInfo); err != nil {
-					logger.Printf("error in port-forward setup: %+v\n", err)
+					logger.Panic(fmt.Errorf("error in port-forward setup: %w", err))
 				}
-				break
-
 			case resourceActionStop:
 				logger.Printf("container stopped: %+v\n", containerInfo)
 				if err := setdownContainerPortProxy(portProxy, containerInfo); err != nil {
-					logger.Printf("error in port-forward setdown: %+v\n", err)
+					logger.Print(fmt.Errorf("error in port-forward setdown: %w", err))
 				}
 			}
-			break
 		}
 	}
+}
+
+func listenForInterrupt() error {
+	listener, err := net.Listen("tcp", ":2378")
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			logger.Panic(err)
+		}
+
+		for _, closer := range []io.Closer{conn, listener} {
+			if err := closer.Close(); err != nil {
+				logger.Panic(err)
+			}
+		}
+
+		os.Exit(0)
+	}()
+
+	return nil
 }
 
 func setupNetworkPortForward(iptables *iptables.IPTables, info NetworkInfo) error {
