@@ -1,0 +1,20 @@
+# permissions for end users to view actionsrunnerreplicasets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: actionsrunnerreplicaset-viewer-role
+rules:
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunnerreplicasets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunnerreplicasets/status
+  verbs:
+  - get
