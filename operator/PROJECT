@@ -3,6 +3,9 @@ repo: github.com/inloco/kube-actions/operator
 resources:
   - group: inloco.com.br
     version: v1alpha1
+    kind: ActionsRunnerReplicaSet
+  - group: inloco.com.br
+    version: v1alpha1
     kind: ActionsRunner
   - group: inloco.com.br
     version: v1alpha1
