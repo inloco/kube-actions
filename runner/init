@@ -6,7 +6,7 @@ git config --global user.email 41898282+github-actions[bot]@users.noreply.github
 
 if [ -z "${AWS_REGION}" ]
 then
-	export AWS_REGION=$(curl -Lf http://169.254.169.254/latest/meta-data/placement/region)
+	export AWS_REGION=$(curl -Lf http://instance-data.ec2.internal/latest/meta-data/placement/region)
 fi
 
 if RESP=$(aws sts get-caller-identity 2> /dev/null)
