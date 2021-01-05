@@ -11,32 +11,69 @@ rules:
   resources:
   - configmaps
   verbs:
+  - create
+  - delete
   - get
+  - list
   - patch
+  - update
   - watch
 - apiGroups:
   - ""
   resources:
   - persistentvolumeclaims
   verbs:
+  - create
+  - delete
+  - get
+  - list
   - patch
+  - update
   - watch
 - apiGroups:
   - ""
   resources:
   - secrets
   verbs:
+  - create
+  - delete
   - get
+  - list
   - patch
+  - update
   - watch
 - apiGroups:
   - batch
   resources:
   - jobs
   verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunner
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunner/status
+  verbs:
   - get
   - patch
-  - watch
+  - update
 - apiGroups:
   - inloco.com.br
   resources:
@@ -53,6 +90,26 @@ rules:
   - inloco.com.br
   resources:
   - actionsrunnerjobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunnerreplicasets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inloco.com.br
+  resources:
+  - actionsrunnerreplicasets/status
   verbs:
   - get
   - patch

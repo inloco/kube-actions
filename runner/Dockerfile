@@ -31,6 +31,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     export KUBERNETES_VERSION=$(curl -Lf https://storage.googleapis.com/kubernetes-release/release/stable.txt) && \
     curl -Lfo /usr/local/bin/kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl" && \
     chmod 0755 /usr/local/bin/kubectl && \
+    curl -Lfo /usr/local/bin/ec2-metadata http://s3.amazonaws.com/ec2metadata/ec2-metadata && \
+    chmod 0755 /usr/local/bin/ec2-metadata && \
     curl -Lfo /tmp/awscli-exe-linux-x86_64.zip https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip && \
     unzip /tmp/awscli-exe-linux-x86_64.zip -d /tmp && \
     /tmp/aws/install && \

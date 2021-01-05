@@ -21,6 +21,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerreplicaset"
+
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerjob"
@@ -68,6 +70,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&actionsrunnerreplicaset.Reconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ActionsRunnerReplicaSet"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ActionsRunnerReplicaSet")
+		os.Exit(1)
+	}
 	if err = (&actionsrunner.Reconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("actionsRunner"),
@@ -92,5 +102,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	<-time.After(2 * time.Second)
+	time.Sleep(2 * time.Second)
 }
