@@ -22,7 +22,8 @@ type Credentials struct {
 }
 
 type CredentialsData struct {
-	ClientId         string `json:"clientId"`
-	AuthorizationURL string `json:"authorizationUrl"`
-	OAuthEndpointURL string `json:"oauthEndpointUrl"`
+	ClientId                string `json:"clientId"`
+	AuthorizationURL        string `json:"authorizationUrl"`
+	OAuthEndpointURL        string `json:"oauthEndpointUrl"`
+	RequireFipsCryptography string `json:"requireFipsCryptography"`
 }
