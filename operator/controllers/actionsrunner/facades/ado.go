@@ -23,6 +23,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -268,6 +269,11 @@ func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, runner *do
 	runner.Credentials.Data.AuthorizationURL = *agent.Authorization.AuthorizationUrl
 	runner.Credentials.Data.OAuthEndpointURL = *agent.Authorization.AuthorizationUrl
 
+	runner.Credentials.Data.RequireFipsCryptography = "False"
+	if v := util.GetPropertyValue(agent.Properties, "RequireFipsCryptography"); v == true {
+		runner.Credentials.Data.RequireFipsCryptography = "True"
+	}
+
 	ado.TaskAgent = agent
 	return nil
 }
@@ -374,7 +380,12 @@ func (ado *AzureDevOps) InitAzureDevOpsTaskAgentSession(ctx context.Context) err
 		return nil
 	}
 
-	encryptionKey, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, ado.RSAPrivateKey, *session.EncryptionKey.Value, nil)
+	hash := sha1.New()
+	if *session.UseFipsEncryption {
+		hash = sha256.New()
+	}
+
+	encryptionKey, err := rsa.DecryptOAEP(hash, rand.Reader, ado.RSAPrivateKey, *session.EncryptionKey.Value, nil)
 	if err != nil {
 		return err
 	}
