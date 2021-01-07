@@ -1,0 +1,17 @@
+name: Upgrade
+on:
+  schedule:
+    - cron: '* * * * *'
+jobs:
+  upgrade:
+    name: Upgrade
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git Config
+        run: |
+          git config --global user.name github-actions[bot]
+          git config --global user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Upgrade
+        run: make continuous-upgrade
