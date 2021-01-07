@@ -2,6 +2,8 @@ IMAGE_NAME ?= inloco/kube-actions
 IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -operator
 
+AGENT_VERSION ?= 2.274.2
+
 # Default rule
 all: manager
 
@@ -51,7 +53,7 @@ docker: docker-build docker-tag docker-push
 
 # Build the docker image
 docker-build:
-	docker build --build-arg VER=$(IMAGE_VERSION) --tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT) .
+	docker build --build-arg VER=$(IMAGE_VERSION) --build-arg API=$(AGENT_VERSION) --tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT) .
 
 # Tag the docker image
 docker-tag:

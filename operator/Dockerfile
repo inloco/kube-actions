@@ -9,7 +9,8 @@ COPY ./api/ ./api/
 COPY ./constants/ ./constants/
 COPY ./controllers/ ./controllers/
 ARG VER
-RUN CGO_ENABLED=0 go install -a -ldflags '-d -extldflags "-fno-PIC -static" -X github.com/inloco/kube-actions/operator/constants.ver='${VER} -tags 'netgo osusergo static_build' -trimpath -v ./...
+ARG API
+RUN CGO_ENABLED=0 go install -a -ldflags '-d -extldflags "-fno-PIC -static" -X github.com/inloco/kube-actions/operator/constants.ver='${VER}' -X github.com/inloco/kube-actions/operator/constants.api='${API} -tags 'netgo osusergo static_build' -trimpath -v ./...
 
 FROM gcr.io/distroless/static:nonroot AS runtime
 COPY --from=build /go/bin/dlv /usr/local/bin/dlv
