@@ -1,4 +1,5 @@
 FROM golang:1.15 AS build
+RUN CGO_ENABLED=0 go get -v github.com/go-delve/delve/cmd/dlv
 WORKDIR /go/src/github.com/inloco/kube-actions/operator
 COPY ./go.mod ./go.mod
 COPY ./go.sum ./go.sum
@@ -8,8 +9,9 @@ COPY ./api/ ./api/
 COPY ./constants/ ./constants/
 COPY ./controllers/ ./controllers/
 ARG VER
-RUN CGO_ENABLED=0 go install -a -ldflags '-d -extldflags "-fno-PIC -static" -s -w -X github.com/inloco/kube-actions/operator/constants.ver='${VER} -tags 'netgo osusergo static_build' -trimpath -v ./...
+RUN CGO_ENABLED=0 go install -a -ldflags '-d -extldflags "-fno-PIC -static" -X github.com/inloco/kube-actions/operator/constants.ver='${VER} -tags 'netgo osusergo static_build' -trimpath -v ./...
 
 FROM gcr.io/distroless/static:nonroot AS runtime
+COPY --from=build /go/bin/dlv /usr/local/bin/dlv
 COPY --from=build /go/bin/operator /manager
 ENTRYPOINT ["/manager"]
