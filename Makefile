@@ -1,5 +1,6 @@
 .ONESHELL:
 .SHELLFLAGS = -o pipefail -ec
+SHELL = /bin/bash
 
 dind/% operator/% runner/%:
 	$(MAKE) -C $(@D) $(@F)
