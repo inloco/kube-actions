@@ -3,7 +3,7 @@ module github.com/inloco/kube-actions/operator
 go 1.15
 
 require (
-	github.com/go-logr/logr v0.1.0
+	github.com/go-logr/logr v0.3.0
 	github.com/google/go-github/v32 v32.1.0
 	github.com/google/uuid v1.1.4
 	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b3
