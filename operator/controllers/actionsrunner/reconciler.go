@@ -107,7 +107,10 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("actionsrunner", req.NamespacedName)
 
 	var actionsRunner inlocov1alpha1.ActionsRunner
-	if err := r.Get(ctx, req.NamespacedName, &actionsRunner); err != nil {
+	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
+	case apierrors.IsNotFound(err):
+		return ctrl.Result{}, r.wires.TryClose(&actionsRunner)
+	case err != nil:
 		return ctrl.Result{}, err
 	}
 
