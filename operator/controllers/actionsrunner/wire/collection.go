@@ -19,6 +19,7 @@ package wire
 import (
 	"context"
 	"errors"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
@@ -65,7 +66,13 @@ func (c *Collection) WireFor(ctx context.Context, log logr.Logger, actionsRunner
 	}
 
 	if wire, ok := c.wireRegistry[namespacedName]; ok && !wire.gone {
-		return wire, nil
+		if reflect.DeepEqual(*wire.ActionsRunner, *actionsRunner) {
+			return wire, nil
+		}
+
+		if err := wire.Close(); err != nil {
+			return nil, err
+		}
 	}
 
 	wire := &Wire{
