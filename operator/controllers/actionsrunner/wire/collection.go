@@ -86,3 +86,21 @@ func (c *Collection) WireFor(ctx context.Context, log logr.Logger, actionsRunner
 	c.wireRegistry[namespacedName] = wire
 	return wire, nil
 }
+
+func (c *Collection) TryClose(actionsRunner *inlocov1alpha1.ActionsRunner) error {
+	if actionsRunner == nil {
+		return errors.New("ActionsRunner == nil")
+	}
+
+	namespacedName := client.ObjectKey{
+		Namespace: actionsRunner.GetNamespace(),
+		Name:      actionsRunner.GetName(),
+	}
+
+	wire, ok := c.wireRegistry[namespacedName]
+	if !ok || wire.gone {
+		return nil
+	}
+
+	return wire.Close()
+}
