@@ -339,7 +339,6 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 									SubPath:   "user",
 								},
 							},
-							ImagePullPolicy: corev1.PullAlways,
 						},
 					},
 					RestartPolicy:                corev1.RestartPolicyNever,
@@ -483,7 +482,6 @@ func addDockerCapability(job *batchv1.Job) {
 			},
 			InitialDelaySeconds: 3,
 		},
-		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: pointer.BoolPtr(true),
 		},
