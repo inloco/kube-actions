@@ -2,6 +2,7 @@ name: Upgrade
 on:
   schedule:
     - cron: '* * * * *'
+  workflow_dispatch: {}
 jobs:
   upgrade:
     name: Upgrade
