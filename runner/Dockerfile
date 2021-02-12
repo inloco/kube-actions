@@ -60,4 +60,7 @@ ENV DOCKER_BUILDKIT 0
 ENV DOCKER_CLI_EXPERIMENTAL enabled
 ENV RUNNER_ALLOW_RUNASROOT true
 
+# languages tools-specific
+ENV GRADLE_OPTS -Dorg.gradle.daemon=false
+
 ENTRYPOINT ["/sbin/init"]
