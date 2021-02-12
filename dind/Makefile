@@ -2,7 +2,7 @@ IMAGE_NAME ?= inloco/kube-actions
 IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -dind
 
-DOCKER_VERSION ?= 19.03
+DOCKER_VERSION ?= 20.10
 
 # Build, tag, and push the docker image
 docker: docker-build docker-tag docker-push
