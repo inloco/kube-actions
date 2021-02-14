@@ -10,12 +10,14 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     unset IFS && \
     apt-get update && \
     apt-get install -y apt-transport-https busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make python3 python3-distutils software-properties-common sudo zstd && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0 && \
+    apt-add-repository https://cli.github.com/packages && \
     curl -Lf https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
     curl -Lf "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/Release.key" | sudo apt-key add - && \
     echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && \
     apt-get update && \
-    apt-get install -y docker-ce-cli skopeo && \
+    apt-get install -y docker-ce-cli gh skopeo && \
     busybox --install && \
     curl -Lf https://bootstrap.pypa.io/get-pip.py | python3 - && \
     mkdir -p /usr/local/lib/docker/cli-plugins && \
