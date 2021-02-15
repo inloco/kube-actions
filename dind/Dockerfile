@@ -20,11 +20,12 @@ RUN apk add --no-cache jq socat && \
     chown rootless:rootless /opt/containerd && \
     mkdir /run/netns && \
     chown rootless:rootless /run/netns && \
+    sed -i s/0.0.0.0/127.0.0.1/g $(which dockerd-entrypoint.sh) && \
     unlink /sbin/init
 COPY --from=build /go/bin/dind /sbin/init
 RUN chmod +s /sbin/init
 USER rootless
-ENV DOCKER_HOST=tcp://localhost:2375
+ENV DOCKER_HOST=tcp://127.0.0.1:2375
 ENV DOCKER_TLS_CERTDIR=
 ENV DOCKERD_ROOTLESS_ROOTLESSKIT_NET=slirp4netns
 ENV DOCKERD_ROOTLESS_ROOTLESSKIT_MTU=65520
