@@ -24,9 +24,9 @@ RUN apk add --no-cache jq socat && \
 COPY --from=build /go/bin/dind /sbin/init
 RUN chmod +s /sbin/init
 USER rootless
-ENV DOCKER_HOST tcp://localhost:2375
-ENV DOCKER_TLS_CERTDIR ""
-ENV DOCKERD_ROOTLESS_ROOTLESSKIT_NET slirp4netns
-ENV DOCKERD_ROOTLESS_ROOTLESSKIT_MTU 65520
-ENV DOCKERD_ENTRYPOINT_ARGS --add-runtime crun=/usr/local/bin/crun --default-runtime crun --experimental --registry-mirror https://mirror.gcr.io --tls=false
+ENV DOCKER_HOST=tcp://localhost:2375
+ENV DOCKER_TLS_CERTDIR=
+ENV DOCKERD_ROOTLESS_ROOTLESSKIT_NET=slirp4netns
+ENV DOCKERD_ROOTLESS_ROOTLESSKIT_MTU=65520
+ENV DOCKERD_ENTRYPOINT_ARGS="--add-runtime crun=/usr/local/bin/crun --default-runtime crun --experimental --registry-mirror https://mirror.gcr.io --tls=false"
 ENTRYPOINT ["/sbin/init"]
