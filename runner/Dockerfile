@@ -18,6 +18,9 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y docker-ce-cli skopeo && \
     busybox --install && \
     curl -Lf https://bootstrap.pypa.io/get-pip.py | python3 - && \
+    export HUB_URL=$(curl -Lf https://api.github.com/repos/github/hub/releases/latest | jq -r '.assets[] | select(.name | match("linux-amd64")) | .browser_download_url') && \
+    curl -Lf ${HUB_URL} | tar -xzvC /tmp && \
+    /tmp/hub-*/install && \
     mkdir -p /usr/local/lib/docker/cli-plugins && \
     export APP_URL=$(curl -Lf https://api.github.com/repos/docker/app/releases | jq -r '.[0].assets[] | select(.name | match("linux.tar.gz$")) | .browser_download_url') && \
     curl -Lf ${APP_URL} | tar -xzvC /usr/local/lib/docker/cli-plugins && \
