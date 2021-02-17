@@ -1,6 +1,6 @@
 ARG DOCKER_VERSION
 
-FROM golang:1.15-alpine AS build
+FROM golang:1.16.0-alpine AS build
 WORKDIR /go/src/github.com/inloco/kube-actions/dind
 COPY ./go.mod ./go.sum ./
 RUN go mod download
