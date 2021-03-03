@@ -9,7 +9,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     export $(cat /etc/os-release | sed 's/"//g') && \
     unset IFS && \
     apt-get update && \
-    apt-get install -y apt-transport-https busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make python3 python3-distutils software-properties-common sudo zstd && \
+    apt-get install -y apt-transport-https busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make python3 python3-distutils software-properties-common sudo zstd moreutils && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0 && \
     apt-add-repository https://cli.github.com/packages && \
     curl -Lf https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
