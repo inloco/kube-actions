@@ -27,9 +27,6 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     export APP_URL=$(curl -Lf https://api.github.com/repos/docker/app/releases | jq -r '.[0].assets[] | select(.name | match("linux.tar.gz$")) | .browser_download_url') && \
     curl -Lf ${APP_URL} | tar -xzvC /usr/local/lib/docker/cli-plugins && \
     mv /usr/local/lib/docker/cli-plugins/docker-app* /usr/local/lib/docker/cli-plugins/docker-app && \
-    export BUILDX_URL=$(curl -Lf https://api.github.com/repos/docker/buildx/releases/latest | jq -r '.assets[] | select(.name | match("linux-amd64$")) | .browser_download_url') && \
-    curl -Lfo /usr/local/lib/docker/cli-plugins/docker-buildx ${BUILDX_URL} && \
-    chmod 0755 /usr/local/lib/docker/cli-plugins/docker-buildx && \
     export COMPOSE_URL=$(curl -Lf https://api.github.com/repos/docker/compose/releases/latest | jq -r '.assets[] | select(.name | match("Linux-x86_64$")) | .browser_download_url') && \
     curl -Lfo /usr/local/bin/docker-compose ${COMPOSE_URL} && \
     chmod 0755 /usr/local/bin/docker-compose && \
@@ -60,8 +57,6 @@ COPY ./init /sbin/init
 ENV ACTIONS_ALLOW_UNSECURE_COMMANDS true
 ENV AWS_EC2_METADATA_DISABLED true
 ENV AWS_SDK_LOAD_CONFIG 1
-ENV BUILDX_NO_DEFAULT_LOAD false
-ENV DOCKER_BUILDKIT 0
 ENV DOCKER_CLI_EXPERIMENTAL enabled
 ENV RUNNER_ALLOW_RUNASROOT true
 
