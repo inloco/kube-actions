@@ -6,7 +6,7 @@ require (
 	github.com/go-logr/logr v0.1.0
 	github.com/google/go-github/v32 v32.1.0
 	github.com/google/uuid v1.2.0
-	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b3
+	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b5
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.11.0
 	github.com/square/go-jose/v3 v3.0.0-20200630053402-0a67ce9b0693
