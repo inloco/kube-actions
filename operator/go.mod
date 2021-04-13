@@ -3,7 +3,7 @@ module github.com/inloco/kube-actions/operator
 go 1.15
 
 require (
-	github.com/go-logr/logr v0.1.0
+	github.com/go-logr/logr v0.4.0
 	github.com/google/go-github/v32 v32.1.0
 	github.com/google/uuid v1.2.0
 	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b3
@@ -11,10 +11,10 @@ require (
 	github.com/onsi/gomega v1.11.0
 	github.com/square/go-jose/v3 v3.0.0-20200630053402-0a67ce9b0693
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	k8s.io/api v0.18.6
-	k8s.io/apimachinery v0.18.6
-	k8s.io/client-go v0.18.6
-	k8s.io/utils v0.0.0-20200716102541-988ee3149bb2
+	k8s.io/api v0.21.0
+	k8s.io/apimachinery v0.21.0
+	k8s.io/client-go v0.21.0
+	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/controller-runtime v0.6.0
 )
 
