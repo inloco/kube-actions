@@ -7,8 +7,8 @@ dind/% operator/% runner/%:
 .ONESHELL:
 continuous-upgrade:
 	@
-	export LATEST="$$(curl -Lf https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name | ltrimstr("v")')"
-	if ! sed -En "/^RUNNER_VERSION \?= $${LATEST}\$$/$$!{q1}" ./runner/Makefile
+	LATEST="$$(curl -Lf https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name | ltrimstr("v")')"
+	if grep -qE "^RUNNER_VERSION \?= $${LATEST}$$" ./runner/Makefile
 	then
 		echo 'Everything up-to-date'
 	elif git ls-remote --exit-code "$$(git remote show)" "feat/actions-runner-v$${LATEST}"
