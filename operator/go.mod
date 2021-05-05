@@ -7,7 +7,7 @@ require (
 	github.com/google/go-github/v32 v32.1.0
 	github.com/google/uuid v1.2.0
 	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b3
-	github.com/onsi/ginkgo v1.12.1
+	github.com/onsi/ginkgo v1.16.2
 	github.com/onsi/gomega v1.11.0
 	github.com/square/go-jose/v3 v3.0.0-20200630053402-0a67ce9b0693
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
