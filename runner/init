@@ -81,4 +81,10 @@ then
 	fi
 fi
 
+sudo update-ca-certificates
+export HTTP_PROXY="http://${PROXY_HOST}:${PROXY_PORT}"
+export HTTPS_PROXY="https://${PROXY_HOST}:${PROXY_PORT}"
+# exclude internal ranges
+export NO_PROXY="0.0.0.0/8,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
 . /opt/actions-runner/run.sh --once
