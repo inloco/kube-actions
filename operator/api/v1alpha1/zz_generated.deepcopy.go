@@ -292,6 +292,20 @@ func (in *ActionsRunnerSpec) DeepCopyInto(out *ActionsRunnerSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]v1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.VolumeMounts != nil {
+		in, out := &in.VolumeMounts, &out.VolumeMounts
+		*out = make([]v1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.EnvFrom != nil {
 		in, out := &in.EnvFrom, &out.EnvFrom
 		*out = make([]v1.EnvFromSource, len(*in))
