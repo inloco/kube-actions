@@ -365,7 +365,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 }
 
 func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
-	var volumeByName map[string]corev1.Volume
+	volumeByName := map[string]corev1.Volume{}
 
 	for _, volume := range actionsRunner.Spec.Volumes {
 		volumeByName[volume.Name] = volume
