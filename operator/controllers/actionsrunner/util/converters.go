@@ -448,12 +448,19 @@ func withVolumeMounts(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volu
 	}
 
 	for _, volumeMount := range actionsRunner.Spec.VolumeMounts {
+		conflict := false
+
 		for _, defaultVolumeMount := range defaultVolumeMounts {
 			sameName := volumeMount.Name == defaultVolumeMount.Name
 			prefixIsMount := strings.HasPrefix(volumeMount.MountPath, defaultVolumeMount.MountPath)
-			if !sameName && !prefixIsMount {
-				volumeMounts = append(volumeMounts, volumeMount)
+			if sameName || prefixIsMount {
+				conflict = true
+				break
 			}
+		}
+
+		if (!conflict) {
+			volumeMounts = append(volumeMounts, volumeMount)
 		}
 	}
 
