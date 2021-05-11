@@ -171,7 +171,6 @@ func ToSecret(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, 
 	if err := ctrl.SetControllerReference(actionsRunner, &secret, scheme); err != nil {
 		return nil, err
 	}
-
 	return &secret, nil
 }
 
@@ -268,34 +267,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 			BackoffLimit:          pointer.Int32Ptr(0),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					Volumes: []corev1.Volume{
-						corev1.Volume{
-							Name: "config-map",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: actionsRunner.GetName(),
-									},
-								},
-							},
-						},
-						corev1.Volume{
-							Name: "secret",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: actionsRunner.GetName(),
-								},
-							},
-						},
-						corev1.Volume{
-							Name: "persistent-volume-claim",
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: actionsRunner.GetName(),
-								},
-							},
-						},
-					},
+					Volumes: withVolumes(actionsRunner),
 					Containers: []corev1.Container{
 						corev1.Container{
 							Name:  "runner",
@@ -307,38 +279,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 								return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
 							}),
 							Resources: FilterResources(actionsRunner.Spec.Resources, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
-							VolumeMounts: []corev1.VolumeMount{
-								corev1.VolumeMount{
-									Name:      "config-map",
-									MountPath: "/opt/actions-runner/.runner",
-									SubPath:   ".runner",
-								},
-								corev1.VolumeMount{
-									Name:      "config-map",
-									MountPath: "/opt/actions-runner/.credentials",
-									SubPath:   ".credentials",
-								},
-								corev1.VolumeMount{
-									Name:      "secret",
-									MountPath: "/opt/actions-runner/.credentials_rsaparams",
-									SubPath:   ".credentials_rsaparams",
-								},
-								corev1.VolumeMount{
-									Name:      "persistent-volume-claim",
-									MountPath: "/opt/actions-runner/_work",
-									SubPath:   "runner",
-								},
-								corev1.VolumeMount{
-									Name:      "persistent-volume-claim",
-									MountPath: "/root",
-									SubPath:   "root",
-								},
-								corev1.VolumeMount{
-									Name:      "persistent-volume-claim",
-									MountPath: "/home/user",
-									SubPath:   "user",
-								},
-							},
+							VolumeMounts: withVolumeMounts(actionsRunner),
 						},
 					},
 					RestartPolicy:                corev1.RestartPolicyNever,
@@ -373,6 +314,96 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 	}
 
 	return &job, nil
+}
+
+func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
+	volumeByName := make(map[string]*corev1.Volume, len(actionsRunner.Spec.Volumes))
+
+	for _, volume := range actionsRunner.Spec.Volumes {
+		volumeByName[volume.Name] = &volume
+	}
+
+	volumeByName["config-map"] = &corev1.Volume{
+		Name: "config-map",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: actionsRunner.GetName(),
+				},
+			},
+		},
+	}
+
+	volumeByName["secret"] = &corev1.Volume{
+		Name: "secret",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: actionsRunner.GetName(),
+			},
+		},
+	}
+
+	volumeByName["persistent-volume-claim"] = &corev1.Volume{
+		Name: "persistent-volume-claim",
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: actionsRunner.GetName(),
+			},
+		},
+	}
+
+	volumes := make([]corev1.Volume, 0, len(volumeByName))
+	for _, volume := range volumeByName {
+		volumes = append(volumes, *volume)
+	}
+
+	return volumes
+}
+
+func withVolumeMounts(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.VolumeMount {
+	volumeMountByPath := make(map[string]*corev1.VolumeMount, len(actionsRunner.Spec.Volumes))
+
+	for _, volumeMount := range actionsRunner.Spec.VolumeMounts {
+		volumeMountByPath[volumeMount.MountPath] = &volumeMount
+	}
+
+	volumeMountByPath["/opt/actions-runner/.runner"] = &corev1.VolumeMount{
+		MountPath: "/opt/actions-runner/.runner",
+		Name:      "config-map",
+		SubPath:   ".runner",
+	}
+	volumeMountByPath["/opt/actions-runner/.credentials"] = &corev1.VolumeMount{
+		MountPath: "/opt/actions-runner/.credentials",
+		Name:      "config-map",
+		SubPath:   ".credentials",
+	}
+	volumeMountByPath["/opt/actions-runner/.credentials_rsaparams"] = &corev1.VolumeMount{
+		MountPath: "/opt/actions-runner/.credentials_rsaparams",
+		Name:      "secret",
+		SubPath:   ".credentials_rsaparams",
+	}
+	volumeMountByPath["/opt/actions-runner/_work"] = &corev1.VolumeMount{
+		MountPath: "/opt/actions-runner/_work",
+		Name:      "persistent-volume-claim",
+		SubPath:   "runner",
+	}
+	volumeMountByPath["/root"] = &corev1.VolumeMount{
+		MountPath: "/root",
+		Name:      "persistent-volume-claim",
+		SubPath:   "root",
+	}
+	volumeMountByPath["/home/user"] = &corev1.VolumeMount{
+		MountPath: "/home/user",
+		Name:      "persistent-volume-claim",
+		SubPath:   "user",
+	}
+
+	volumeMounts := make([]corev1.VolumeMount, 0, len(volumeMountByPath))
+	for _, volumeMount := range volumeMountByPath {
+		volumeMounts = append(volumeMounts, *volumeMount)
+	}
+
+	return volumeMounts
 }
 
 func withRuntimeAffinity(affinity *corev1.Affinity) *corev1.Affinity {
