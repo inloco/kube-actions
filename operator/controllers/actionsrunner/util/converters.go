@@ -115,7 +115,7 @@ func ToConfigMap(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunne
 		return nil, err
 	}
 
-	configMapCredentials := corev1.ConfigMap{
+	configMap := corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),
 			Kind:       "ConfigMap",
@@ -130,11 +130,11 @@ func ToConfigMap(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunne
 		},
 	}
 
-	if err := ctrl.SetControllerReference(actionsRunner, &configMapCredentials, scheme); err != nil {
+	if err := ctrl.SetControllerReference(actionsRunner, &configMap, scheme); err != nil {
 		return nil, err
 	}
 
-	return &configMapCredentials, nil
+	return &configMap, nil
 }
 
 func ToSecret(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) (*corev1.Secret, error) {
@@ -155,7 +155,7 @@ func ToSecret(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, 
 		return nil, err
 	}
 
-	secretRSA := corev1.Secret{
+	secret := corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),
 			Kind:       "Secret",
@@ -169,10 +169,10 @@ func ToSecret(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, 
 		},
 	}
 
-	if err := ctrl.SetControllerReference(actionsRunner, &secretRSA, scheme); err != nil {
+	if err := ctrl.SetControllerReference(actionsRunner, &secret, scheme); err != nil {
 		return nil, err
 	}
-	return &secretRSA, nil
+	return &secret, nil
 }
 
 func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) (*inlocov1alpha1.ActionsRunnerJob, error) {
