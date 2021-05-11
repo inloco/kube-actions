@@ -318,13 +318,13 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 }
 
 func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
-	volumeByName := map[string]corev1.Volume{}
+	volumeByName := make(map[string]*corev1.Volume, len(actionsRunner.Spec.Volumes))
 
 	for _, volume := range actionsRunner.Spec.Volumes {
-		volumeByName[volume.Name] = volume
+		volumeByName[volume.Name] = &volume
 	}
 
-	volumeByName["config-map"] = corev1.Volume{
+	volumeByName["config-map"] = &corev1.Volume{
 		Name: "config-map",
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -335,7 +335,7 @@ func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
 		},
 	}
 
-	volumeByName["secret"] = corev1.Volume{
+	volumeByName["secret"] = &corev1.Volume{
 		Name: "secret",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
@@ -344,7 +344,7 @@ func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
 		},
 	}
 
-	volumeByName["persistent-volume-claim"] = corev1.Volume{
+	volumeByName["persistent-volume-claim"] = &corev1.Volume{
 		Name: "persistent-volume-claim",
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
@@ -353,9 +353,9 @@ func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
 		},
 	}
 
-	var volumes []corev1.Volume
+	volumes := make([]corev1.Volume, 0, len(volumeByName))
 	for _, volume := range volumeByName {
-		volumes = append(volumes, volume)
+		volumes = append(volumes, *volume)
 	}
 
 	return volumes
@@ -395,7 +395,7 @@ func withVolumeMounts(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volu
 		},
 	}
 
-	var volumeMounts []corev1.VolumeMount
+	volumeMounts := make([]corev1.VolumeMount, 0, len(defaultVolumeMounts) + len(actionsRunner.Spec.VolumeMounts))
 	for _, volumeMount := range defaultVolumeMounts {
 		volumeMounts = append(volumeMounts, volumeMount)
 	}
