@@ -405,8 +405,8 @@ func withVolumeMounts(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volu
 
 		for _, defaultVolumeMount := range defaultVolumeMounts {
 			sameName := volumeMount.Name == defaultVolumeMount.Name
-			prefixIsMount := strings.HasPrefix(volumeMount.MountPath, defaultVolumeMount.MountPath)
-			if sameName || prefixIsMount {
+			sameMount := volumeMount.MountPath == defaultVolumeMount.MountPath && volumeMount.SubPath == defaultVolumeMount.SubPath
+			if sameName || sameMount {
 				conflict = true
 				break
 			}
