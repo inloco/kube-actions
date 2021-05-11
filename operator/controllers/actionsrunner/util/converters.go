@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/constants"
@@ -362,59 +361,46 @@ func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
 }
 
 func withVolumeMounts(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.VolumeMount {
-	var defaultVolumeMounts = []corev1.VolumeMount{
-		{
-			Name:      "config-map",
-			MountPath: "/opt/actions-runner/.runner",
-			SubPath:   ".runner",
-		},
-		{
-			Name:      "config-map",
-			MountPath: "/opt/actions-runner/.credentials",
-			SubPath:   ".credentials",
-		},
-		{
-			Name:      "secret",
-			MountPath: "/opt/actions-runner/.credentials_rsaparams",
-			SubPath:   ".credentials_rsaparams",
-		},
-		{
-			Name:      "persistent-volume-claim",
-			MountPath: "/opt/actions-runner/_work",
-			SubPath:   "runner",
-		},
-		{
-			Name:      "persistent-volume-claim",
-			MountPath: "/root",
-			SubPath:   "root",
-		},
-		{
-			Name:      "persistent-volume-claim",
-			MountPath: "/home/user",
-			SubPath:   "user",
-		},
-	}
-
-	volumeMounts := make([]corev1.VolumeMount, 0, len(defaultVolumeMounts) + len(actionsRunner.Spec.VolumeMounts))
-	for _, volumeMount := range defaultVolumeMounts {
-		volumeMounts = append(volumeMounts, volumeMount)
-	}
+	volumeMountByPath := make(map[string]*corev1.VolumeMount, len(actionsRunner.Spec.Volumes))
 
 	for _, volumeMount := range actionsRunner.Spec.VolumeMounts {
-		conflict := false
+		volumeMountByPath[volumeMount.MountPath] = &volumeMount
+	}
 
-		for _, defaultVolumeMount := range defaultVolumeMounts {
-			sameName := volumeMount.Name == defaultVolumeMount.Name
-			sameMount := volumeMount.MountPath == defaultVolumeMount.MountPath && volumeMount.SubPath == defaultVolumeMount.SubPath
-			if sameName || sameMount {
-				conflict = true
-				break
-			}
-		}
+	volumeMountByPath["/opt/actions-runner/.runner"] = &corev1.VolumeMount{
+		MountPath: "/opt/actions-runner/.runner",
+		Name:      "config-map",
+		SubPath:   ".runner",
+	};
+	volumeMountByPath["/opt/actions-runner/.credentials"] = &corev1.VolumeMount{
+		MountPath: "/opt/actions-runner/.credentials",
+		Name:      "config-map",
+		SubPath:   ".credentials",
+	};
+	volumeMountByPath["/opt/actions-runner/.credentials_rsaparams"] = &corev1.VolumeMount{
+		MountPath: "/opt/actions-runner/.credentials_rsaparams",
+		Name:      "secret",
+		SubPath:   ".credentials_rsaparams",
+	};
+	volumeMountByPath["/opt/actions-runner/_work"] = &corev1.VolumeMount{
+		MountPath: "/opt/actions-runner/_work",
+		Name:      "persistent-volume-claim",
+		SubPath:   "runner",
+	};
+	volumeMountByPath["/root"] = &corev1.VolumeMount{
+		MountPath: "/root",
+		Name:      "persistent-volume-claim",
+		SubPath:   "root",
+	};
+	volumeMountByPath["/home/user"] = &corev1.VolumeMount{
+		MountPath: "/home/user",
+		Name:      "persistent-volume-claim",
+		SubPath:   "user",
+	};
 
-		if (!conflict) {
-			volumeMounts = append(volumeMounts, volumeMount)
-		}
+	volumeMounts := make([]corev1.VolumeMount, 0, len(volumeMountByPath))
+	for _, volumeMount := range volumeMountByPath {
+		volumeMounts = append(volumeMounts, *volumeMount)
 	}
 
 	return volumeMounts
@@ -494,23 +480,23 @@ func addDockerCapability(job *batchv1.Job) {
 		Name:  "dind",
 		Image: fmt.Sprintf("%s:%s%s", dindImageName, dindImageVersion, dindImageVariant),
 		Env: []corev1.EnvVar{
-			{
+			corev1.EnvVar{
 				Name:  "DOCKER_TLS_CERTDIR",
 				Value: "",
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
-			{
+			corev1.VolumeMount{
 				Name:      "persistent-volume-claim",
 				MountPath: "/home/rootless",
 				SubPath:   "dind",
 			},
-			{
+			corev1.VolumeMount{
 				Name:      "persistent-volume-claim",
 				MountPath: "/home/rootless/.local/share/docker",
 				SubPath:   "dind/.local/share/docker",
 			},
-			{
+			corev1.VolumeMount{
 				Name:      "persistent-volume-claim",
 				MountPath: "/opt/actions-runner/_work",
 				SubPath:   "runner",
