@@ -1,6 +1,8 @@
 #!/bin/bash
 set -ex
 
+sudo update-ca-certificates
+
 git config --global user.name github-actions[bot]
 git config --global user.email 41898282+github-actions[bot]@users.noreply.github.com
 
@@ -80,7 +82,5 @@ then
 		envsubst <<< $(jq --argjson _ "${DOCKER_PLUGINS}" '.plugins |= . + $ARGS.named["_"]' ${CONF} || cat ${CONF}) > ${CONF}
 	fi
 fi
-
-sudo update-ca-certificates
 
 . /opt/actions-runner/run.sh --once
