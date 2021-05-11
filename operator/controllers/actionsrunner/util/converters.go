@@ -269,7 +269,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 				Spec: corev1.PodSpec{
 					Volumes: withVolumes(actionsRunner),
 					Containers: []corev1.Container{
-						{
+						corev1.Container{
 							Name:  "runner",
 							Image: fmt.Sprintf("%s:%s%s", runnerImageName, runnerImageVersion, runnerImageVariant),
 							EnvFrom: FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
