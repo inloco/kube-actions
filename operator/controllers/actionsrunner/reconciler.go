@@ -140,24 +140,20 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	desiredConfigMaps, err := util.ToConfigMaps(wire.DotFiles, &actionsRunner, r.Scheme)
+	desiredConfigMap, err := util.ToConfigMap(wire.DotFiles, &actionsRunner, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	for _, desiredConfigMap := range desiredConfigMaps {
-		if err := r.Patch(ctx, &desiredConfigMap, client.Apply, patchOpts...); err != nil {
-			return ctrl.Result{}, err
-		}
+	if err := r.Patch(ctx, desiredConfigMap, client.Apply, patchOpts...); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	desiredSecrets, err := util.ToSecrets(wire.DotFiles, &actionsRunner, r.Scheme)
+	desiredSecret, err := util.ToSecret(wire.DotFiles, &actionsRunner, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	for _, desiredScret := range desiredSecrets {
-		if err := r.Patch(ctx, &desiredScret, client.Apply, patchOpts...); err != nil {
-			return ctrl.Result{}, err
-		}
+	if err := r.Patch(ctx, desiredSecret, client.Apply, patchOpts...); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	consumer := &Consumer{

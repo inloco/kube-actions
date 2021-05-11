@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
@@ -42,14 +41,6 @@ var (
 	dindImageName    = EnvVar("KUBEACTIONS_DIND_IMAGE_NAME", "inloco/kube-actions")
 	dindImageVersion = EnvVar("KUBEACTIONS_DIND_IMAGE_VERSION", constants.Ver())
 	dindImageVariant = EnvVar("KUBEACTIONS_DIND_IMAGE_VARIANT", "-dind")
-
-	dependenciesCacheResourceName = "dependenciescache-proxy"
-	dependenciesCacheHost = os.Getenv("DEPENDENCIES_CACHE_HOST")
-	dependenciesCachePort = os.Getenv("DEPENDENCIES_CACHE_HOST")
-	dependenciesCacheCAEnv = "DEPENDENCIES_CACHE_CA"
-	dependenciesCacheCA = os.Getenv(dependenciesCacheCAEnv)
-	dependenciesCacheCAPath = "/usr/local/share/ca-certificates/dependencies-cache-ca.crt"
-
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -101,7 +92,7 @@ func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
 	return &dotFiles
 }
 
-func ToConfigMaps(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) ([]corev1.ConfigMap, error) {
+func ToConfigMap(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) (*corev1.ConfigMap, error) {
 	if dotFiles == nil {
 		return nil, errors.New("dotFiles == nil")
 	}
@@ -143,29 +134,10 @@ func ToConfigMaps(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunn
 		return nil, err
 	}
 
-	configMapDependenciesCacheProxy := corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: corev1.SchemeGroupVersion.String(),
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dependenciesCacheResourceName,
-			Namespace: actionsRunner.GetNamespace(),
-		},
-		Data: map[string]string{
-			"DEPENDENCIES_CACHE_HOST": dependenciesCacheHost,
-			"DEPENDENCIES_CACHE_PORT": dependenciesCachePort,
-		},
-	}
-
-	if err := ctrl.SetControllerReference(actionsRunner, &configMapDependenciesCacheProxy, scheme); err != nil {
-		return nil, err
-	}
-
-	return []corev1.ConfigMap{configMapCredentials, configMapDependenciesCacheProxy}, nil
+	return &configMapCredentials, nil
 }
 
-func ToSecrets(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) ([]corev1.Secret, error) {
+func ToSecret(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) (*corev1.Secret, error) {
 	if dotFiles == nil {
 		return nil, errors.New("dotFiles == nil")
 	}
@@ -200,26 +172,7 @@ func ToSecrets(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner,
 	if err := ctrl.SetControllerReference(actionsRunner, &secretRSA, scheme); err != nil {
 		return nil, err
 	}
-
-	secretProxy := corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: corev1.SchemeGroupVersion.String(),
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dependenciesCacheResourceName,
-			Namespace: actionsRunner.GetNamespace(),
-		},
-		StringData: map[string]string{
-			"ca.crt": dependenciesCacheCA,
-		},
-	}
-
-	if err := ctrl.SetControllerReference(actionsRunner, &secretProxy, scheme); err != nil {
-		return nil, err
-	}
-
-	return []corev1.Secret{secretRSA, secretProxy}, nil
+	return &secretRSA, nil
 }
 
 func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) (*inlocov1alpha1.ActionsRunnerJob, error) {
