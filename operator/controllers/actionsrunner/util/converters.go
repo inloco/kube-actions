@@ -371,32 +371,32 @@ func withVolumeMounts(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volu
 		MountPath: "/opt/actions-runner/.runner",
 		Name:      "config-map",
 		SubPath:   ".runner",
-	};
+	}
 	volumeMountByPath["/opt/actions-runner/.credentials"] = &corev1.VolumeMount{
 		MountPath: "/opt/actions-runner/.credentials",
 		Name:      "config-map",
 		SubPath:   ".credentials",
-	};
+	}
 	volumeMountByPath["/opt/actions-runner/.credentials_rsaparams"] = &corev1.VolumeMount{
 		MountPath: "/opt/actions-runner/.credentials_rsaparams",
 		Name:      "secret",
 		SubPath:   ".credentials_rsaparams",
-	};
+	}
 	volumeMountByPath["/opt/actions-runner/_work"] = &corev1.VolumeMount{
 		MountPath: "/opt/actions-runner/_work",
 		Name:      "persistent-volume-claim",
 		SubPath:   "runner",
-	};
+	}
 	volumeMountByPath["/root"] = &corev1.VolumeMount{
 		MountPath: "/root",
 		Name:      "persistent-volume-claim",
 		SubPath:   "root",
-	};
+	}
 	volumeMountByPath["/home/user"] = &corev1.VolumeMount{
 		MountPath: "/home/user",
 		Name:      "persistent-volume-claim",
 		SubPath:   "user",
-	};
+	}
 
 	volumeMounts := make([]corev1.VolumeMount, 0, len(volumeMountByPath))
 	for _, volumeMount := range volumeMountByPath {
