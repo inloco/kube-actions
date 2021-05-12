@@ -14,6 +14,6 @@ jobs:
           git config --global user.email 41898282+github-actions[bot]@users.noreply.github.com
           gh auth login --with-token <<< ${{ github.token }}
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
       - name: Upgrade
         run: make continuous-upgrade
