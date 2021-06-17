@@ -71,7 +71,7 @@ func (c *Collection) WireFor(ctx context.Context, log logr.Logger, actionsRunner
 		}
 
 		if err := wire.Close(); err != nil {
-			return nil, err
+			wire.log.Error(err, err.Error())
 		}
 	}
 
