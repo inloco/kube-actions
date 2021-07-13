@@ -5,7 +5,7 @@ go 1.15
 require (
 	github.com/go-logr/logr v0.1.0
 	github.com/google/go-github/v32 v32.1.0
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b3
 	github.com/onsi/ginkgo v1.16.2
 	github.com/onsi/gomega v1.12.0
