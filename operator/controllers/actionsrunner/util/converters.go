@@ -292,6 +292,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 					},
 					Affinity:    withRuntimeAffinity(actionsRunner.Spec.Affinity),
 					Tolerations: actionsRunner.Spec.Tolerations,
+					NodeSelector: actionsRunner.Spec.NodeSelector,
 				},
 			},
 			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
