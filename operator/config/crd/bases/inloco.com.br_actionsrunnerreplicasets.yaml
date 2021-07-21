@@ -494,6 +494,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  nodeSelector:
+                    additionalProperties:
+                      type: string
+                    type: object
                   repository:
                     properties:
                       apiEndpoint:
