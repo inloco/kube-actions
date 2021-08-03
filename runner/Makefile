@@ -2,7 +2,7 @@ IMAGE_NAME ?= inloco/kube-actions
 IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -runner
 
-RUNNER_VERSION ?= 2.279.0
+RUNNER_VERSION ?= 2.280.0
 UBUNTU_VERSION ?= focal
 
 # Build, tag, and push the docker image
