@@ -26,8 +26,10 @@ import (
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1beta "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -40,6 +42,8 @@ var (
 	dindImageName    = EnvVar("KUBEACTIONS_DIND_IMAGE_NAME", "inloco/kube-actions")
 	dindImageVersion = EnvVar("KUBEACTIONS_DIND_IMAGE_VERSION", constants.Ver())
 	dindImageVariant = EnvVar("KUBEACTIONS_DIND_IMAGE_VARIANT", "-dind")
+
+	labelApp      = "app"
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -238,6 +242,45 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 	return &persistentVolumeClaim, nil
 }
 
+func ToPodDisruptionBudget(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob, scheme *runtime.Scheme) (*policyv1beta.PodDisruptionBudget, error) {
+	if actionsRunner == nil {
+		return nil, errors.New("actionsRunner == nil")
+	}
+
+	if actionsRunnerJob == nil {
+		return nil, errors.New("actionsRunnerJob == nil")
+	}
+
+	if scheme == nil {
+		return nil, errors.New("scheme == nil")
+	}
+
+	podDisruptionBudget := policyv1beta.PodDisruptionBudget{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: policyv1beta.SchemeGroupVersion.String(),
+			Kind:       "PodDisruptionBudget",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      actionsRunner.GetName(),
+			Namespace: actionsRunner.GetNamespace(),
+		},
+		Spec: policyv1beta.PodDisruptionBudgetSpec{
+			MinAvailable: &intstr.IntOrString{IntVal: 1},
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					labelApp: actionsRunner.GetName(),
+				},
+			},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(actionsRunnerJob, &podDisruptionBudget, scheme); err != nil {
+		return nil, err
+	}
+
+	return &podDisruptionBudget, nil
+}
+
 func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob, scheme *runtime.Scheme) (*batchv1.Job, error) {
 	if actionsRunner == nil {
 		return nil, errors.New("actionsRunner == nil")
@@ -259,17 +302,30 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      actionsRunner.GetName(),
 			Namespace: actionsRunner.GetNamespace(),
+			Labels: map[string]string{
+				labelApp: actionsRunner.GetName(),
+			},
 		},
 		Spec: batchv1.JobSpec{
 			Parallelism:           pointer.Int32Ptr(1),
 			Completions:           pointer.Int32Ptr(1),
 			ActiveDeadlineSeconds: pointer.Int64Ptr(3000),
 			BackoffLimit:          pointer.Int32Ptr(0),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					labelApp: actionsRunner.GetName(),
+				},
+			},
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						labelApp: actionsRunner.GetName(),
+					},
+				},
 				Spec: corev1.PodSpec{
 					Volumes: withVolumes(actionsRunner),
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name:  "runner",
 							Image: fmt.Sprintf("%s:%s%s", runnerImageName, runnerImageVersion, runnerImageVariant),
 							EnvFrom: FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
