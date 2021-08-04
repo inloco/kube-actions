@@ -37,12 +37,12 @@ func main() {
 	logger.Println("starting dockerd")
 	cmdWait, err := docker.StartDockerd()
 	if err != nil {
-		logger.Panic(err)
+		logger.Printf("error starting dockerd: %+v\n", err)
 	}
 
 	logger.Println("waiting for dockerd")
 	if err := docker.WaitForDockerd(); err != nil {
-		logger.Panic(err)
+		logger.Printf("error waiting for dockerd: %+v\n", err)
 	}
 
 	logger.Println("creating iptables client")
@@ -62,14 +62,16 @@ Loop:
 		select {
 		case err := <-cmdWait:
 			if err == nil {
+				logger.Println("dockerd stopped with no error")
 				break Loop
 			}
 			if exitError, ok := err.(*exec.ExitError); ok {
 				if waitStatus, ok := exitError.Sys().(syscall.WaitStatus); ok {
+					logger.Printf("docker stopped with status: %d\n", waitStatus.ExitStatus())
 					os.Exit(waitStatus.ExitStatus())
 				}
 			}
-			logger.Panic(err)
+			logger.Panicf("dockerd stopped with unknown status: %+v\n", err)
 
 		case networkInfo, ok := <-networks:
 			if !ok {
@@ -101,7 +103,7 @@ Loop:
 			case resourceActionStop:
 				logger.Printf("container stopped: %+v\n", containerInfo)
 				if err := setdownContainerPortProxy(portProxy, containerInfo); err != nil {
-					logger.Print(fmt.Errorf("error in port-forward setdown: %w", err))
+					logger.Panic(fmt.Errorf("error in port-forward setdown: %w", err))
 				}
 			}
 		}
@@ -126,6 +128,7 @@ func listenForInterrupt() error {
 			}
 		}
 
+		logger.Println("exiting dind after tcp interrupt")
 		os.Exit(0)
 	}()
 
