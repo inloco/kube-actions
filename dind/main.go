@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"syscall"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -18,6 +19,9 @@ var (
 )
 
 func main() {
+	logger.Println("listening for unix signals")
+	listenForUnixSignals()
+
 	logger.Println("listening for interrupt")
 	if err := listenForInterrupt(); err != nil {
 		logger.Panic(err)
@@ -108,6 +112,16 @@ Loop:
 			}
 		}
 	}
+}
+
+func listenForUnixSignals() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		for sig := range signals {
+			logger.Printf("received unix signal: %s", sig)
+		}
+	}()
 }
 
 func listenForInterrupt() error {
