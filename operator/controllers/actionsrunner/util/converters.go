@@ -26,8 +26,10 @@ import (
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1beta "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -45,6 +47,8 @@ var (
 	runnerResourcesKey  = "runner"
 	dindContainerName   = "dind"
 	dindResourcesKey    = "docker"
+
+	labelApp      = "app"
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -247,6 +251,45 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 	return &persistentVolumeClaim, nil
 }
 
+func ToPodDisruptionBudget(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob, scheme *runtime.Scheme) (*policyv1beta.PodDisruptionBudget, error) {
+	if actionsRunner == nil {
+		return nil, errors.New("actionsRunner == nil")
+	}
+
+	if actionsRunnerJob == nil {
+		return nil, errors.New("actionsRunnerJob == nil")
+	}
+
+	if scheme == nil {
+		return nil, errors.New("scheme == nil")
+	}
+
+	podDisruptionBudget := policyv1beta.PodDisruptionBudget{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: policyv1beta.SchemeGroupVersion.String(),
+			Kind:       "PodDisruptionBudget",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      actionsRunner.GetName(),
+			Namespace: actionsRunner.GetNamespace(),
+		},
+		Spec: policyv1beta.PodDisruptionBudgetSpec{
+			MinAvailable: &intstr.IntOrString{IntVal: 1},
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					labelApp: actionsRunner.GetName(),
+				},
+			},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(actionsRunnerJob, &podDisruptionBudget, scheme); err != nil {
+		return nil, err
+	}
+
+	return &podDisruptionBudget, nil
+}
+
 func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob, scheme *runtime.Scheme) (*batchv1.Job, error) {
 	if actionsRunner == nil {
 		return nil, errors.New("actionsRunner == nil")
@@ -280,8 +323,10 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 			BackoffLimit:          pointer.Int32Ptr(0),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Annotations: actionsRunner.Annotations,
-					Labels:      actionsRunner.Labels,
+					Annotations: actionsRunner.Spec.Annotations,
+					Labels: map[string]string{
+						labelApp: actionsRunner.GetName(),
+					},
 				},
 				Spec: corev1.PodSpec{
 					Volumes: withVolumes(actionsRunner),
