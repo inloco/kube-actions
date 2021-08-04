@@ -132,7 +132,7 @@ func (c *DockerClient) StartDockerd() (chan error, error) {
 	go func() {
 		for sig := range signals {
 			if err := cmd.Process.Signal(sig); err != nil {
-				logger.Print(err)
+				logger.Printf("error sending signal for dockerd: %+v\n", err)
 			}
 		}
 	}()
@@ -166,19 +166,21 @@ func (c *DockerClient) GetResourcesInfoFromEvents() (chan NetworkInfo, chan Cont
 			for {
 				select {
 				case err := <-errs:
-					c.logger.Printf("error: %+v\n", err)
 					if err == io.EOF || err == nil {
 						c.logger.Println("EOF received from events channel, shutdown")
 						close(networks)
 						close(containers)
 						return
 					}
+
+					c.logger.Printf("error from events channel: %+v\n", err)
 					break
 
 				case msg := <-msgs:
 					kind, knownKind := resourceKindByString[msg.Type]
 					action, knownAction := resourceActionByString[msg.Action]
 					if !knownKind || !knownAction {
+						c.logger.Printf("unhandled event: %+v\n", msg)
 						continue
 					}
 
