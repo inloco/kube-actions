@@ -178,6 +178,45 @@ func ToSecret(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, 
 	return &secret, nil
 }
 
+func ToPodDisruptionBudget(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) (*policyv1beta.PodDisruptionBudget, error) {
+	if dotFiles == nil {
+		return nil, errors.New("dotFiles == nil")
+	}
+
+	if actionsRunner == nil {
+		return nil, errors.New("actionsRunner == nil")
+	}
+
+	if scheme == nil {
+		return nil, errors.New("scheme == nil")
+	}
+
+	podDisruptionBudget := policyv1beta.PodDisruptionBudget{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: policyv1beta.SchemeGroupVersion.String(),
+			Kind:       "PodDisruptionBudget",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      actionsRunner.GetName(),
+			Namespace: actionsRunner.GetNamespace(),
+		},
+		Spec: policyv1beta.PodDisruptionBudgetSpec{
+			MaxUnavailable: &intstr.IntOrString{IntVal: 0},
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					labelApp: actionsRunner.GetName(),
+				},
+			},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(actionsRunner, &podDisruptionBudget, scheme); err != nil {
+		return nil, err
+	}
+
+	return &podDisruptionBudget, nil
+}
+
 func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) (*inlocov1alpha1.ActionsRunnerJob, error) {
 	if actionsRunner == nil {
 		return nil, errors.New("actionsRunner == nil")
@@ -240,45 +279,6 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 	}
 
 	return &persistentVolumeClaim, nil
-}
-
-func ToPodDisruptionBudget(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob, scheme *runtime.Scheme) (*policyv1beta.PodDisruptionBudget, error) {
-	if actionsRunner == nil {
-		return nil, errors.New("actionsRunner == nil")
-	}
-
-	if actionsRunnerJob == nil {
-		return nil, errors.New("actionsRunnerJob == nil")
-	}
-
-	if scheme == nil {
-		return nil, errors.New("scheme == nil")
-	}
-
-	podDisruptionBudget := policyv1beta.PodDisruptionBudget{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyv1beta.SchemeGroupVersion.String(),
-			Kind:       "PodDisruptionBudget",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      actionsRunner.GetName(),
-			Namespace: actionsRunner.GetNamespace(),
-		},
-		Spec: policyv1beta.PodDisruptionBudgetSpec{
-			MaxUnavailable: &intstr.IntOrString{IntVal: 0},
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					labelApp: actionsRunner.GetName(),
-				},
-			},
-		},
-	}
-
-	if err := ctrl.SetControllerReference(actionsRunnerJob, &podDisruptionBudget, scheme); err != nil {
-		return nil, err
-	}
-
-	return &podDisruptionBudget, nil
 }
 
 func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob, scheme *runtime.Scheme) (*batchv1.Job, error) {
