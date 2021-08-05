@@ -81,14 +81,6 @@ func (c *Consumer) onPipelineAgentJobRequest(ctx context.Context, ack <-chan str
 		return err
 	}
 
-	desiredPodDisruptionBudget, err := util.ToPodDisruptionBudget(c.wire.ActionsRunner, desiredActionsRunnerJob, c.Scheme)
-	if err != nil {
-		return err
-	}
-	if err := c.Patch(ctx, desiredPodDisruptionBudget, client.Apply, patchOpts...); err != nil {
-		return err
-	}
-
 	desiredJob, err := util.ToJob(c.wire.ActionsRunner, desiredActionsRunnerJob, c.Scheme)
 	if err != nil {
 		return err

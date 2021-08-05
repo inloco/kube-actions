@@ -161,6 +161,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
+	desiredPodDisruptionBudget, err := util.ToPodDisruptionBudget(wire.DotFiles, &actionsRunner, r.Scheme)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.Patch(ctx, desiredPodDisruptionBudget, client.Apply, patchOpts...); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	consumer := &Consumer{
 		Client: r.Client,
 		Log:    r.Log,
