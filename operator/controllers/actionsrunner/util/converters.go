@@ -43,7 +43,7 @@ var (
 	dindImageVersion = EnvVar("KUBEACTIONS_DIND_IMAGE_VERSION", constants.Ver())
 	dindImageVariant = EnvVar("KUBEACTIONS_DIND_IMAGE_VARIANT", "-dind")
 
-	labelApp      = "app"
+	labelApp = "app"
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -265,7 +265,7 @@ func ToPodDisruptionBudget(actionsRunner *inlocov1alpha1.ActionsRunner, actionsR
 			Namespace: actionsRunner.GetNamespace(),
 		},
 		Spec: policyv1beta.PodDisruptionBudgetSpec{
-			MinAvailable: &intstr.IntOrString{IntVal: 1},
+			MaxUnavailable: &intstr.IntOrString{IntVal: 0},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					labelApp: actionsRunner.GetName(),
@@ -302,20 +302,12 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      actionsRunner.GetName(),
 			Namespace: actionsRunner.GetNamespace(),
-			Labels: map[string]string{
-				labelApp: actionsRunner.GetName(),
-			},
 		},
 		Spec: batchv1.JobSpec{
 			Parallelism:           pointer.Int32Ptr(1),
 			Completions:           pointer.Int32Ptr(1),
 			ActiveDeadlineSeconds: pointer.Int64Ptr(3000),
 			BackoffLimit:          pointer.Int32Ptr(0),
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					labelApp: actionsRunner.GetName(),
-				},
-			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -334,7 +326,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 							Env: FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
 								return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
 							}),
-							Resources: FilterResources(actionsRunner.Spec.Resources, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
+							Resources:    FilterResources(actionsRunner.Spec.Resources, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
 							VolumeMounts: withVolumeMounts(actionsRunner),
 						},
 					},
@@ -346,8 +338,8 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 						RunAsNonRoot: pointer.BoolPtr(true),
 						FSGroup:      pointer.Int64Ptr(1000),
 					},
-					Affinity:    withRuntimeAffinity(actionsRunner.Spec.Affinity),
-					Tolerations: actionsRunner.Spec.Tolerations,
+					Affinity:     withRuntimeAffinity(actionsRunner.Spec.Affinity),
+					Tolerations:  actionsRunner.Spec.Tolerations,
 					NodeSelector: actionsRunner.Spec.NodeSelector,
 				},
 			},
