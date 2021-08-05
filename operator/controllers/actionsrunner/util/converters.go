@@ -48,7 +48,7 @@ var (
 	dindContainerName   = "dind"
 	dindResourcesKey    = "docker"
 
-	labelApp      = "app"
+	labelApp = "app"
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -274,7 +274,7 @@ func ToPodDisruptionBudget(actionsRunner *inlocov1alpha1.ActionsRunner, actionsR
 			Namespace: actionsRunner.GetNamespace(),
 		},
 		Spec: policyv1beta.PodDisruptionBudgetSpec{
-			MinAvailable: &intstr.IntOrString{IntVal: 1},
+			MaxUnavailable: &intstr.IntOrString{IntVal: 0},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					labelApp: actionsRunner.GetName(),
