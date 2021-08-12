@@ -40,9 +40,6 @@ var (
 	dindImageName    = EnvVar("KUBEACTIONS_DIND_IMAGE_NAME", "inloco/kube-actions")
 	dindImageVersion = EnvVar("KUBEACTIONS_DIND_IMAGE_VERSION", constants.Ver())
 	dindImageVariant = EnvVar("KUBEACTIONS_DIND_IMAGE_VARIANT", "-dind")
-
-	runnerContainerName = "runner"
-	dindContainerName   = "dind"
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -230,7 +227,7 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
-			Resources: FilterResources(actionsRunner.Spec.Resources[runnerContainerName], corev1.ResourceStorage),
+			Resources: FilterResources(actionsRunner.Spec.Resources, corev1.ResourceStorage),
 		},
 	}
 
@@ -272,8 +269,8 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 				Spec: corev1.PodSpec{
 					Volumes: withVolumes(actionsRunner),
 					Containers: []corev1.Container{
-						{
-							Name:  runnerContainerName,
+						corev1.Container{
+							Name:  "runner",
 							Image: fmt.Sprintf("%s:%s%s", runnerImageName, runnerImageVersion, runnerImageVariant),
 							EnvFrom: FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
 								return envFromSource.SecretRef == nil
@@ -281,7 +278,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 							Env: FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
 								return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
 							}),
-							Resources:    FilterResources(actionsRunner.Spec.Resources[runnerContainerName], corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
+							Resources: FilterResources(actionsRunner.Spec.Resources, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
 							VolumeMounts: withVolumeMounts(actionsRunner),
 						},
 					},
@@ -293,8 +290,8 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 						RunAsNonRoot: pointer.BoolPtr(true),
 						FSGroup:      pointer.Int64Ptr(1000),
 					},
-					Affinity:     withRuntimeAffinity(actionsRunner.Spec.Affinity),
-					Tolerations:  actionsRunner.Spec.Tolerations,
+					Affinity:    withRuntimeAffinity(actionsRunner.Spec.Affinity),
+					Tolerations: actionsRunner.Spec.Tolerations,
 					NodeSelector: actionsRunner.Spec.NodeSelector,
 				},
 			},
@@ -310,7 +307,7 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		addSecretCapability(&job, actionsRunner)
 	}
 	if _, ok := capabilities[inlocov1alpha1.ActionsRunnerCapabilityDocker]; ok {
-		addDockerCapability(&job, actionsRunner)
+		addDockerCapability(&job)
 	}
 
 	if err := ctrl.SetControllerReference(actionsRunnerJob, &job, scheme); err != nil {
@@ -471,7 +468,7 @@ func addSecretCapability(job *batchv1.Job, actionsRunner *inlocov1alpha1.Actions
 	podSpec.AutomountServiceAccountToken = pointer.BoolPtr(true)
 }
 
-func addDockerCapability(job *batchv1.Job, actionsRunner *inlocov1alpha1.ActionsRunner) {
+func addDockerCapability(job *batchv1.Job) {
 	podSpec := &job.Spec.Template.Spec
 	runnerContainer := &podSpec.Containers[0]
 
@@ -517,7 +514,6 @@ func addDockerCapability(job *batchv1.Job, actionsRunner *inlocov1alpha1.Actions
 			},
 			InitialDelaySeconds: 3,
 		},
-		Resources: FilterResources(actionsRunner.Spec.Resources[dindContainerName], corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: pointer.BoolPtr(true),
 		},
