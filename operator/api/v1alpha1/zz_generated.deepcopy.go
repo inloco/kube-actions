@@ -320,13 +320,7 @@ func (in *ActionsRunnerSpec) DeepCopyInto(out *ActionsRunnerSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.Resources != nil {
-		in, out := &in.Resources, &out.Resources
-		*out = make(map[string]v1.ResourceRequirements, len(*in))
-		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
-		}
-	}
+	in.Resources.DeepCopyInto(&out.Resources)
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
 		*out = new(v1.Affinity)
