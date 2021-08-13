@@ -40,11 +40,11 @@ type ActionsRunnerSpec struct {
 	Capabilities []ActionsRunnerCapability `json:"capabilities,omitempty"`
 	Labels       []string                  `json:"labels,omitempty"`
 
-	Volumes      []corev1.Volume             `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-	VolumeMounts []corev1.VolumeMount        `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath"`
-	EnvFrom      []corev1.EnvFromSource      `json:"envFrom,omitempty"`
-	Env          []corev1.EnvVar             `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-	Resources    corev1.ResourceRequirements `json:"resources,omitempty"`
+	Volumes      []corev1.Volume                        `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	VolumeMounts []corev1.VolumeMount                   `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath"`
+	EnvFrom      []corev1.EnvFromSource                 `json:"envFrom,omitempty"`
+	Env          []corev1.EnvVar                        `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	Resources    map[string]corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	ServiceAccountName string              `json:"serviceAccountName,omitempty"`
 	Affinity           *corev1.Affinity    `json:"affinity,omitempty"`
