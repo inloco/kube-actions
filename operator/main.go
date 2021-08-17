@@ -26,6 +26,7 @@ import (
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerjob"
+	"github.com/inloco/kube-actions/operator/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -48,9 +49,9 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
+	metrics.Init()
+
 	var enableLeaderElection bool
-	flag.StringVar(&metricsAddr, "metrics-addr", ":9100", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -60,7 +61,7 @@ func main() {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
+		MetricsBindAddress: "0", // disable
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "54b17098.inloco.com.br",

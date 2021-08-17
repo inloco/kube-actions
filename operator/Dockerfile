@@ -8,6 +8,7 @@ COPY ./main.go ./main.go
 COPY ./api/ ./api/
 COPY ./constants/ ./constants/
 COPY ./controllers/ ./controllers/
+COPY ./metrics/ ./metrics/
 ARG VER
 ARG API
 RUN CGO_ENABLED=0 go install -a -ldflags '-d -extldflags "-fno-PIC -static" -X github.com/inloco/kube-actions/operator/constants.ver='${VER}' -X github.com/inloco/kube-actions/operator/constants.api='${API} -tags 'netgo osusergo static_build' -trimpath -v ./...

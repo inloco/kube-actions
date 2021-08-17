@@ -9,6 +9,7 @@ require (
 	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b3
 	github.com/onsi/ginkgo v1.16.2
 	github.com/onsi/gomega v1.12.0
+	github.com/prometheus/client_golang v1.0.0 // indirect
 	github.com/square/go-jose/v3 v3.0.0-20200630053402-0a67ce9b0693
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	k8s.io/api v0.18.6
