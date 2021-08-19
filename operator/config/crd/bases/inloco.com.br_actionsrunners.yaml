@@ -373,6 +373,10 @@ spec:
                         type: array
                     type: object
                 type: object
+              annotations:
+                additionalProperties:
+                  type: string
+                type: object
               capabilities:
                 items:
                   type: string
@@ -489,8 +493,6 @@ spec:
                 items:
                   type: string
                 type: array
-              metadata:
-                type: object
               nodeSelector:
                 additionalProperties:
                   type: string
