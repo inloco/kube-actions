@@ -36,6 +36,8 @@ const (
 
 // ActionsRunnerSpec defines the desired state of ActionsRunner
 type ActionsRunnerSpec struct {
+	Metadata metav1.ObjectMeta `json:"metadata,omitempty"`
+
 	Repository   ActionsRunnerRepository   `json:"repository"`
 	Capabilities []ActionsRunnerCapability `json:"capabilities,omitempty"`
 	Labels       []string                  `json:"labels,omitempty"`

@@ -489,6 +489,8 @@ spec:
                 items:
                   type: string
                 type: array
+              metadata:
+                type: object
               nodeSelector:
                 additionalProperties:
                   type: string
