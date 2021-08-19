@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
 
 	"github.com/go-logr/logr"
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
@@ -31,22 +32,23 @@ import (
 
 type Collection struct {
 	eventChannel chan event.GenericEvent
-	wireRegistry map[client.ObjectKey]*Wire
+	wireRegistry sync.Map // map[client.ObjectKey]*Wire
 }
 
 func (c *Collection) Init() {
 	c.eventChannel = make(chan event.GenericEvent)
-	c.wireRegistry = make(map[client.ObjectKey]*Wire)
 }
 
 func (c *Collection) Deinit() {
 	close(c.eventChannel)
 
-	for _, wire := range c.wireRegistry {
+	c.wireRegistry.Range(func(key, iwire interface{}) bool {
+		wire := iwire.(*Wire)
 		if err := wire.Close(); err != nil {
 			wire.log.Error(err, err.Error())
 		}
-	}
+		return true
+	})
 }
 
 func (c *Collection) EventSource() source.Source {
@@ -65,13 +67,16 @@ func (c *Collection) WireFor(ctx context.Context, log logr.Logger, actionsRunner
 		Name:      actionsRunner.GetName(),
 	}
 
-	if wire, ok := c.wireRegistry[namespacedName]; ok && !wire.gone {
-		if reflect.DeepEqual(*wire.ActionsRunner, *actionsRunner) {
-			return wire, nil
-		}
+	if iwire, ok := c.wireRegistry.Load(namespacedName); ok {
+		wire := iwire.(*Wire)
+		if !wire.gone {
+			if reflect.DeepEqual(*wire.ActionsRunner, *actionsRunner) {
+				return wire, nil
+			}
 
-		if err := wire.Close(); err != nil {
-			wire.log.Error(err, err.Error())
+			if err := wire.Close(); err != nil {
+				wire.log.Error(err, err.Error())
+			}
 		}
 	}
 
@@ -90,7 +95,7 @@ func (c *Collection) WireFor(ctx context.Context, log logr.Logger, actionsRunner
 
 	log.Info("Wire Initialized")
 
-	c.wireRegistry[namespacedName] = wire
+	c.wireRegistry.Store(namespacedName, wire)
 	return wire, nil
 }
 
@@ -104,8 +109,13 @@ func (c *Collection) TryClose(actionsRunner *inlocov1alpha1.ActionsRunner) error
 		Name:      actionsRunner.GetName(),
 	}
 
-	wire, ok := c.wireRegistry[namespacedName]
-	if !ok || wire.gone {
+	iwire, ok := c.wireRegistry.Load(namespacedName)
+	if !ok {
+		return nil
+	}
+
+	wire := iwire.(*Wire)
+	if wire.gone {
 		return nil
 	}
 
