@@ -51,6 +51,8 @@ func init() {
 func main() {
 	metrics.Init()
 
+	var concurrencyLevel int
+	flag.IntVar(&concurrencyLevel, "concurrency-level", 1, "Set reconciler concurrency level")
 	var enableLeaderElection bool
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
@@ -72,25 +74,28 @@ func main() {
 	}
 
 	if err = (&actionsrunnerreplicaset.Reconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ActionsRunnerReplicaSet"),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Log:         ctrl.Log.WithName("controllers").WithName("ActionsRunnerReplicaSet"),
+		Scheme:      mgr.GetScheme(),
+		Concurrency: concurrencyLevel,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ActionsRunnerReplicaSet")
 		os.Exit(1)
 	}
 	if err = (&actionsrunner.Reconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("actionsRunner"),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Log:         ctrl.Log.WithName("controllers").WithName("actionsRunner"),
+		Scheme:      mgr.GetScheme(),
+		Concurrency: concurrencyLevel,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "actionsRunner")
 		os.Exit(1)
 	}
 	if err = (&actionsrunnerjob.Reconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ActionsRunnerJob"),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Log:         ctrl.Log.WithName("controllers").WithName("ActionsRunnerJob"),
+		Scheme:      mgr.GetScheme(),
+		Concurrency: concurrencyLevel,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ActionsRunnerJob")
 		os.Exit(1)
