@@ -103,5 +103,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	time.Sleep(4 * time.Second)
+	time.Sleep(30 * time.Second)
 }
