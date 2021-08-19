@@ -2,7 +2,7 @@ IMAGE_NAME ?= inloco/kube-actions
 IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -operator
 
-AGENT_VERSION ?= 2.280.2
+AGENT_VERSION ?= 2.280.3
 
 # Default rule
 all: manager
