@@ -5,16 +5,17 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
-	githubActionsEventCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
+	githubActionsEventCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "kube_actions_operator",
 		Name:      "github_actions_event_counter",
 	}, []string{"runner", "event"})
 
-	githubActionsEventConsumeDurationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+	githubActionsEventConsumeDurationHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "kube_actions_operator",
 		Name:      "github_actions_event_consume_duration_histogram",
 		Buckets:   []float64{.1, .5, 1, 2.5, 5, 7.5, 10, 15, 20},
@@ -39,7 +40,11 @@ func (o *observer) ObserveDeffered() {
 
 func Init() {
 	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":9102", nil)
+	go func() {
+		if err := http.ListenAndServe(":9102", nil); err != nil {
+			panic(err)
+		}
+	}()
 }
 
 func IncGithubActionsEventCounter(runner, event string) {
