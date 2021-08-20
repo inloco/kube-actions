@@ -21,11 +21,13 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v32/github"
@@ -86,38 +88,22 @@ var (
 
 		return allowed
 	}()
+
+	githubClient       *github.Client
+	githubClientExpiry time.Time
+	githubClientMutext sync.Mutex
+
+	githubRepositories       map[string]*github.Repository
+	githubRepositoriesMutext sync.Mutex
+
+	githubRegistrationTokens       map[string]*github.RegistrationToken
+	githubRegistrationTokensMutext sync.Mutex
+
+	githubRemoveTokens       map[string]*github.RemoveToken
+	githubRemoveTokensMutext sync.Mutex
 )
 
-type GitHub struct {
-	AppClient *github.Client
-
-	Client     *github.Client
-	Repository *github.Repository
-
-	BridgeClient *github.Client
-}
-
-func (gh *GitHub) Init(ctx context.Context, repoOwner string, repoName string) error {
-	if err := gh.initGitHubAppClient(ctx); err != nil {
-		log.Print(err)
-	}
-
-	if err := gh.initGitHubClient(ctx); err != nil {
-		return err
-	}
-
-	if err := gh.initGitHubRepository(ctx, repoOwner, repoName); err != nil {
-		return err
-	}
-
-	if err := gh.initGitHubBridgeClient(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (gh *GitHub) GetGitHubAppToken() (string, error) {
+func getGitHubAppToken() (string, error) {
 	if githubAppId == "" {
 		return "", errors.New(`githubAppId == ""`)
 	}
@@ -162,13 +148,13 @@ func (gh *GitHub) GetGitHubAppToken() (string, error) {
 	return token, nil
 }
 
-func (gh *GitHub) initGitHubAppClient(ctx context.Context) error {
-	token, err := gh.GetGitHubAppToken()
+func newGitHubAppClient(ctx context.Context) (*github.Client, error) {
+	token, err := getGitHubAppToken()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	gh.AppClient = github.NewClient(
+	appClient := github.NewClient(
 		oauth2.NewClient(
 			ctx,
 			oauth2.StaticTokenSource(
@@ -178,100 +164,146 @@ func (gh *GitHub) initGitHubAppClient(ctx context.Context) error {
 			),
 		),
 	)
-	return nil
+	return appClient, nil
 }
 
-func (gh *GitHub) GetGitHubInstallationToken(ctx context.Context) (string, error) {
-	if gh.AppClient == nil {
-		return "", errors.New(".AppClient == nil")
+func getGitHubInstallationToken(ctx context.Context, appClient *github.Client) (*github.InstallationToken, error) {
+	if appClient == nil {
+		return nil, errors.New("appClient == nil")
 	}
 
 	var installationId int64
 	if githubInstlId != "" {
 		id, err := strconv.ParseInt(githubInstlId, 10, 0)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		installationId = id
 	} else {
 		log.Print(`githubInstlId == ""`)
 
-		installations, _, err := gh.AppClient.Apps.ListInstallations(ctx, nil)
+		installations, _, err := appClient.Apps.ListInstallations(ctx, nil)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		if len(installations) != 1 {
-			return "", errors.New("len(installations) != 1")
+			return nil, errors.New("len(installations) != 1")
 		}
 
 		installationId = installations[0].GetID()
 	}
 
-	installationToken, _, err := gh.AppClient.Apps.CreateInstallationToken(ctx, installationId, nil)
+	installationToken, _, err := appClient.Apps.CreateInstallationToken(ctx, installationId, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return installationToken.GetToken(), nil
+	return installationToken, nil
 }
 
-func (gh *GitHub) initGitHubClient(ctx context.Context) error {
-	token := githubPAT
-	if token == "" {
-		githubIAT, err := gh.GetGitHubInstallationToken(ctx)
+func initGitHubClient(ctx context.Context) error {
+	githubClientMutext.Lock()
+	defer githubClientMutext.Unlock()
+
+	if githubClient != nil && (githubClientExpiry.IsZero() || githubClientExpiry.After(time.Now().Add(time.Minute))) {
+		return nil
+	}
+
+	token := oauth2.Token{
+		AccessToken: githubPAT,
+	}
+	if token.AccessToken == "" {
+		appClient, err := newGitHubAppClient(ctx)
+		if err != nil {
+			log.Print(err)
+		}
+
+		githubIAT, err := getGitHubInstallationToken(ctx, appClient)
 		if err != nil {
 			return err
 		}
 
-		token = githubIAT
+		token.AccessToken = githubIAT.GetToken()
+		token.Expiry = githubIAT.GetExpiresAt()
 	}
 
-	gh.Client = github.NewClient(
+	githubClient = github.NewClient(
 		oauth2.NewClient(
 			ctx,
-			oauth2.StaticTokenSource(
-				&oauth2.Token{
-					AccessToken: token,
-				},
-			),
+			oauth2.StaticTokenSource(&token),
 		),
 	)
+	githubClientExpiry = token.Expiry
+
 	return nil
 }
 
-func (gh *GitHub) initGitHubRepository(ctx context.Context, owner string, name string) error {
-	if gh.Client == nil {
-		return errors.New(".Client == nil")
+func getGitHubRepository(ctx context.Context, owner string, name string) (*github.Repository, error) {
+	key := fmt.Sprintf("%s/%s", owner, name)
+
+	githubRepositoriesMutext.Lock()
+	defer githubRepositoriesMutext.Unlock()
+
+	if githubRepositories == nil {
+		githubRepositories = make(map[string]*github.Repository)
 	}
 
-	repository, githubResponse, err := gh.Client.Repositories.Get(ctx, owner, name)
+	repository, ok := githubRepositories[key]
+	if ok {
+		return repository, nil
+	}
+
+	if githubClient == nil {
+		return nil, errors.New("githubClient == nil")
+	}
+
+	repository, githubResponse, err := githubClient.Repositories.Get(ctx, owner, name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
-		return errors.New(githubResponse.Status)
+		return nil, errors.New(githubResponse.Status)
 	}
 
 	if _, ok := githubOwners[repository.GetOwner().GetLogin()]; !ok {
-		return errors.New("not in githubOwners")
+		return nil, errors.New("not in githubOwners")
 	}
 
 	if private := repository.GetPrivate(); (private && githubVisibilities&repoPrivate == 0) || (!private && githubVisibilities&repoPublic == 0) {
-		return errors.New("not in githubVisibilities")
+		return nil, errors.New("not in githubVisibilities")
 	}
 
-	gh.Repository = repository
-	return nil
+	githubRepositories[key] = repository
+
+	return repository, nil
 }
 
-func (gh *GitHub) GetGitHubRegistrationToken(ctx context.Context) (*github.RegistrationToken, error) {
-	if gh.Client == nil {
-		return nil, errors.New(".Client == nil")
+func getGitHubRegistrationToken(ctx context.Context, repository *github.Repository) (*github.RegistrationToken, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
 	}
 
-	token, githubResponse, err := gh.Client.Actions.CreateRegistrationToken(ctx, gh.Repository.GetOwner().GetLogin(), gh.Repository.GetName())
+	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
+
+	githubRegistrationTokensMutext.Lock()
+	defer githubRegistrationTokensMutext.Unlock()
+
+	if githubRegistrationTokens == nil {
+		githubRegistrationTokens = make(map[string]*github.RegistrationToken)
+	}
+
+	registrationToken, ok := githubRegistrationTokens[key]
+	if ok && registrationToken.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return registrationToken, nil
+	}
+
+	if githubClient == nil {
+		return nil, errors.New("githubClient == nil")
+	}
+
+	registrationToken, githubResponse, err := githubClient.Actions.CreateRegistrationToken(ctx, repository.GetOwner().GetLogin(), repository.GetName())
 	if err != nil {
 		return nil, err
 	}
@@ -279,42 +311,137 @@ func (gh *GitHub) GetGitHubRegistrationToken(ctx context.Context) (*github.Regis
 		return nil, errors.New(githubResponse.Status)
 	}
 
-	return token, nil
+	githubRegistrationTokens[key] = registrationToken
+
+	return registrationToken, nil
 }
 
-func (gh *GitHub) GetGitHubRemoveToken(ctx context.Context) (*github.RemoveToken, error) {
-	if gh.Client == nil {
-		return nil, errors.New(".Client == nil")
+func newGitHubBridgeClientWithRegistrationToken(ctx context.Context, repository *github.Repository) (*github.Client, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
 	}
 
-	token, githubResponse, err := gh.Client.Actions.CreateRemoveToken(ctx, gh.Repository.GetOwner().GetLogin(), gh.Repository.GetName())
+	registrationToken, err := getGitHubRegistrationToken(ctx, repository)
 	if err != nil {
 		return nil, err
 	}
-	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
-		return nil, errors.New(githubResponse.Status)
-	}
 
-	return token, nil
-}
-
-func (gh *GitHub) initGitHubBridgeClient(ctx context.Context) error {
-	token, err := gh.GetGitHubRegistrationToken(ctx)
-	if err != nil {
-		return err
-	}
-
-	gh.BridgeClient = github.NewClient(
+	bridgeClient := github.NewClient(
 		oauth2.NewClient(
 			ctx,
 			oauth2.StaticTokenSource(
 				&oauth2.Token{
-					AccessToken: token.GetToken(),
+					AccessToken: registrationToken.GetToken(),
 					TokenType:   "RemoteAuth",
 				},
 			),
 		),
 	)
+	return bridgeClient, nil
+}
+
+func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*github.RemoveToken, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
+	}
+
+	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
+
+	githubRemoveTokensMutext.Lock()
+	defer githubRemoveTokensMutext.Unlock()
+
+	if githubRemoveTokens == nil {
+		githubRemoveTokens = make(map[string]*github.RemoveToken)
+	}
+
+	removeToken, ok := githubRemoveTokens[key]
+	if ok && removeToken.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return removeToken, nil
+	}
+
+	if githubClient == nil {
+		return nil, errors.New("githubClient == nil")
+	}
+
+	removeToken, githubResponse, err := githubClient.Actions.CreateRemoveToken(ctx, repository.GetOwner().GetLogin(), repository.GetName())
+	if err != nil {
+		return nil, err
+	}
+	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
+		return nil, errors.New(githubResponse.Status)
+	}
+
+	githubRemoveTokens[key] = removeToken
+
+	return removeToken, nil
+}
+
+func newGitHubBridgeClientWithRemoveToken(ctx context.Context, repository *github.Repository) (*github.Client, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
+	}
+
+	removeToken, err := getGitHubRemoveToken(ctx, repository)
+	if err != nil {
+		return nil, err
+	}
+
+	bridgeClient := github.NewClient(
+		oauth2.NewClient(
+			ctx,
+			oauth2.StaticTokenSource(
+				&oauth2.Token{
+					AccessToken: removeToken.GetToken(),
+					TokenType:   "RemoteAuth",
+				},
+			),
+		),
+	)
+	return bridgeClient, nil
+}
+
+type GitHub struct {
+	Repository   *github.Repository
+	BridgeClient *github.Client
+}
+
+func (gh *GitHub) InitWithRegistrationToken(ctx context.Context, repoOwner string, repoName string) error {
+	if err := initGitHubClient(ctx); err != nil {
+		return err
+	}
+
+	repository, err := getGitHubRepository(ctx, repoOwner, repoName)
+	if err != nil {
+		return err
+	}
+	gh.Repository = repository
+
+	bridgeClient, err := newGitHubBridgeClientWithRegistrationToken(ctx, repository)
+	if err != nil {
+		return err
+	}
+	gh.BridgeClient = bridgeClient
+
+	return nil
+}
+
+func (gh *GitHub) InitWithRemoveToken(ctx context.Context, repoOwner string, repoName string) error {
+	if err := initGitHubClient(ctx); err != nil {
+		return err
+	}
+
+	repository, err := getGitHubRepository(ctx, repoOwner, repoName)
+	if err != nil {
+		return err
+	}
+	gh.Repository = repository
+
+	bridgeClient, err := newGitHubBridgeClientWithRemoveToken(ctx, repository)
+	if err != nil {
+		return err
+	}
+	gh.BridgeClient = bridgeClient
+
 	return nil
 }
 
