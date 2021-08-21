@@ -23,15 +23,16 @@ import (
 
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerreplicaset"
 
-	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerjob"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerjob"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -99,6 +100,14 @@ func main() {
 		Concurrency: concurrencyLevel,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ActionsRunnerJob")
+		os.Exit(1)
+	}
+	if err = (&inlocov1alpha1.ActionsRunner{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ActionsRunner")
+		os.Exit(1)
+	}
+	if err = (&inlocov1alpha1.ActionsRunner{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ActionsRunner")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

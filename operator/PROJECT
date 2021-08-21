@@ -1,15 +1,25 @@
-version: 3-alpha
-repo: github.com/inloco/kube-actions/operator
-resources:
-  - group: inloco.com.br
-    version: v1alpha1
-    kind: ActionsRunnerReplicaSet
-  - group: inloco.com.br
-    version: v1alpha1
-    kind: ActionsRunner
-  - group: inloco.com.br
-    version: v1alpha1
-    kind: ActionsRunnerJob
-layout: go.kubebuilder.io/v2
+layout:
+- go.kubebuilder.io/v2
 plugins:
   go.operator-sdk.io/v2-alpha: {}
+repo: github.com/inloco/kube-actions/operator
+resources:
+- controller: true
+  group: inloco.com.br
+  kind: ActionsRunnerReplicaSet
+  path: github.com/inloco/kube-actions/operator/api/v1alpha1
+  version: v1alpha1
+- controller: true
+  group: inloco.com.br
+  kind: ActionsRunner
+  path: github.com/inloco/kube-actions/operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    validation: true
+    webhookVersion: v1beta1
+- controller: true
+  group: inloco.com.br
+  kind: ActionsRunnerJob
+  path: github.com/inloco/kube-actions/operator/api/v1alpha1
+  version: v1alpha1
+version: "3"
