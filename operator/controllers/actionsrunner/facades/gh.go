@@ -102,6 +102,8 @@ var (
 
 	githubRemoveTokens       sync.Map
 	githubRemoveTokensMutext sync.Mutex
+
+	githubTenantCredential sync.Mutex
 )
 
 func collectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, clientName string) error {
@@ -534,10 +536,15 @@ func (gh *GitHub) GetGitHubTenantCredential(ctx context.Context, runnerEvent Run
 		return nil, errors.New(".BridgeClient == nil")
 	}
 
+	githubTenantCredential.Lock()
+	defer githubTenantCredential.Unlock()
+
 	tenantCredential, githubResponse, err := gh.BridgeClient.Actions.CreateTenantCredential(ctx, string(runnerEvent), gh.Repository.GetHTMLURL())
 	if err := handleGitHubResponse(ctx, gh.BridgeClient, "bridge", githubResponse, err); err != nil {
 		return nil, err
 	}
+
+	time.Sleep(time.Second)
 
 	return tenantCredential, nil
 }
