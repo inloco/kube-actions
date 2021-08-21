@@ -51,7 +51,7 @@ func (w *Wire) Init(ctx context.Context) error {
 		return err
 	}
 
-	if err := w.ghFacade.Init(ctx, w.ActionsRunner.Spec.Repository.Owner, w.ActionsRunner.Spec.Repository.Name); err != nil {
+	if err := w.ghFacade.InitWithRegistrationToken(ctx, w.ActionsRunner.Spec.Repository.Owner, w.ActionsRunner.Spec.Repository.Name); err != nil {
 		return err
 	}
 	w.DotFiles.Runner.GitHubUrl = w.ghFacade.Repository.GetGitCommitsURL()
