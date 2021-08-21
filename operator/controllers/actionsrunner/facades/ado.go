@@ -306,22 +306,22 @@ func (ado *AzureDevOps) initAzureDevOpsBridgeConnection(ctx context.Context, run
 		return err
 	}
 
-	data, err := ado.GetAzureDevOpsConnectionData(ctx)
-	if err != nil {
-		return err
-	}
-
-	url := ado.Connection.BaseUrl
-	for _, accessMapping := range *data.LocationServiceData.AccessMappings {
-		if *accessMapping.Moniker == "HostGuidAccessMapping" {
-			url = *accessMapping.AccessPoint
-			break
-		}
-	}
+	//data, err := ado.GetAzureDevOpsConnectionData(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//url := ado.Connection.BaseUrl
+	//for _, accessMapping := range *data.LocationServiceData.AccessMappings {
+	//	if *accessMapping.Moniker == "HostGuidAccessMapping" {
+	//		url = *accessMapping.AccessPoint
+	//		break
+	//	}
+	//}
 
 	ado.BridgeConnection = &azuredevops.Connection{
 		AuthorizationString: fmt.Sprintf("Bearer %v", token),
-		BaseUrl:             url,
+		BaseUrl:             runner.ServerUrl,
 	}
 	return nil
 }
