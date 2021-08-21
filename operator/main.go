@@ -26,7 +26,6 @@ import (
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerjob"
-	"github.com/inloco/kube-actions/operator/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -49,10 +48,12 @@ func init() {
 }
 
 func main() {
-	metrics.Init()
-
 	var concurrencyLevel int
 	flag.IntVar(&concurrencyLevel, "concurrency-level", 1, "Set reconciler concurrency level")
+
+	var metricsAddr string
+	flag.StringVar(&metricsAddr, "metrics-addr", ":9102", "The address the metric endpoint binds to.")
+
 	var enableLeaderElection bool
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
@@ -63,7 +64,7 @@ func main() {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
-		MetricsBindAddress: "0", // disable
+		MetricsBindAddress: metricsAddr,
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "54b17098.inloco.com.br",

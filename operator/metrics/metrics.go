@@ -1,26 +1,84 @@
 package metrics
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var (
-	githubActionsEventCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "kube_actions_operator",
-		Name:      "github_actions_event_counter",
-	}, []string{"runner", "event"})
+	githubRateLimitCollector = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "kubeactions",
+			Subsystem: "github",
+			Name:      "rate_limit",
+			Help:      "Current GitHub Rate Limit.",
+		},
+		[]string{
+			"client",
+		},
+	)
 
-	githubActionsEventConsumeDurationHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "kube_actions_operator",
-		Name:      "github_actions_event_consume_duration_histogram",
-		Buckets:   []float64{.1, .5, 1, 2.5, 5, 7.5, 10, 15, 20},
-	}, []string{"runner", "event"})
+	githubRateRemainingCollector = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "kubeactions",
+			Subsystem: "github",
+			Name:      "rate_remaining",
+			Help:      "Current GitHub Rate Remaining.",
+		},
+		[]string{
+			"client",
+		},
+	)
+
+	githubAPICallsCollector = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "kubeactions",
+			Subsystem: "github",
+			Name:      "api_calls",
+			Help:      "Number of GitHub API Calls.",
+		},
+		[]string{
+			"client",
+			"request",
+			"response",
+		},
+	)
+
+	githubActionsEventCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "kube_actions_operator",
+			Name:      "github_actions_event_counter",
+		},
+		[]string{
+			"runner",
+			"event",
+		},
+	)
+
+	githubActionsEventConsumeDurationHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "kube_actions_operator",
+			Name:      "github_actions_event_consume_duration_histogram",
+			Buckets:   []float64{.1, .5, 1, 2.5, 5, 7.5, 10, 15, 20},
+		},
+		[]string{
+			"runner",
+			"event",
+		},
+	)
 )
+
+func init() {
+	metrics.Registry.MustRegister(
+		githubRateLimitCollector,
+		githubRateRemainingCollector,
+		githubAPICallsCollector,
+		githubActionsEventCounter,
+		githubActionsEventConsumeDurationHistogram,
+	)
+}
 
 type observer struct {
 	start   time.Time
@@ -38,13 +96,16 @@ func (o *observer) ObserveDeffered() {
 	o.observe(time.Since(o.start))
 }
 
-func Init() {
-	http.Handle("/metrics", promhttp.Handler())
-	go func() {
-		if err := http.ListenAndServe(":9102", nil); err != nil {
-			panic(err)
-		}
-	}()
+func SetGithubRateLimitCollector(clientName string, limit int) {
+	githubRateLimitCollector.WithLabelValues(clientName).Set(float64(limit))
+}
+
+func SetGithubRateRemainingCollector(clientName string, remaining int) {
+	githubRateRemainingCollector.WithLabelValues(clientName).Set(float64(remaining))
+}
+
+func IncGithubAPICallsCollector(clientName, request, response string) {
+	githubAPICallsCollector.WithLabelValues(clientName, request, response).Inc()
 }
 
 func IncGithubActionsEventCounter(runner, event string) {
