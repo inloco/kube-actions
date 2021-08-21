@@ -236,9 +236,10 @@ func newGitHubAppClient(ctx context.Context) (*github.Client, error) {
 		),
 	)
 
-	if err := collectGitHubRateLimitMetrics(ctx, appClient, "app"); err != nil {
-		return nil, err
-	}
+	// TODO: this is returning 401
+	//if err := collectGitHubRateLimitMetrics(ctx, appClient, "app"); err != nil {
+	//	return nil, err
+	//}
 
 	return appClient, nil
 }
@@ -293,7 +294,7 @@ func initGitHubClient(ctx context.Context) error {
 	if token.AccessToken == "" {
 		appClient, err := newGitHubAppClient(ctx)
 		if err != nil {
-			log.Print(err)
+			return err
 		}
 
 		githubIAT, err := getGitHubInstallationToken(ctx, appClient)
