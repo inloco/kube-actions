@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/go-github/v32/github"
@@ -118,7 +119,7 @@ func collectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, c
 	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
 		return errors.New(githubResponse.Status)
 	}
-	log.Print(rateLimits.String())
+	log.Printf("%s: %s", clientName, rateLimits.String())
 
 	core := rateLimits.GetCore()
 	if core == nil {
@@ -358,6 +359,11 @@ func getGitHubRepository(ctx context.Context, owner string, name string) (*githu
 	return repository, nil
 }
 
+type registrationTokenContainer struct {
+	Token *github.RegistrationToken
+	Rate  uint64
+}
+
 func getGitHubRegistrationToken(ctx context.Context, repository *github.Repository) (*github.RegistrationToken, error) {
 	if repository == nil {
 		return nil, errors.New("repository == nil")
@@ -365,15 +371,32 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 
 	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
 
-	if token, ok := githubRegistrationTokens.Load(key); ok && token.(*github.RegistrationToken).GetExpiresAt().After(time.Now().Add(time.Minute)) {
-		return token.(*github.RegistrationToken), nil
+	if i, ok := githubRegistrationTokens.Load(key); ok {
+		container, ok := i.(*registrationTokenContainer)
+		if !ok {
+			return nil, errors.New("i not *registrationTokenContainer")
+		}
+
+		// TODO: make rate limit dynamic by getting the value from GET /rate_limits
+		if rate := atomic.AddUint64(&container.Rate, 1); rate < 60 && container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+			return container.Token, nil
+		}
 	}
 
 	githubRegistrationTokensMutext.Lock()
 	defer githubRegistrationTokensMutext.Unlock()
 
-	if token, ok := githubRegistrationTokens.Load(key); ok && token.(*github.RegistrationToken).GetExpiresAt().After(time.Now().Add(time.Minute)) {
-		return token.(*github.RegistrationToken), nil
+	// TODO: deduplicate code
+	if i, ok := githubRegistrationTokens.Load(key); ok {
+		container, ok := i.(*registrationTokenContainer)
+		if !ok {
+			return nil, errors.New("i not *registrationTokenContainer")
+		}
+
+		// TODO: make rate limit dynamic by getting the value from GET /rate_limits
+		if rate := atomic.AddUint64(&container.Rate, 1); rate < 60 && container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+			return container.Token, nil
+		}
 	}
 
 	if githubClient == nil {
@@ -385,7 +408,9 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 		return nil, err
 	}
 
-	githubRegistrationTokens.Store(key, registrationToken)
+	githubRegistrationTokens.Store(key, &registrationTokenContainer{
+		Token: registrationToken,
+	})
 
 	return registrationToken, nil
 }
@@ -419,6 +444,11 @@ func newGitHubBridgeClientWithRegistrationToken(ctx context.Context, repository 
 	return bridgeClient, nil
 }
 
+type removeTokenContainer struct {
+	Token *github.RemoveToken
+	Rate  uint64
+}
+
 func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*github.RemoveToken, error) {
 	if repository == nil {
 		return nil, errors.New("repository == nil")
@@ -426,12 +456,33 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 
 	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
 
-	if token, ok := githubRemoveTokens.Load(key); ok && token.(*github.RemoveToken).GetExpiresAt().After(time.Now().Add(time.Minute)) {
-		return token.(*github.RemoveToken), nil
+	if i, ok := githubRemoveTokens.Load(key); ok {
+		container, ok := i.(*removeTokenContainer)
+		if !ok {
+			return nil, errors.New("i not *registrationTokenContainer")
+		}
+
+		// TODO: make rate limit dynamic by getting the value from GET /rate_limits
+		if rate := atomic.AddUint64(&container.Rate, 1); rate < 60 && container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+			return container.Token, nil
+		}
 	}
 
 	githubRemoveTokensMutext.Lock()
 	defer githubRemoveTokensMutext.Unlock()
+
+	// TODO: deduplicate code
+	if i, ok := githubRemoveTokens.Load(key); ok {
+		container, ok := i.(*removeTokenContainer)
+		if !ok {
+			return nil, errors.New("i not *registrationTokenContainer")
+		}
+
+		// TODO: make rate limit dynamic by getting the value from GET /rate_limits
+		if rate := atomic.AddUint64(&container.Rate, 1); rate < 60 && container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+			return container.Token, nil
+		}
+	}
 
 	if token, ok := githubRemoveTokens.Load(key); ok && token.(*github.RemoveToken).GetExpiresAt().After(time.Now().Add(time.Minute)) {
 		return token.(*github.RemoveToken), nil
@@ -446,7 +497,9 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 		return nil, err
 	}
 
-	githubRemoveTokens.Store(key, removeToken)
+	githubRemoveTokens.Store(key, &removeTokenContainer{
+		Token: removeToken,
+	})
 
 	return removeToken, nil
 }
