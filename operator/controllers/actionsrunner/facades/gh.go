@@ -93,13 +93,13 @@ var (
 	githubClientExpiry time.Time
 	githubClientMutext sync.Mutex
 
-	githubRepositories       map[string]*github.Repository
+	githubRepositories       sync.Map
 	githubRepositoriesMutext sync.Mutex
 
-	githubRegistrationTokens       map[string]*github.RegistrationToken
+	githubRegistrationTokens       sync.Map
 	githubRegistrationTokensMutext sync.Mutex
 
-	githubRemoveTokens       map[string]*github.RemoveToken
+	githubRemoveTokens       sync.Map
 	githubRemoveTokensMutext sync.Mutex
 )
 
@@ -243,16 +243,15 @@ func initGitHubClient(ctx context.Context) error {
 func getGitHubRepository(ctx context.Context, owner string, name string) (*github.Repository, error) {
 	key := fmt.Sprintf("%s/%s", owner, name)
 
+	if repository, ok := githubRepositories.Load(key); ok {
+		return repository.(*github.Repository), nil
+	}
+
 	githubRepositoriesMutext.Lock()
 	defer githubRepositoriesMutext.Unlock()
 
-	if githubRepositories == nil {
-		githubRepositories = make(map[string]*github.Repository)
-	}
-
-	repository, ok := githubRepositories[key]
-	if ok {
-		return repository, nil
+	if repository, ok := githubRepositories.Load(key); ok {
+		return repository.(*github.Repository), nil
 	}
 
 	if githubClient == nil {
@@ -275,7 +274,7 @@ func getGitHubRepository(ctx context.Context, owner string, name string) (*githu
 		return nil, errors.New("not in githubVisibilities")
 	}
 
-	githubRepositories[key] = repository
+	githubRepositories.Store(key, repository)
 
 	return repository, nil
 }
@@ -287,16 +286,15 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 
 	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
 
+	if token, ok := githubRegistrationTokens.Load(key); ok && token.(*github.RegistrationToken).GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return token.(*github.RegistrationToken), nil
+	}
+
 	githubRegistrationTokensMutext.Lock()
 	defer githubRegistrationTokensMutext.Unlock()
 
-	if githubRegistrationTokens == nil {
-		githubRegistrationTokens = make(map[string]*github.RegistrationToken)
-	}
-
-	registrationToken, ok := githubRegistrationTokens[key]
-	if ok && registrationToken.GetExpiresAt().After(time.Now().Add(time.Minute)) {
-		return registrationToken, nil
+	if token, ok := githubRegistrationTokens.Load(key); ok && token.(*github.RegistrationToken).GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return token.(*github.RegistrationToken), nil
 	}
 
 	if githubClient == nil {
@@ -311,7 +309,7 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 		return nil, errors.New(githubResponse.Status)
 	}
 
-	githubRegistrationTokens[key] = registrationToken
+	githubRegistrationTokens.Store(key, registrationToken)
 
 	return registrationToken, nil
 }
@@ -347,16 +345,15 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 
 	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
 
+	if token, ok := githubRemoveTokens.Load(key); ok && token.(*github.RemoveToken).GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return token.(*github.RemoveToken), nil
+	}
+
 	githubRemoveTokensMutext.Lock()
 	defer githubRemoveTokensMutext.Unlock()
 
-	if githubRemoveTokens == nil {
-		githubRemoveTokens = make(map[string]*github.RemoveToken)
-	}
-
-	removeToken, ok := githubRemoveTokens[key]
-	if ok && removeToken.GetExpiresAt().After(time.Now().Add(time.Minute)) {
-		return removeToken, nil
+	if token, ok := githubRemoveTokens.Load(key); ok && token.(*github.RemoveToken).GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return token.(*github.RemoveToken), nil
 	}
 
 	if githubClient == nil {
@@ -371,7 +368,7 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 		return nil, errors.New(githubResponse.Status)
 	}
 
-	githubRemoveTokens[key] = removeToken
+	githubRemoveTokens.Store(key, removeToken)
 
 	return removeToken, nil
 }
