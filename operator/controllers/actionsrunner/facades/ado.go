@@ -36,7 +36,6 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/location"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
-	"github.com/microsoft/azure-devops-go-api/azuredevops/webapi"
 )
 
 var (
@@ -72,10 +71,6 @@ func (ado *AzureDevOps) Init(ctx context.Context, token string, url string, dotF
 	}
 
 	if err := ado.initAzureDevOpsConnection(token, url); err != nil {
-		return err
-	}
-
-	if err := ado.initAzureDevOpsLocationClient(ctx); err != nil {
 		return err
 	}
 
@@ -121,15 +116,6 @@ func (ado *AzureDevOps) initAzureDevOpsConnection(token string, url string) erro
 		AuthorizationString: fmt.Sprintf("Bearer %v", token),
 		BaseUrl:             url,
 	}
-	return nil
-}
-
-func (ado *AzureDevOps) initAzureDevOpsLocationClient(ctx context.Context) error {
-	if ado.Connection == nil {
-		return errors.New(".Connection == nil")
-	}
-
-	ado.LocationClient = location.NewClient(ctx, ado.Connection)
 	return nil
 }
 
@@ -279,17 +265,6 @@ func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, runner *do
 	return nil
 }
 
-func (ado *AzureDevOps) GetAzureDevOpsConnectionData(ctx context.Context) (*location.ConnectionData, error) {
-	if ado.LocationClient == nil {
-		return nil, errors.New(".LocationClient == nil")
-	}
-
-	connectOptions := webapi.ConnectOptions("1")
-	return ado.LocationClient.GetConnectionData(ctx, location.GetConnectionDataArgs{
-		ConnectOptions: &connectOptions,
-	})
-}
-
 func (ado *AzureDevOps) initAzureDevOpsBridgeConnection(ctx context.Context, runner *dot.Files) error {
 	// TODO
 	//if rc.credentials == nil {
@@ -305,19 +280,6 @@ func (ado *AzureDevOps) initAzureDevOpsBridgeConnection(ctx context.Context, run
 	if err != nil {
 		return err
 	}
-
-	//data, err := ado.GetAzureDevOpsConnectionData(ctx)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//url := ado.Connection.BaseUrl
-	//for _, accessMapping := range *data.LocationServiceData.AccessMappings {
-	//	if *accessMapping.Moniker == "HostGuidAccessMapping" {
-	//		url = *accessMapping.AccessPoint
-	//		break
-	//	}
-	//}
 
 	ado.BridgeConnection = &azuredevops.Connection{
 		AuthorizationString: fmt.Sprintf("Bearer %v", token),
