@@ -65,7 +65,7 @@ type AzureDevOps struct {
 	TaskAgentSession      *taskagent.TaskAgentSession
 }
 
-func (ado *AzureDevOps) Init(ctx context.Context, token string, url string, dotFiles *dot.Files, labels []string) error {
+func (ado *AzureDevOps) InitForCRUD(ctx context.Context, dotFiles *dot.Files, labels []string, token string, url string) error {
 	if err := ado.initRSAPrivateKey(dotFiles); err != nil {
 		return err
 	}
@@ -75,6 +75,18 @@ func (ado *AzureDevOps) Init(ctx context.Context, token string, url string, dotF
 	}
 
 	if err := ado.initAzureDevOpsTaskAgentClient(ctx); err != nil {
+		return err
+	}
+
+	if err := ado.initAzureDevOpsTaskAgent(ctx, dotFiles, append(agentLabelsBase, labels...)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ado *AzureDevOps) InitForRun(ctx context.Context, dotFiles *dot.Files, labels []string) error {
+	if err := ado.initRSAPrivateKey(dotFiles); err != nil {
 		return err
 	}
 
@@ -93,8 +105,8 @@ func (ado *AzureDevOps) Init(ctx context.Context, token string, url string, dotF
 	return nil
 }
 
-func (ado *AzureDevOps) initRSAPrivateKey(runner *dot.Files) error {
-	rsaPrivateKey, err := runner.RSAParameters.ToRSAPrivateKey()
+func (ado *AzureDevOps) initRSAPrivateKey(dotFiles *dot.Files) error {
+	rsaPrivateKey, err := dotFiles.RSAParameters.ToRSAPrivateKey()
 	if err != nil {
 		return err
 	}
@@ -206,23 +218,27 @@ func (ado *AzureDevOps) DeleteAgent(ctx context.Context) error {
 	})
 }
 
-func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, runner *dot.Files, labels []string) error {
+func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, dotFiles *dot.Files, labels []string) error {
 	// TODO
 	//if rc.rsaParameters == nil {
 	//	return errors.New(".rsaParameters == nil")
 	//}
 
 	ado.TaskAgent = &taskagent.TaskAgent{
-		Id:      &runner.Runner.AgentId,
-		Name:    &runner.Runner.AgentName,
+		Id:      &dotFiles.Runner.AgentId,
+		Name:    &dotFiles.Runner.AgentName,
 		Version: &agentVersion,
 		Labels:  &labels,
 		Authorization: &taskagent.TaskAgentAuthorization{
 			PublicKey: &taskagent.TaskAgentPublicKey{
-				Exponent: &runner.RSAParameters.Exponent,
-				Modulus:  &runner.RSAParameters.Modulus,
+				Exponent: &dotFiles.RSAParameters.Exponent,
+				Modulus:  &dotFiles.RSAParameters.Modulus,
 			},
 		},
+	}
+
+	if ado.TaskAgentClient == nil {
+		return nil
 	}
 
 	if agent, err := ado.GetAgent(ctx); err == nil {
@@ -250,40 +266,40 @@ func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, runner *do
 		agent = taskAgent
 	}
 
-	runner.Runner.AgentId = *agent.Id
+	dotFiles.Runner.AgentId = *agent.Id
 
-	runner.Credentials.Data.ClientId = agent.Authorization.ClientId.String()
-	runner.Credentials.Data.AuthorizationURL = *agent.Authorization.AuthorizationUrl
-	runner.Credentials.Data.OAuthEndpointURL = *agent.Authorization.AuthorizationUrl
+	dotFiles.Credentials.Data.ClientId = agent.Authorization.ClientId.String()
+	dotFiles.Credentials.Data.AuthorizationURL = *agent.Authorization.AuthorizationUrl
+	dotFiles.Credentials.Data.OAuthEndpointURL = *agent.Authorization.AuthorizationUrl
 
-	runner.Credentials.Data.RequireFipsCryptography = "False"
+	dotFiles.Credentials.Data.RequireFipsCryptography = "False"
 	if v := util.GetPropertyValue(agent.Properties, "RequireFipsCryptography"); v == true {
-		runner.Credentials.Data.RequireFipsCryptography = "True"
+		dotFiles.Credentials.Data.RequireFipsCryptography = "True"
 	}
 
 	ado.TaskAgent = agent
 	return nil
 }
 
-func (ado *AzureDevOps) initAzureDevOpsBridgeConnection(ctx context.Context, runner *dot.Files) error {
+func (ado *AzureDevOps) initAzureDevOpsBridgeConnection(ctx context.Context, dotFiles *dot.Files) error {
 	// TODO
 	//if rc.credentials == nil {
 	//	return errors.New(".credentials == nil")
 	//}
 
-	assertion, err := util.ClientAssertion(runner.Credentials.Data.ClientId, runner.Credentials.Data.AuthorizationURL, ado.RSAPrivateKey)
+	assertion, err := util.ClientAssertion(dotFiles.Credentials.Data.ClientId, dotFiles.Credentials.Data.AuthorizationURL, ado.RSAPrivateKey)
 	if err != nil {
 		return err
 	}
 
-	token, err := util.AccessToken(ctx, runner.Credentials.Data.OAuthEndpointURL, assertion)
+	token, err := util.AccessToken(ctx, dotFiles.Credentials.Data.OAuthEndpointURL, assertion)
 	if err != nil {
 		return err
 	}
 
 	ado.BridgeConnection = &azuredevops.Connection{
 		AuthorizationString: fmt.Sprintf("Bearer %v", token),
-		BaseUrl:             runner.ServerUrl,
+		BaseUrl:             dotFiles.ServerUrl,
 	}
 	return nil
 }

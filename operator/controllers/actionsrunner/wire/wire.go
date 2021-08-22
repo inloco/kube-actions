@@ -47,22 +47,28 @@ type Wire struct {
 }
 
 func (w *Wire) Init(ctx context.Context) error {
-	if err := w.initDotFiles(); err != nil {
-		return err
+	if w.DotFiles == nil {
+		if err := w.initDotFiles(); err != nil {
+			return err
+		}
+
+		if err := w.ghFacade.Init(ctx, w.ActionsRunner.Spec.Repository.Owner, w.ActionsRunner.Spec.Repository.Name); err != nil {
+			return err
+		}
+		w.DotFiles.Runner.GitHubUrl = w.ghFacade.Repository.GetGitCommitsURL()
+
+		credential, err := facades.GetGitHubTenantCredential(ctx, w.ghFacade.Repository, facades.RunnerEventRegister)
+		if err != nil {
+			return err
+		}
+		w.DotFiles.Runner.ServerUrl = credential.GetURL()
+
+		if err := w.adoFacade.InitForCRUD(ctx, w.DotFiles, w.ActionsRunner.Spec.Labels, credential.GetToken(), credential.GetURL()); err != nil {
+			return err
+		}
 	}
 
-	if err := w.ghFacade.Init(ctx, w.ActionsRunner.Spec.Repository.Owner, w.ActionsRunner.Spec.Repository.Name); err != nil {
-		return err
-	}
-	w.DotFiles.Runner.GitHubUrl = w.ghFacade.Repository.GetGitCommitsURL()
-
-	credential, err := facades.GetGitHubTenantCredential(ctx, w.ghFacade.Repository, facades.RunnerEventRegister)
-	if err != nil {
-		return err
-	}
-	w.DotFiles.Runner.ServerUrl = credential.GetURL()
-
-	if err := w.adoFacade.Init(ctx, credential.GetToken(), credential.GetURL(), w.DotFiles, w.ActionsRunner.Spec.Labels); err != nil {
+	if err := w.adoFacade.InitForRun(ctx, w.DotFiles, w.ActionsRunner.Spec.Labels); err != nil {
 		return err
 	}
 
