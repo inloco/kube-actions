@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -36,6 +35,7 @@ import (
 	"github.com/google/go-github/v32/github"
 	"github.com/inloco/kube-actions/operator/metrics"
 	"golang.org/x/oauth2"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -84,7 +84,8 @@ var (
 				allowed |= repoPrivate
 
 			default:
-				log.Printf("unknown visility: %v", allowedVisibility)
+				logger := log.FromContext(context.TODO())
+				logger.Info("unknown visility: " + allowedVisibility)
 			}
 		}
 
@@ -109,6 +110,8 @@ var (
 )
 
 func collectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, clientName string) error {
+	logger := log.FromContext(ctx)
+
 	if client == nil {
 		return errors.New("client == nil")
 	}
@@ -120,7 +123,7 @@ func collectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, c
 	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
 		return errors.New(githubResponse.Status)
 	}
-	log.Printf("%s: %s", clientName, rateLimits.String())
+	logger.Info(rateLimits.String(), "clientName", clientName)
 
 	core := rateLimits.GetCore()
 	if core == nil {
@@ -133,8 +136,10 @@ func collectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, c
 }
 
 func tryCollectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, clientName string) {
+	logger := log.FromContext(ctx)
+
 	if err := collectGitHubRateLimitMetrics(ctx, client, clientName); err != nil {
-		log.Print(err)
+		logger.Error(err, err.Error(), "clientName", clientName)
 	}
 }
 
@@ -157,8 +162,10 @@ func collectGitHubAPICallMetrics(ctx context.Context, client *github.Client, cli
 }
 
 func tryCollectGitHubAPICallMetrics(ctx context.Context, client *github.Client, clientName string, response *github.Response) {
+	logger := log.FromContext(ctx)
+
 	if err := collectGitHubAPICallMetrics(ctx, client, clientName, response); err != nil {
-		log.Print(err)
+		logger.Error(err, err.Error(), "clientName", clientName)
 	}
 }
 
@@ -238,15 +245,12 @@ func newGitHubAppClient(ctx context.Context) (*github.Client, error) {
 		),
 	)
 
-	// TODO: this is returning 401
-	//if err := collectGitHubRateLimitMetrics(ctx, appClient, "app"); err != nil {
-	//	return nil, err
-	//}
-
 	return appClient, nil
 }
 
 func getGitHubInstallationToken(ctx context.Context, appClient *github.Client) (*github.InstallationToken, error) {
+	logger := log.FromContext(ctx)
+
 	if appClient == nil {
 		return nil, errors.New("appClient == nil")
 	}
@@ -260,7 +264,7 @@ func getGitHubInstallationToken(ctx context.Context, appClient *github.Client) (
 
 		installationId = id
 	} else {
-		log.Print(`githubInstlId == ""`)
+		logger.Info(`githubInstlId == ""`)
 
 		installations, githubResponse, err := appClient.Apps.ListInstallations(ctx, nil)
 		if err := handleGitHubResponse(ctx, appClient, "app", githubResponse, err); err != nil {
@@ -393,7 +397,7 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 		return nil, errors.New("repository == nil")
 	}
 
-	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
+	key := fmt.Sprintf("%s/%s", repository.GetOwner().GetLogin(), repository.GetName())
 
 	if registrationToken, err := tryGetGitHubRegistrationToken(key); err == nil {
 		metrics.IncGitHubCacheHitCollector("registrationToken", true)
@@ -484,7 +488,7 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 		return nil, errors.New("repository == nil")
 	}
 
-	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
+	key := fmt.Sprintf("%s/%s", repository.GetOwner().GetLogin(), repository.GetName())
 
 	if removeToken, err := tryGetGitHubRemoveToken(key); err == nil {
 		metrics.IncGitHubCacheHitCollector("removeToken", true)
@@ -586,7 +590,7 @@ func GetGitHubTenantCredential(ctx context.Context, repository *github.Repositor
 		return nil, errors.New("repository == nil")
 	}
 
-	key := fmt.Sprintf("%s@%s/%s", string(runnerEvent), repository.GetOwner(), repository.GetName())
+	key := fmt.Sprintf("%s@%s/%s", string(runnerEvent), repository.GetOwner().GetLogin(), repository.GetName())
 
 	if tenantCredential, err := tryGetGitHubTenantCredential(key); err == nil {
 		metrics.IncGitHubCacheHitCollector("tenantCredential", true)

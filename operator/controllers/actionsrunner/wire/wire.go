@@ -21,13 +21,12 @@ import (
 	"errors"
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/facades"
 	"k8s.io/utils/strings"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Wire struct {
@@ -46,29 +45,49 @@ type Wire struct {
 	gone bool
 }
 
-func (w *Wire) Init(ctx context.Context) error {
+func (w *Wire) initGH(ctx context.Context) error {
+	if err := w.ghFacade.Init(ctx, w.ActionsRunner.Spec.Repository.Owner, w.ActionsRunner.Spec.Repository.Name); err != nil {
+		return err
+	}
+	w.DotFiles.Runner.GitHubUrl = w.ghFacade.Repository.GetGitCommitsURL()
+
+	return nil
+}
+
+func (w *Wire) initADO(ctx context.Context, runnerEvent facades.RunnerEvent) error {
+	credential, err := facades.GetGitHubTenantCredential(ctx, w.ghFacade.Repository, runnerEvent)
+	if err != nil {
+		return err
+	}
+	w.DotFiles.Runner.ServerUrl = credential.GetURL()
+
+	return w.adoFacade.InitForCRUD(ctx, w.DotFiles, w.ActionsRunner.Spec.Labels, credential.GetToken(), credential.GetURL())
+}
+
+func (w *Wire) init(ctx context.Context) error {
 	if w.DotFiles == nil {
 		if err := w.initDotFiles(); err != nil {
 			return err
 		}
 
-		if err := w.ghFacade.Init(ctx, w.ActionsRunner.Spec.Repository.Owner, w.ActionsRunner.Spec.Repository.Name); err != nil {
+		if err := w.initGH(ctx); err != nil {
 			return err
 		}
-		w.DotFiles.Runner.GitHubUrl = w.ghFacade.Repository.GetGitCommitsURL()
 
-		credential, err := facades.GetGitHubTenantCredential(ctx, w.ghFacade.Repository, facades.RunnerEventRegister)
-		if err != nil {
-			return err
-		}
-		w.DotFiles.Runner.ServerUrl = credential.GetURL()
-
-		if err := w.adoFacade.InitForCRUD(ctx, w.DotFiles, w.ActionsRunner.Spec.Labels, credential.GetToken(), credential.GetURL()); err != nil {
+		if err := w.initADO(ctx, facades.RunnerEventRegister); err != nil {
 			return err
 		}
 	}
 
 	if err := w.adoFacade.InitForRun(ctx, w.DotFiles, w.ActionsRunner.Spec.Labels); err != nil {
+		return err
+	}
+
+	if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
+		return err
+	}
+
+	if err := w.adoFacade.DeinitAzureDevOpsTaskAgentSession(ctx); err != nil {
 		return err
 	}
 
@@ -81,6 +100,46 @@ func (w *Wire) Init(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (w *Wire) destroy(ctx context.Context) error {
+	if err := w.initDotFiles(); err != nil {
+		return err
+	}
+
+	if err := w.initGH(ctx); err != nil {
+		return err
+	}
+
+	if err := w.initADO(ctx, facades.RunnerEventRegister); err != nil {
+		return err
+	}
+
+	if err := w.adoFacade.DeleteAgent(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *Wire) Init(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+
+	err := w.init(ctx)
+	if err == nil {
+		return nil
+	}
+
+	if err := w.destroy(ctx); err != nil {
+		logger.Error(err, err.Error())
+	}
+
+	if err := w.Close(ctx); err != nil {
+		logger.Error(err, err.Error())
+	}
+
+	w.gone = true
+	return err
 }
 
 func (w *Wire) initDotFiles() error {
@@ -128,9 +187,13 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 				err := fmt.Errorf("%v", r)
 				logger.Error(err, err.Error())
 
-				w.events <- genericEvent
+				if err := w.trySendEvent(genericEvent); err != nil {
+					logger.Error(err, err.Error())
+				}
 
-				w.Close(ctx)
+				if err := w.Close(ctx); err != nil {
+					logger.Error(err, err.Error())
+				}
 			}
 		}()
 
@@ -227,4 +290,16 @@ func (w *Wire) isClosed() bool {
 	default:
 		return w.loopClose == nil
 	}
+}
+
+func (w *Wire) trySendEvent(genericEvent event.GenericEvent) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
+	w.events <- genericEvent
+
+	return nil
 }

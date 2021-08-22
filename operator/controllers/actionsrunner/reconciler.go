@@ -45,7 +45,7 @@ var (
 	}
 
 	deleteOpts = []client.DeleteOption{
-		client.PropagationPolicy(metav1.DeletePropagationForeground),
+		client.PropagationPolicy(metav1.DeletePropagationBackground),
 	}
 )
 
@@ -141,7 +141,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	wire, err := r.wires.WireFor(ctx, &actionsRunner, dotFiles)
 	if err != nil {
-		return ctrl.Result{}, err
+		logger.Error(err, err.Error())
+		return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, &actionsRunner, deleteOpts...))
 	}
 
 	desiredConfigMap, err := util.ToConfigMap(wire.DotFiles, &actionsRunner, r.Scheme)

@@ -25,6 +25,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
@@ -351,7 +352,15 @@ func (ado *AzureDevOps) CreateAgentSession(ctx context.Context) (*taskagent.Task
 func (ado *AzureDevOps) InitAzureDevOpsTaskAgentSession(ctx context.Context) error {
 	session, err := ado.CreateAgentSession(ctx)
 	if err != nil {
-		return err
+		unmarshalTypeError, ok := err.(*json.UnmarshalTypeError)
+		if !ok {
+			return err
+		}
+
+		// sometimes ADO returns TaskAgentStatus as an int instead of a string
+		if unmarshalTypeError.Struct != "TaskAgentReference" || unmarshalTypeError.Field != "agent.status" || unmarshalTypeError.Value != "number" {
+			return err
+		}
 	}
 
 	if !*session.EncryptionKey.Encrypted {
