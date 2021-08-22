@@ -21,7 +21,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/facades"
@@ -30,7 +31,6 @@ import (
 )
 
 type Wire struct {
-	log    logr.Logger
 	events chan<- event.GenericEvent
 
 	ActionsRunner *inlocov1alpha1.ActionsRunner
@@ -109,12 +109,14 @@ func (w *Wire) initDotFiles() error {
 }
 
 func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
+	logger := log.FromContext(ctx)
+
 	if !w.isClosed() {
 		return w.loopAck, w.loopMessages
 	}
 
 	w.loopClose = make(chan struct{})
-	w.log.Info("Wire Opened")
+	logger.Info("Wire Opened")
 
 	go func() {
 		genericEvent := event.GenericEvent{
@@ -124,17 +126,17 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 		defer func() {
 			if r := recover(); r != nil {
 				err := fmt.Errorf("%v", r)
-				w.log.Error(err, err.Error())
+				logger.Error(err, err.Error())
 
 				w.events <- genericEvent
 
-				w.Close()
+				w.Close(ctx)
 			}
 		}()
 
 		if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
 			w.gone = true
-			w.log.Info("Wire Gone")
+			logger.Info("Wire Gone")
 
 			panic(err)
 		}
@@ -142,7 +144,7 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 
 		var lastMessageId *uint64
 		for !w.isClosed() {
-			w.log.Info("Getting Message")
+			logger.Info("Getting Message")
 
 			taMessage, err := w.adoFacade.GetMessage(ctx, lastMessageId)
 			if err != nil {
@@ -159,7 +161,7 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 				panic(err)
 			}
 
-			w.log.Info("Message Received", "id", message.Id, "type", message.Type)
+			logger.Info("Message Received", "id", message.Id, "type", message.Type)
 
 			if err := w.adoFacade.DeinitAzureDevOpsTaskAgentSession(ctx); err != nil {
 				panic(err)
@@ -178,23 +180,23 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 			}
 
 			if message.Type != MessageTypePipelineAgentJobRequest {
-				w.log.Info("Deleting Message", "id", message.Id, "type", message.Type)
+				logger.Info("Deleting Message", "id", message.Id, "type", message.Type)
 
 				if err := w.adoFacade.DeleteMessage(ctx, *taMessage); err != nil {
 					panic(err)
 				}
 
-				w.log.Info("Message Deleted", "id", message.Id, "type", message.Type)
+				logger.Info("Message Deleted", "id", message.Id, "type", message.Type)
 			}
 
 			if message.Type == MessageTypeAgentRefresh {
-				w.log.Info("Deleting Agent", "id", message.Id, "type", message.Type)
+				logger.Info("Deleting Agent", "id", message.Id, "type", message.Type)
 
 				if err := w.adoFacade.DeleteAgent(ctx); err != nil {
 					panic(err)
 				}
 
-				w.log.Info("Agent Deleted", "id", message.Id, "type", message.Type)
+				logger.Info("Agent Deleted", "id", message.Id, "type", message.Type)
 
 				break
 			}
@@ -204,7 +206,9 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 	return w.loopAck, w.loopMessages
 }
 
-func (w *Wire) Close() error {
+func (w *Wire) Close(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+
 	if w.isClosed() {
 		return errors.New(".isClosed")
 	}
@@ -212,7 +216,7 @@ func (w *Wire) Close() error {
 	close(w.loopClose)
 	w.adoFacade.DeinitAzureDevOpsTaskAgentSession(context.Background())
 
-	w.log.Info("Wire Closed")
+	logger.Info("Wire Closed")
 	return nil
 }
 

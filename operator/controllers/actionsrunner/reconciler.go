@@ -85,7 +85,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		close(stop)
 
 		r.gone = true
-		r.wires.Deinit()
+		r.wires.Deinit(context.TODO())
 		r.watchers.Deinit()
 	}()
 
@@ -113,7 +113,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var actionsRunner inlocov1alpha1.ActionsRunner
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
 	case apierrors.IsNotFound(err):
-		return ctrl.Result{}, r.wires.TryClose(&actionsRunner)
+		return ctrl.Result{}, r.wires.TryClose(ctx, &actionsRunner)
 	case err != nil:
 		return ctrl.Result{}, err
 	}
@@ -139,7 +139,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	dotFiles := util.ToDotFiles(&configMap, &secret)
 
-	wire, err := r.wires.WireFor(ctx, logger, &actionsRunner, dotFiles)
+	wire, err := r.wires.WireFor(ctx, &actionsRunner, dotFiles)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
