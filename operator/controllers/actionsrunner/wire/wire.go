@@ -51,12 +51,12 @@ func (w *Wire) Init(ctx context.Context) error {
 		return err
 	}
 
-	if err := w.ghFacade.InitWithRegistrationToken(ctx, w.ActionsRunner.Spec.Repository.Owner, w.ActionsRunner.Spec.Repository.Name); err != nil {
+	if err := w.ghFacade.Init(ctx, w.ActionsRunner.Spec.Repository.Owner, w.ActionsRunner.Spec.Repository.Name); err != nil {
 		return err
 	}
 	w.DotFiles.Runner.GitHubUrl = w.ghFacade.Repository.GetGitCommitsURL()
 
-	credential, err := w.ghFacade.GetGitHubTenantCredential(ctx, facades.RunnerEventRegister)
+	credential, err := facades.GetGitHubTenantCredential(ctx, w.ghFacade.Repository, facades.RunnerEventRegister)
 	if err != nil {
 		return err
 	}
