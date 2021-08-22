@@ -127,8 +127,8 @@ func collectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, c
 		return errors.New("core == nil")
 	}
 
-	metrics.SetGithubRateLimitCollector(clientName, core.Limit)
-	metrics.SetGithubRateRemainingCollector(clientName, core.Remaining)
+	metrics.SetGitHubRateLimitCollector(clientName, core.Limit)
+	metrics.SetGitHubRateRemainingCollector(clientName, core.Remaining)
 	return nil
 }
 
@@ -152,7 +152,7 @@ func collectGitHubAPICallMetrics(ctx context.Context, client *github.Client, cli
 	}
 	reqLabelValue := fmt.Sprintf("%s %s", request.Method, request.URL.String())
 
-	metrics.IncGithubAPICallsCollector(clientName, reqLabelValue, resLabelValue)
+	metrics.IncGitHubAPICallsCollector(clientName, reqLabelValue, resLabelValue)
 	return nil
 }
 
@@ -328,6 +328,7 @@ func getGitHubRepository(ctx context.Context, owner string, name string) (*githu
 	key := fmt.Sprintf("%s/%s", owner, name)
 
 	if repository, ok := githubRepositories.Load(key); ok {
+		metrics.IncGitHubCacheHitCollector("repository", true)
 		return repository.(*github.Repository), nil
 	}
 
@@ -335,8 +336,11 @@ func getGitHubRepository(ctx context.Context, owner string, name string) (*githu
 	defer githubRepositoriesMutext.Unlock()
 
 	if repository, ok := githubRepositories.Load(key); ok {
+		metrics.IncGitHubCacheHitCollector("repository", true)
 		return repository.(*github.Repository), nil
 	}
+
+	metrics.IncGitHubCacheHitCollector("repository", false)
 
 	if githubClient == nil {
 		return nil, errors.New("githubClient == nil")
@@ -392,6 +396,7 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
 
 	if registrationToken, err := tryGetGitHubRegistrationToken(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("registrationToken", true)
 		return registrationToken, nil
 	}
 
@@ -399,8 +404,11 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 	defer githubRegistrationTokensMutext.Unlock()
 
 	if registrationToken, err := tryGetGitHubRegistrationToken(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("registrationToken", true)
 		return registrationToken, nil
 	}
+
+	metrics.IncGitHubCacheHitCollector("registrationToken", false)
 
 	if githubClient == nil {
 		return nil, errors.New("githubClient == nil")
@@ -479,6 +487,7 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
 
 	if removeToken, err := tryGetGitHubRemoveToken(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("removeToken", true)
 		return removeToken, nil
 	}
 
@@ -486,8 +495,11 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 	defer githubRemoveTokensMutext.Unlock()
 
 	if removeToken, err := tryGetGitHubRemoveToken(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("removeToken", true)
 		return removeToken, nil
 	}
+
+	metrics.IncGitHubCacheHitCollector("removeToken", false)
 
 	if githubClient == nil {
 		return nil, errors.New("githubClient == nil")
@@ -577,6 +589,7 @@ func GetGitHubTenantCredential(ctx context.Context, repository *github.Repositor
 	key := fmt.Sprintf("%s@%s/%s", string(runnerEvent), repository.GetOwner(), repository.GetName())
 
 	if tenantCredential, err := tryGetGitHubTenantCredential(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("tenantCredential", true)
 		return tenantCredential, nil
 	}
 
@@ -584,8 +597,11 @@ func GetGitHubTenantCredential(ctx context.Context, repository *github.Repositor
 	defer githubTenantCredentialsMutext.Unlock()
 
 	if tenantCredential, err := tryGetGitHubTenantCredential(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("tenantCredential", true)
 		return tenantCredential, nil
 	}
+
+	metrics.IncGitHubCacheHitCollector("tenantCredential", false)
 
 	var bridgeClient *github.Client
 	switch runnerEvent {

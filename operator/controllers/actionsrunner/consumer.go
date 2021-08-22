@@ -43,8 +43,8 @@ func (c *Consumer) Consume(ctx context.Context) error {
 	ack, msg := c.wire.Channels(ctx)
 	select {
 	case msg := <-msg:
-		metrics.IncGithubActionsEventCounter(c.wire.ActionsRunner.Name, string(msg.Type))
-		defer metrics.ObserveGithubActionsEventConsumeDuration(c.wire.ActionsRunner.Name, string(msg.Type)).ObserveDeffered()
+		metrics.IncGitHubActionsEventCounter(c.wire.ActionsRunner.Name, string(msg.Type))
+		defer metrics.ObserveGitHubActionsEventConsumeDuration(c.wire.ActionsRunner.Name, string(msg.Type)).ObserveDeffered()
 
 		switch typ := msg.Type; typ {
 		case wire.MessageTypePipelineAgentJobRequest:
