@@ -19,7 +19,6 @@ package actionsrunnerjob
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,9 +30,9 @@ import (
 // Reconciler reconciles an ActionsRunnerJob object
 type Reconciler struct {
 	client.Client
-	Log         logr.Logger
-	Scheme      *runtime.Scheme
-	Concurrency int
+	Scheme *runtime.Scheme
+
+	MaxConcurrentReconciles int
 }
 
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunnerjobs,verbs=get;list;watch;create;update;patch;delete
@@ -42,7 +41,7 @@ type Reconciler struct {
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&inlocov1alpha1.ActionsRunnerJob{}).
-		WithOptions(controller.Options{MaxConcurrentReconciles: r.Concurrency}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		Complete(r)
 }
 

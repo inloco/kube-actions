@@ -52,9 +52,10 @@ var (
 // Reconciler reconciles an actionsRunner object
 type Reconciler struct {
 	client.Client
-	Log         logr.Logger
-	Scheme      *runtime.Scheme
-	Concurrency int
+	Log    logr.Logger
+	Scheme *runtime.Scheme
+
+	MaxConcurrentReconciles int
 
 	watchers WatcherCollection
 	wires    wire.Collection
@@ -97,7 +98,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Watches(r.watchers.EventSource(), &handler.EnqueueRequestForObject{}).
 		Watches(r.wires.EventSource(), &handler.EnqueueRequestForObject{}).
-		WithOptions(controller.Options{MaxConcurrentReconciles: r.Concurrency}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		Complete(r)
 }
 

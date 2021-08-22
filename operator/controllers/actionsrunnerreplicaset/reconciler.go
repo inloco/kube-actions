@@ -84,9 +84,10 @@ func desiredActionsRunner(actionsRunnerReplicaSet *inlocov1alpha1.ActionsRunnerR
 // Reconciler reconciles an ActionsRunnerReplicaSet object
 type Reconciler struct {
 	client.Client
-	Log         logr.Logger
-	Scheme      *runtime.Scheme
-	Concurrency int
+	Log    logr.Logger
+	Scheme *runtime.Scheme
+
+	MaxConcurrentReconciles int
 }
 
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunnerreplicasets,verbs=get;list;watch;create;update;patch;delete
@@ -99,7 +100,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&inlocov1alpha1.ActionsRunnerReplicaSet{}).
 		Owns(&inlocov1alpha1.ActionsRunner{}).
-		WithOptions(controller.Options{MaxConcurrentReconciles: r.Concurrency}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		Complete(r)
 }
 
