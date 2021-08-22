@@ -18,14 +18,14 @@ package main
 
 import (
 	"flag"
+	_ "net/http/pprof"
 	"os"
 	"time"
-
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerreplicaset"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerjob"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerreplicaset"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
