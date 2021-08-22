@@ -598,7 +598,5 @@ func (gh *GitHub) GetGitHubTenantCredential(ctx context.Context, runnerEvent Run
 		return nil, err
 	}
 
-	time.Sleep(time.Second)
-
 	return tenantCredential, nil
 }
