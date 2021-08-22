@@ -112,7 +112,7 @@ func (w *Wire) Channels(ctx context.Context) (<-chan struct{}, <-chan Message) {
 
 	go func() {
 		genericEvent := event.GenericEvent{
-			Meta: w.ActionsRunner,
+			Object: w.ActionsRunner,
 		}
 
 		defer func() {

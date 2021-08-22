@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -100,14 +101,13 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	if r.gone {
-		r.Log.Info("Reconciler Gone")
+		logger.Info("Reconciler Gone")
 		return ctrl.Result{}, nil
 	}
-
-	ctx := context.Background()
-	log := r.Log.WithValues("actionsrunner", req.NamespacedName)
 
 	var actionsRunner inlocov1alpha1.ActionsRunner
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
@@ -120,7 +120,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
 	case err == nil:
-		r.watchers.Watch(ctx, log, &actionsRunnerJob, nil)
+		r.watchers.Watch(ctx, logger, &actionsRunnerJob, nil)
 		return ctrl.Result{}, nil
 	case !apierrors.IsNotFound(err):
 		return ctrl.Result{}, err
@@ -138,7 +138,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	dotFiles := util.ToDotFiles(&configMap, &secret)
 
-	wire, err := r.wires.WireFor(ctx, log, &actionsRunner, dotFiles)
+	wire, err := r.wires.WireFor(ctx, logger, &actionsRunner, dotFiles)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -164,8 +164,10 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		Log:    r.Log,
 		Scheme: r.Scheme,
 
-		wire:  wire,
-		watch: func(job *inlocov1alpha1.ActionsRunnerJob, ack <-chan struct{}) { r.watchers.Watch(ctx, log, job, ack) },
+		wire: wire,
+		watch: func(job *inlocov1alpha1.ActionsRunnerJob, ack <-chan struct{}) {
+			r.watchers.Watch(ctx, logger, job, ack)
+		},
 	}
 	if err := consumer.Consume(ctx); err != nil {
 		return ctrl.Result{}, err
