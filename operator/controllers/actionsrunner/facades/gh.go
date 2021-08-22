@@ -104,7 +104,8 @@ var (
 	githubRemoveTokens       sync.Map
 	githubRemoveTokensMutext sync.Mutex
 
-	githubTenantCredential sync.Mutex
+	githubTenantCredentials       sync.Map
+	githubTenantCredentialsMutext sync.Mutex
 )
 
 func collectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, clientName string) error {
@@ -342,7 +343,7 @@ func getGitHubRepository(ctx context.Context, owner string, name string) (*githu
 	}
 
 	repository, githubResponse, err := githubClient.Repositories.Get(ctx, owner, name)
-	if err := handleGitHubResponse(ctx, githubClient, "", githubResponse, err); err != nil {
+	if err := handleGitHubResponse(ctx, githubClient, "entry", githubResponse, err); err != nil {
 		return nil, err
 	}
 
@@ -364,6 +365,25 @@ type registrationTokenContainer struct {
 	Rate  uint64
 }
 
+func tryGetGitHubRegistrationToken(key string) (*github.RegistrationToken, error) {
+	i, ok := githubRegistrationTokens.Load(key)
+	if !ok {
+		return nil, errors.New("githubRegistrationTokens.Load(key) !ok")
+	}
+
+	container, ok := i.(*registrationTokenContainer)
+	if !ok {
+		return nil, errors.New("i.(*registrationTokenContainer) !ok")
+	}
+
+	// TODO: make rate limit dynamic by getting the value from GET /rate_limits
+	if rate := atomic.AddUint64(&container.Rate, 1); rate >= 60 || !container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return nil, errors.New("rate >= 60 || !container.Token.GetExpiresAt().After(time.Now().Add(time.Minute))")
+	}
+
+	return container.Token, nil
+}
+
 func getGitHubRegistrationToken(ctx context.Context, repository *github.Repository) (*github.RegistrationToken, error) {
 	if repository == nil {
 		return nil, errors.New("repository == nil")
@@ -371,32 +391,15 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 
 	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
 
-	if i, ok := githubRegistrationTokens.Load(key); ok {
-		container, ok := i.(*registrationTokenContainer)
-		if !ok {
-			return nil, errors.New("i not *registrationTokenContainer")
-		}
-
-		// TODO: make rate limit dynamic by getting the value from GET /rate_limits
-		if rate := atomic.AddUint64(&container.Rate, 1); rate < 60 && container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
-			return container.Token, nil
-		}
+	if registrationToken, err := tryGetGitHubRegistrationToken(key); err == nil {
+		return registrationToken, nil
 	}
 
 	githubRegistrationTokensMutext.Lock()
 	defer githubRegistrationTokensMutext.Unlock()
 
-	// TODO: deduplicate code
-	if i, ok := githubRegistrationTokens.Load(key); ok {
-		container, ok := i.(*registrationTokenContainer)
-		if !ok {
-			return nil, errors.New("i not *registrationTokenContainer")
-		}
-
-		// TODO: make rate limit dynamic by getting the value from GET /rate_limits
-		if rate := atomic.AddUint64(&container.Rate, 1); rate < 60 && container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
-			return container.Token, nil
-		}
+	if registrationToken, err := tryGetGitHubRegistrationToken(key); err == nil {
+		return registrationToken, nil
 	}
 
 	if githubClient == nil {
@@ -404,7 +407,7 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 	}
 
 	registrationToken, githubResponse, err := githubClient.Actions.CreateRegistrationToken(ctx, repository.GetOwner().GetLogin(), repository.GetName())
-	if err := handleGitHubResponse(ctx, githubClient, "", githubResponse, err); err != nil {
+	if err := handleGitHubResponse(ctx, githubClient, "entry", githubResponse, err); err != nil {
 		return nil, err
 	}
 
@@ -449,6 +452,25 @@ type removeTokenContainer struct {
 	Rate  uint64
 }
 
+func tryGetGitHubRemoveToken(key string) (*github.RemoveToken, error) {
+	i, ok := githubRemoveTokens.Load(key)
+	if !ok {
+		return nil, errors.New("githubRemoveTokens.Load(key) !ok")
+	}
+
+	container, ok := i.(*removeTokenContainer)
+	if !ok {
+		return nil, errors.New("i.(*removeTokenContainer) !ok")
+	}
+
+	// TODO: make rate limit dynamic by getting the value from GET /rate_limits
+	if rate := atomic.AddUint64(&container.Rate, 1); rate >= 60 || !container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return nil, errors.New("rate >= 60 || !container.Token.GetExpiresAt().After(time.Now().Add(time.Minute))")
+	}
+
+	return container.Token, nil
+}
+
 func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*github.RemoveToken, error) {
 	if repository == nil {
 		return nil, errors.New("repository == nil")
@@ -456,36 +478,15 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 
 	key := fmt.Sprintf("%s/%s", repository.GetOwner(), repository.GetName())
 
-	if i, ok := githubRemoveTokens.Load(key); ok {
-		container, ok := i.(*removeTokenContainer)
-		if !ok {
-			return nil, errors.New("i not *registrationTokenContainer")
-		}
-
-		// TODO: make rate limit dynamic by getting the value from GET /rate_limits
-		if rate := atomic.AddUint64(&container.Rate, 1); rate < 60 && container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
-			return container.Token, nil
-		}
+	if removeToken, err := tryGetGitHubRemoveToken(key); err == nil {
+		return removeToken, nil
 	}
 
 	githubRemoveTokensMutext.Lock()
 	defer githubRemoveTokensMutext.Unlock()
 
-	// TODO: deduplicate code
-	if i, ok := githubRemoveTokens.Load(key); ok {
-		container, ok := i.(*removeTokenContainer)
-		if !ok {
-			return nil, errors.New("i not *registrationTokenContainer")
-		}
-
-		// TODO: make rate limit dynamic by getting the value from GET /rate_limits
-		if rate := atomic.AddUint64(&container.Rate, 1); rate < 60 && container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
-			return container.Token, nil
-		}
-	}
-
-	if token, ok := githubRemoveTokens.Load(key); ok && token.(*github.RemoveToken).GetExpiresAt().After(time.Now().Add(time.Minute)) {
-		return token.(*github.RemoveToken), nil
+	if removeToken, err := tryGetGitHubRemoveToken(key); err == nil {
+		return removeToken, nil
 	}
 
 	if githubClient == nil {
@@ -493,7 +494,7 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 	}
 
 	removeToken, githubResponse, err := githubClient.Actions.CreateRemoveToken(ctx, repository.GetOwner().GetLogin(), repository.GetName())
-	if err := handleGitHubResponse(ctx, githubClient, "", githubResponse, err); err != nil {
+	if err := handleGitHubResponse(ctx, githubClient, "entry", githubResponse, err); err != nil {
 		return nil, err
 	}
 
@@ -533,49 +534,32 @@ func newGitHubBridgeClientWithRemoveToken(ctx context.Context, repository *githu
 	return bridgeClient, nil
 }
 
-type GitHub struct {
-	Repository   *github.Repository
-	BridgeClient *github.Client
-}
-
-func (gh *GitHub) InitWithRegistrationToken(ctx context.Context, repoOwner string, repoName string) error {
-	if err := initGitHubClient(ctx); err != nil {
-		return err
+func tryGetGitHubTenantCredential(key string) (*github.TenantCredential, error) {
+	i, ok := githubTenantCredentials.Load(key)
+	if !ok {
+		return nil, errors.New("githubTenantCredentials.Load(key) !ok")
 	}
 
-	repository, err := getGitHubRepository(ctx, repoOwner, repoName)
+	tenantCredential, ok := i.(*github.TenantCredential)
+	if !ok {
+		return nil, errors.New("i.(*github.TenantCredential) !ok")
+	}
+
+	token, err := jwt.ParseSigned(tenantCredential.GetToken())
 	if err != nil {
-		return err
-	}
-	gh.Repository = repository
-
-	bridgeClient, err := newGitHubBridgeClientWithRegistrationToken(ctx, repository)
-	if err != nil {
-		return err
-	}
-	gh.BridgeClient = bridgeClient
-
-	return nil
-}
-
-func (gh *GitHub) InitWithRemoveToken(ctx context.Context, repoOwner string, repoName string) error {
-	if err := initGitHubClient(ctx); err != nil {
-		return err
+		return nil, err
 	}
 
-	repository, err := getGitHubRepository(ctx, repoOwner, repoName)
-	if err != nil {
-		return err
+	var claims jwt.Claims
+	if err := token.UnsafeClaimsWithoutVerification(&claims); err != nil {
+		return nil, err
 	}
-	gh.Repository = repository
 
-	bridgeClient, err := newGitHubBridgeClientWithRemoveToken(ctx, repository)
-	if err != nil {
-		return err
+	if !claims.Expiry.Time().After(time.Now().Add(time.Minute)) {
+		return nil, errors.New("!claims.Expiry.Time().After(time.Now().Add(time.Minute))")
 	}
-	gh.BridgeClient = bridgeClient
 
-	return nil
+	return tenantCredential, nil
 }
 
 type RunnerEvent string
@@ -585,18 +569,68 @@ const (
 	RunnerEventRemove   RunnerEvent = "remove"
 )
 
-func (gh *GitHub) GetGitHubTenantCredential(ctx context.Context, runnerEvent RunnerEvent) (*github.TenantCredential, error) {
-	if gh.BridgeClient == nil {
-		return nil, errors.New(".BridgeClient == nil")
+func GetGitHubTenantCredential(ctx context.Context, repository *github.Repository, runnerEvent RunnerEvent) (*github.TenantCredential, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
 	}
 
-	githubTenantCredential.Lock()
-	defer githubTenantCredential.Unlock()
+	key := fmt.Sprintf("%s@%s/%s", string(runnerEvent), repository.GetOwner(), repository.GetName())
 
-	tenantCredential, githubResponse, err := gh.BridgeClient.Actions.CreateTenantCredential(ctx, string(runnerEvent), gh.Repository.GetHTMLURL())
-	if err := handleGitHubResponse(ctx, gh.BridgeClient, "bridge", githubResponse, err); err != nil {
+	if tenantCredential, err := tryGetGitHubTenantCredential(key); err == nil {
+		return tenantCredential, nil
+	}
+
+	githubTenantCredentialsMutext.Lock()
+	defer githubTenantCredentialsMutext.Unlock()
+
+	if tenantCredential, err := tryGetGitHubTenantCredential(key); err == nil {
+		return tenantCredential, nil
+	}
+
+	var bridgeClient *github.Client
+	switch runnerEvent {
+	case RunnerEventRegister:
+		client, err := newGitHubBridgeClientWithRegistrationToken(ctx, repository)
+		if err != nil {
+			return nil, err
+		}
+		bridgeClient = client
+
+	case RunnerEventRemove:
+		client, err := newGitHubBridgeClientWithRemoveToken(ctx, repository)
+		if err != nil {
+			return nil, err
+		}
+		bridgeClient = client
+
+	default:
+		return nil, errors.New("unknown runnerEvent: " + string(runnerEvent))
+	}
+
+	tenantCredential, githubResponse, err := bridgeClient.Actions.CreateTenantCredential(ctx, string(runnerEvent), repository.GetHTMLURL())
+	if err := handleGitHubResponse(ctx, bridgeClient, "bridge-"+key, githubResponse, err); err != nil {
 		return nil, err
 	}
 
+	githubTenantCredentials.Store(key, tenantCredential)
+
 	return tenantCredential, nil
+}
+
+type GitHub struct {
+	Repository *github.Repository
+}
+
+func (gh *GitHub) Init(ctx context.Context, repoOwner string, repoName string) error {
+	if err := initGitHubClient(ctx); err != nil {
+		return err
+	}
+
+	repository, err := getGitHubRepository(ctx, repoOwner, repoName)
+	if err != nil {
+		return err
+	}
+	gh.Repository = repository
+
+	return nil
 }
