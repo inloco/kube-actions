@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
@@ -51,6 +52,8 @@ func init() {
 }
 
 func main() {
+	go http.ListenAndServe(":6060", nil)
+
 	var maxConcurrentReconciles int
 	flag.IntVar(&maxConcurrentReconciles,
 		"max-concurrent-reconciles",
