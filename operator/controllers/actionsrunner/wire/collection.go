@@ -20,33 +20,40 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
 
-	"github.com/go-logr/logr"
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 type Collection struct {
 	eventChannel chan event.GenericEvent
-	wireRegistry map[client.ObjectKey]*Wire
+	wireRegistry sync.Map // map[client.ObjectKey]*Wire
 }
 
 func (c *Collection) Init() {
 	c.eventChannel = make(chan event.GenericEvent)
-	c.wireRegistry = make(map[client.ObjectKey]*Wire)
 }
 
-func (c *Collection) Deinit() {
+func (c *Collection) Deinit(ctx context.Context) {
+	logger := log.FromContext(ctx)
+
 	close(c.eventChannel)
 
-	for _, wire := range c.wireRegistry {
-		if err := wire.Close(); err != nil {
-			wire.log.Error(err, err.Error())
+	c.wireRegistry.Range(func(key, i interface{}) bool {
+		wire, ok := i.(*Wire)
+		if ok && !wire.gone {
+			if err := wire.Close(ctx); err != nil {
+				logger.Error(err, err.Error())
+			}
 		}
-	}
+
+		return true
+	})
 }
 
 func (c *Collection) EventSource() source.Source {
@@ -55,7 +62,9 @@ func (c *Collection) EventSource() source.Source {
 	}
 }
 
-func (c *Collection) WireFor(ctx context.Context, log logr.Logger, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, error) {
+func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, error) {
+	logger := log.FromContext(ctx)
+
 	if actionsRunner == nil {
 		return nil, errors.New("ActionsRunner == nil")
 	}
@@ -65,36 +74,38 @@ func (c *Collection) WireFor(ctx context.Context, log logr.Logger, actionsRunner
 		Name:      actionsRunner.GetName(),
 	}
 
-	if wire, ok := c.wireRegistry[namespacedName]; ok && !wire.gone {
-		if reflect.DeepEqual(*wire.ActionsRunner, *actionsRunner) {
-			return wire, nil
-		}
+	if i, ok := c.wireRegistry.Load(namespacedName); ok {
+		wire, ok := i.(*Wire)
+		if ok && !wire.gone {
+			if reflect.DeepEqual(*wire.ActionsRunner, *actionsRunner) {
+				return wire, nil
+			}
 
-		if err := wire.Close(); err != nil {
-			wire.log.Error(err, err.Error())
+			if err := wire.Close(ctx); err != nil {
+				logger.Error(err, err.Error())
+			}
 		}
 	}
 
 	wire := &Wire{
-		log:           log,
 		events:        c.eventChannel,
 		ActionsRunner: actionsRunner,
 		DotFiles:      dotFiles,
 	}
 
-	log.Info("Initializing Wire")
+	logger.Info("Initializing Wire")
 
 	if err := wire.Init(ctx); err != nil {
 		return nil, err
 	}
 
-	log.Info("Wire Initialized")
+	logger.Info("Wire Initialized")
 
-	c.wireRegistry[namespacedName] = wire
+	c.wireRegistry.Store(namespacedName, wire)
 	return wire, nil
 }
 
-func (c *Collection) TryClose(actionsRunner *inlocov1alpha1.ActionsRunner) error {
+func (c *Collection) TryClose(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner) error {
 	if actionsRunner == nil {
 		return errors.New("ActionsRunner == nil")
 	}
@@ -104,10 +115,15 @@ func (c *Collection) TryClose(actionsRunner *inlocov1alpha1.ActionsRunner) error
 		Name:      actionsRunner.GetName(),
 	}
 
-	wire, ok := c.wireRegistry[namespacedName]
+	i, ok := c.wireRegistry.Load(namespacedName)
+	if !ok {
+		return nil
+	}
+
+	wire, ok := i.(*Wire)
 	if !ok || wire.gone {
 		return nil
 	}
 
-	return wire.Close()
+	return wire.Close(ctx)
 }

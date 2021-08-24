@@ -279,6 +279,10 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 			ActiveDeadlineSeconds: pointer.Int64Ptr(3000),
 			BackoffLimit:          pointer.Int32Ptr(0),
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: actionsRunner.Annotations,
+					Labels:      actionsRunner.Labels,
+				},
 				Spec: corev1.PodSpec{
 					Volumes: withVolumes(actionsRunner),
 					Containers: []corev1.Container{

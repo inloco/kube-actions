@@ -1,0 +1,5 @@
+bases:
+- ../../config/default
+resources:
+- secret.yaml
+- configmap.yaml

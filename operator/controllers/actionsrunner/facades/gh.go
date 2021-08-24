@@ -21,17 +21,21 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
-	"log"
+	"fmt"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/google/go-github/v32/github"
-	"github.com/square/go-jose/v3"
-	"github.com/square/go-jose/v3/jwt"
+	"github.com/inloco/kube-actions/operator/metrics"
 	"golang.org/x/oauth2"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -80,44 +84,106 @@ var (
 				allowed |= repoPrivate
 
 			default:
-				log.Printf("unknown visility: %v", allowedVisibility)
+				logger := log.FromContext(context.TODO())
+				logger.Info("unknown visility: " + allowedVisibility)
 			}
 		}
 
 		return allowed
 	}()
+
+	githubClient       *github.Client
+	githubClientExpiry time.Time
+	githubClientMutext sync.Mutex
+
+	githubRepositories       sync.Map
+	githubRepositoriesMutext sync.Mutex
+
+	githubRegistrationTokens       sync.Map
+	githubRegistrationTokensMutext sync.Mutex
+
+	githubRemoveTokens       sync.Map
+	githubRemoveTokensMutext sync.Mutex
+
+	githubTenantCredentials       sync.Map
+	githubTenantCredentialsMutext sync.Mutex
 )
 
-type GitHub struct {
-	AppClient *github.Client
+func collectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, clientName string) error {
+	logger := log.FromContext(ctx)
 
-	Client     *github.Client
-	Repository *github.Repository
+	if client == nil {
+		return errors.New("client == nil")
+	}
 
-	BridgeClient *github.Client
+	rateLimits, githubResponse, err := client.RateLimits(ctx)
+	if err != nil {
+		return err
+	}
+	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
+		return errors.New(githubResponse.Status)
+	}
+	logger.Info(rateLimits.String(), "clientName", clientName)
+
+	core := rateLimits.GetCore()
+	if core == nil {
+		return errors.New("core == nil")
+	}
+
+	metrics.SetGitHubRateLimitCollector(clientName, core.Limit)
+	metrics.SetGitHubRateRemainingCollector(clientName, core.Remaining)
+	return nil
 }
 
-func (gh *GitHub) Init(ctx context.Context, repoOwner string, repoName string) error {
-	if err := gh.initGitHubAppClient(ctx); err != nil {
-		log.Print(err)
-	}
+func tryCollectGitHubRateLimitMetrics(ctx context.Context, client *github.Client, clientName string) {
+	logger := log.FromContext(ctx)
 
-	if err := gh.initGitHubClient(ctx); err != nil {
+	if err := collectGitHubRateLimitMetrics(ctx, client, clientName); err != nil {
+		logger.Error(err, err.Error(), "clientName", clientName)
+	}
+}
+
+func collectGitHubAPICallMetrics(ctx context.Context, client *github.Client, clientName string, response *github.Response) error {
+	tryCollectGitHubRateLimitMetrics(ctx, client, clientName)
+
+	if response == nil {
+		return errors.New("response == nil")
+	}
+	resLabelValue := fmt.Sprintf("%s", response.Status)
+
+	request := response.Request
+	if request == nil {
+		return errors.New("request == nil")
+	}
+	reqLabelValue := fmt.Sprintf("%s %s", request.Method, request.URL.String())
+
+	metrics.IncGitHubAPICallsCollector(clientName, reqLabelValue, resLabelValue)
+	return nil
+}
+
+func tryCollectGitHubAPICallMetrics(ctx context.Context, client *github.Client, clientName string, response *github.Response) {
+	logger := log.FromContext(ctx)
+
+	if err := collectGitHubAPICallMetrics(ctx, client, clientName, response); err != nil {
+		logger.Error(err, err.Error(), "clientName", clientName)
+	}
+}
+
+func handleGitHubResponse(ctx context.Context, client *github.Client, clientName string, response *github.Response, err error) error {
+	tryCollectGitHubAPICallMetrics(ctx, client, clientName, response)
+
+	if err != nil {
 		return err
 	}
 
-	if err := gh.initGitHubRepository(ctx, repoOwner, repoName); err != nil {
-		return err
-	}
-
-	if err := gh.initGitHubBridgeClient(ctx); err != nil {
-		return err
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return errors.New(response.Status)
 	}
 
 	return nil
 }
 
-func (gh *GitHub) GetGitHubAppToken() (string, error) {
+func getGitHubAppToken() (string, error) {
 	if githubAppId == "" {
 		return "", errors.New(`githubAppId == ""`)
 	}
@@ -162,13 +228,13 @@ func (gh *GitHub) GetGitHubAppToken() (string, error) {
 	return token, nil
 }
 
-func (gh *GitHub) initGitHubAppClient(ctx context.Context) error {
-	token, err := gh.GetGitHubAppToken()
+func newGitHubAppClient(ctx context.Context) (*github.Client, error) {
+	token, err := getGitHubAppToken()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	gh.AppClient = github.NewClient(
+	appClient := github.NewClient(
 		oauth2.NewClient(
 			ctx,
 			oauth2.StaticTokenSource(
@@ -178,144 +244,338 @@ func (gh *GitHub) initGitHubAppClient(ctx context.Context) error {
 			),
 		),
 	)
-	return nil
+
+	return appClient, nil
 }
 
-func (gh *GitHub) GetGitHubInstallationToken(ctx context.Context) (string, error) {
-	if gh.AppClient == nil {
-		return "", errors.New(".AppClient == nil")
+func getGitHubInstallationToken(ctx context.Context, appClient *github.Client) (*github.InstallationToken, error) {
+	logger := log.FromContext(ctx)
+
+	if appClient == nil {
+		return nil, errors.New("appClient == nil")
 	}
 
 	var installationId int64
 	if githubInstlId != "" {
 		id, err := strconv.ParseInt(githubInstlId, 10, 0)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		installationId = id
 	} else {
-		log.Print(`githubInstlId == ""`)
+		logger.Info(`githubInstlId == ""`)
 
-		installations, _, err := gh.AppClient.Apps.ListInstallations(ctx, nil)
-		if err != nil {
-			return "", err
+		installations, githubResponse, err := appClient.Apps.ListInstallations(ctx, nil)
+		if err := handleGitHubResponse(ctx, appClient, "app", githubResponse, err); err != nil {
+			return nil, err
 		}
 
 		if len(installations) != 1 {
-			return "", errors.New("len(installations) != 1")
+			return nil, errors.New("len(installations) != 1")
 		}
 
 		installationId = installations[0].GetID()
 	}
 
-	installationToken, _, err := gh.AppClient.Apps.CreateInstallationToken(ctx, installationId, nil)
-	if err != nil {
-		return "", err
+	installationToken, githubResponse, err := appClient.Apps.CreateInstallationToken(ctx, installationId, nil)
+	if err := handleGitHubResponse(ctx, appClient, "app", githubResponse, err); err != nil {
+		return nil, err
 	}
 
-	return installationToken.GetToken(), nil
+	return installationToken, nil
 }
 
-func (gh *GitHub) initGitHubClient(ctx context.Context) error {
-	token := githubPAT
-	if token == "" {
-		githubIAT, err := gh.GetGitHubInstallationToken(ctx)
+func initGitHubClient(ctx context.Context) error {
+	githubClientMutext.Lock()
+	defer githubClientMutext.Unlock()
+
+	if githubClient != nil && (githubClientExpiry.IsZero() || githubClientExpiry.After(time.Now().Add(time.Minute))) {
+		return nil
+	}
+
+	token := oauth2.Token{
+		AccessToken: githubPAT,
+	}
+	if token.AccessToken == "" {
+		appClient, err := newGitHubAppClient(ctx)
 		if err != nil {
 			return err
 		}
 
-		token = githubIAT
+		githubIAT, err := getGitHubInstallationToken(ctx, appClient)
+		if err != nil {
+			return err
+		}
+
+		token.AccessToken = githubIAT.GetToken()
+		token.Expiry = githubIAT.GetExpiresAt()
 	}
 
-	gh.Client = github.NewClient(
+	client := github.NewClient(
 		oauth2.NewClient(
 			ctx,
-			oauth2.StaticTokenSource(
-				&oauth2.Token{
-					AccessToken: token,
-				},
-			),
+			oauth2.StaticTokenSource(&token),
 		),
 	)
+
+	if err := collectGitHubRateLimitMetrics(ctx, client, ""); err != nil {
+		return err
+	}
+
+	githubClient = client
+	githubClientExpiry = token.Expiry
 	return nil
 }
 
-func (gh *GitHub) initGitHubRepository(ctx context.Context, owner string, name string) error {
-	if gh.Client == nil {
-		return errors.New(".Client == nil")
+func getGitHubRepository(ctx context.Context, owner string, name string) (*github.Repository, error) {
+	key := fmt.Sprintf("%s/%s", owner, name)
+
+	if repository, ok := githubRepositories.Load(key); ok {
+		metrics.IncGitHubCacheHitCollector("repository", true)
+		return repository.(*github.Repository), nil
 	}
 
-	repository, githubResponse, err := gh.Client.Repositories.Get(ctx, owner, name)
-	if err != nil {
-		return err
+	githubRepositoriesMutext.Lock()
+	defer githubRepositoriesMutext.Unlock()
+
+	if repository, ok := githubRepositories.Load(key); ok {
+		metrics.IncGitHubCacheHitCollector("repository", true)
+		return repository.(*github.Repository), nil
 	}
-	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
-		return errors.New(githubResponse.Status)
+
+	metrics.IncGitHubCacheHitCollector("repository", false)
+
+	if githubClient == nil {
+		return nil, errors.New("githubClient == nil")
+	}
+
+	repository, githubResponse, err := githubClient.Repositories.Get(ctx, owner, name)
+	if err := handleGitHubResponse(ctx, githubClient, "entry", githubResponse, err); err != nil {
+		return nil, err
 	}
 
 	if _, ok := githubOwners[repository.GetOwner().GetLogin()]; !ok {
-		return errors.New("not in githubOwners")
+		return nil, errors.New("not in githubOwners")
 	}
 
 	if private := repository.GetPrivate(); (private && githubVisibilities&repoPrivate == 0) || (!private && githubVisibilities&repoPublic == 0) {
-		return errors.New("not in githubVisibilities")
+		return nil, errors.New("not in githubVisibilities")
 	}
 
-	gh.Repository = repository
-	return nil
+	githubRepositories.Store(key, repository)
+
+	return repository, nil
 }
 
-func (gh *GitHub) GetGitHubRegistrationToken(ctx context.Context) (*github.RegistrationToken, error) {
-	if gh.Client == nil {
-		return nil, errors.New(".Client == nil")
+type registrationTokenContainer struct {
+	Token *github.RegistrationToken
+	Rate  uint64
+}
+
+func tryGetGitHubRegistrationToken(key string) (*github.RegistrationToken, error) {
+	i, ok := githubRegistrationTokens.Load(key)
+	if !ok {
+		return nil, errors.New("githubRegistrationTokens.Load(key) !ok")
 	}
 
-	token, githubResponse, err := gh.Client.Actions.CreateRegistrationToken(ctx, gh.Repository.GetOwner().GetLogin(), gh.Repository.GetName())
+	container, ok := i.(*registrationTokenContainer)
+	if !ok {
+		return nil, errors.New("i.(*registrationTokenContainer) !ok")
+	}
+
+	// TODO: make rate limit dynamic by getting the value from GET /rate_limits
+	if rate := atomic.AddUint64(&container.Rate, 1); rate >= 60 || !container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return nil, errors.New("rate >= 60 || !container.Token.GetExpiresAt().After(time.Now().Add(time.Minute))")
+	}
+
+	return container.Token, nil
+}
+
+func getGitHubRegistrationToken(ctx context.Context, repository *github.Repository) (*github.RegistrationToken, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
+	}
+
+	key := fmt.Sprintf("%s/%s", repository.GetOwner().GetLogin(), repository.GetName())
+
+	if registrationToken, err := tryGetGitHubRegistrationToken(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("registrationToken", true)
+		return registrationToken, nil
+	}
+
+	githubRegistrationTokensMutext.Lock()
+	defer githubRegistrationTokensMutext.Unlock()
+
+	if registrationToken, err := tryGetGitHubRegistrationToken(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("registrationToken", true)
+		return registrationToken, nil
+	}
+
+	metrics.IncGitHubCacheHitCollector("registrationToken", false)
+
+	if githubClient == nil {
+		return nil, errors.New("githubClient == nil")
+	}
+
+	registrationToken, githubResponse, err := githubClient.Actions.CreateRegistrationToken(ctx, repository.GetOwner().GetLogin(), repository.GetName())
+	if err := handleGitHubResponse(ctx, githubClient, "entry", githubResponse, err); err != nil {
+		return nil, err
+	}
+
+	githubRegistrationTokens.Store(key, &registrationTokenContainer{
+		Token: registrationToken,
+	})
+
+	return registrationToken, nil
+}
+
+func newGitHubBridgeClientWithRegistrationToken(ctx context.Context, repository *github.Repository) (*github.Client, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
+	}
+
+	registrationToken, err := getGitHubRegistrationToken(ctx, repository)
 	if err != nil {
 		return nil, err
 	}
-	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
-		return nil, errors.New(githubResponse.Status)
-	}
 
-	return token, nil
-}
-
-func (gh *GitHub) GetGitHubRemoveToken(ctx context.Context) (*github.RemoveToken, error) {
-	if gh.Client == nil {
-		return nil, errors.New(".Client == nil")
-	}
-
-	token, githubResponse, err := gh.Client.Actions.CreateRemoveToken(ctx, gh.Repository.GetOwner().GetLogin(), gh.Repository.GetName())
-	if err != nil {
-		return nil, err
-	}
-	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
-		return nil, errors.New(githubResponse.Status)
-	}
-
-	return token, nil
-}
-
-func (gh *GitHub) initGitHubBridgeClient(ctx context.Context) error {
-	token, err := gh.GetGitHubRegistrationToken(ctx)
-	if err != nil {
-		return err
-	}
-
-	gh.BridgeClient = github.NewClient(
+	bridgeClient := github.NewClient(
 		oauth2.NewClient(
 			ctx,
 			oauth2.StaticTokenSource(
 				&oauth2.Token{
-					AccessToken: token.GetToken(),
+					AccessToken: registrationToken.GetToken(),
 					TokenType:   "RemoteAuth",
 				},
 			),
 		),
 	)
-	return nil
+
+	if err := collectGitHubRateLimitMetrics(ctx, bridgeClient, "bridge"); err != nil {
+		return nil, err
+	}
+
+	return bridgeClient, nil
+}
+
+type removeTokenContainer struct {
+	Token *github.RemoveToken
+	Rate  uint64
+}
+
+func tryGetGitHubRemoveToken(key string) (*github.RemoveToken, error) {
+	i, ok := githubRemoveTokens.Load(key)
+	if !ok {
+		return nil, errors.New("githubRemoveTokens.Load(key) !ok")
+	}
+
+	container, ok := i.(*removeTokenContainer)
+	if !ok {
+		return nil, errors.New("i.(*removeTokenContainer) !ok")
+	}
+
+	// TODO: make rate limit dynamic by getting the value from GET /rate_limits
+	if rate := atomic.AddUint64(&container.Rate, 1); rate >= 60 || !container.Token.GetExpiresAt().After(time.Now().Add(time.Minute)) {
+		return nil, errors.New("rate >= 60 || !container.Token.GetExpiresAt().After(time.Now().Add(time.Minute))")
+	}
+
+	return container.Token, nil
+}
+
+func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*github.RemoveToken, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
+	}
+
+	key := fmt.Sprintf("%s/%s", repository.GetOwner().GetLogin(), repository.GetName())
+
+	if removeToken, err := tryGetGitHubRemoveToken(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("removeToken", true)
+		return removeToken, nil
+	}
+
+	githubRemoveTokensMutext.Lock()
+	defer githubRemoveTokensMutext.Unlock()
+
+	if removeToken, err := tryGetGitHubRemoveToken(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("removeToken", true)
+		return removeToken, nil
+	}
+
+	metrics.IncGitHubCacheHitCollector("removeToken", false)
+
+	if githubClient == nil {
+		return nil, errors.New("githubClient == nil")
+	}
+
+	removeToken, githubResponse, err := githubClient.Actions.CreateRemoveToken(ctx, repository.GetOwner().GetLogin(), repository.GetName())
+	if err := handleGitHubResponse(ctx, githubClient, "entry", githubResponse, err); err != nil {
+		return nil, err
+	}
+
+	githubRemoveTokens.Store(key, &removeTokenContainer{
+		Token: removeToken,
+	})
+
+	return removeToken, nil
+}
+
+func newGitHubBridgeClientWithRemoveToken(ctx context.Context, repository *github.Repository) (*github.Client, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
+	}
+
+	removeToken, err := getGitHubRemoveToken(ctx, repository)
+	if err != nil {
+		return nil, err
+	}
+
+	bridgeClient := github.NewClient(
+		oauth2.NewClient(
+			ctx,
+			oauth2.StaticTokenSource(
+				&oauth2.Token{
+					AccessToken: removeToken.GetToken(),
+					TokenType:   "RemoteAuth",
+				},
+			),
+		),
+	)
+
+	if err := collectGitHubRateLimitMetrics(ctx, bridgeClient, "bridge"); err != nil {
+		return nil, err
+	}
+
+	return bridgeClient, nil
+}
+
+func tryGetGitHubTenantCredential(key string) (*github.TenantCredential, error) {
+	i, ok := githubTenantCredentials.Load(key)
+	if !ok {
+		return nil, errors.New("githubTenantCredentials.Load(key) !ok")
+	}
+
+	tenantCredential, ok := i.(*github.TenantCredential)
+	if !ok {
+		return nil, errors.New("i.(*github.TenantCredential) !ok")
+	}
+
+	token, err := jwt.ParseSigned(tenantCredential.GetToken())
+	if err != nil {
+		return nil, err
+	}
+
+	var claims jwt.Claims
+	if err := token.UnsafeClaimsWithoutVerification(&claims); err != nil {
+		return nil, err
+	}
+
+	if !claims.Expiry.Time().After(time.Now().Add(time.Minute)) {
+		return nil, errors.New("!claims.Expiry.Time().After(time.Now().Add(time.Minute))")
+	}
+
+	return tenantCredential, nil
 }
 
 type RunnerEvent string
@@ -325,18 +585,72 @@ const (
 	RunnerEventRemove   RunnerEvent = "remove"
 )
 
-func (gh *GitHub) GetGitHubTenantCredential(ctx context.Context, runnerEvent RunnerEvent) (*github.TenantCredential, error) {
-	if gh.BridgeClient == nil {
-		return nil, errors.New(".BridgeClient == nil")
+func GetGitHubTenantCredential(ctx context.Context, repository *github.Repository, runnerEvent RunnerEvent) (*github.TenantCredential, error) {
+	if repository == nil {
+		return nil, errors.New("repository == nil")
 	}
 
-	tenantCredential, githubResponse, err := gh.BridgeClient.Actions.CreateTenantCredential(ctx, string(runnerEvent), gh.Repository.GetHTMLURL())
-	if err != nil {
+	key := fmt.Sprintf("%s@%s/%s", string(runnerEvent), repository.GetOwner().GetLogin(), repository.GetName())
+
+	if tenantCredential, err := tryGetGitHubTenantCredential(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("tenantCredential", true)
+		return tenantCredential, nil
+	}
+
+	githubTenantCredentialsMutext.Lock()
+	defer githubTenantCredentialsMutext.Unlock()
+
+	if tenantCredential, err := tryGetGitHubTenantCredential(key); err == nil {
+		metrics.IncGitHubCacheHitCollector("tenantCredential", true)
+		return tenantCredential, nil
+	}
+
+	metrics.IncGitHubCacheHitCollector("tenantCredential", false)
+
+	var bridgeClient *github.Client
+	switch runnerEvent {
+	case RunnerEventRegister:
+		client, err := newGitHubBridgeClientWithRegistrationToken(ctx, repository)
+		if err != nil {
+			return nil, err
+		}
+		bridgeClient = client
+
+	case RunnerEventRemove:
+		client, err := newGitHubBridgeClientWithRemoveToken(ctx, repository)
+		if err != nil {
+			return nil, err
+		}
+		bridgeClient = client
+
+	default:
+		return nil, errors.New("unknown runnerEvent: " + string(runnerEvent))
+	}
+
+	tenantCredential, githubResponse, err := bridgeClient.Actions.CreateTenantCredential(ctx, string(runnerEvent), repository.GetHTMLURL())
+	if err := handleGitHubResponse(ctx, bridgeClient, "bridge-"+key, githubResponse, err); err != nil {
 		return nil, err
 	}
-	if githubResponse.StatusCode < 200 || githubResponse.StatusCode >= 300 {
-		return nil, errors.New(githubResponse.Status)
-	}
+
+	githubTenantCredentials.Store(key, tenantCredential)
 
 	return tenantCredential, nil
+}
+
+type GitHub struct {
+	Repository *github.Repository
+}
+
+func (gh *GitHub) Init(ctx context.Context, repoOwner string, repoName string) error {
+	if err := initGitHubClient(ctx); err != nil {
+		return err
+	}
+
+	repository, err := getGitHubRepository(ctx, repoOwner, repoName)
+	if err != nil {
+		return err
+	}
+	gh.Repository = repository
+
+	return nil
 }

@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -84,6 +86,8 @@ type Reconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+
+	MaxConcurrentReconciles int
 }
 
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunnerreplicasets,verbs=get;list;watch;create;update;patch;delete
@@ -96,12 +100,12 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&inlocov1alpha1.ActionsRunnerReplicaSet{}).
 		Owns(&inlocov1alpha1.ActionsRunner{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		Complete(r)
 }
 
-func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
-	log := r.Log.WithValues("actionsrunnerreplicaset", req.NamespacedName)
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 
 	var actionsRunnerReplicaSet inlocov1alpha1.ActionsRunnerReplicaSet
 	if err := r.Get(ctx, req.NamespacedName, &actionsRunnerReplicaSet); err != nil {
@@ -120,14 +124,14 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		log.Info("less replicas than expected, creating ActionsRunner " + actionsRunner.GetGenerateName())
+		logger.Info("less replicas than expected, creating ActionsRunner " + actionsRunner.GetGenerateName())
 
 		return ctrl.Result{}, r.Create(ctx, actionsRunner, createOpts...)
 	}
 
 	if len(items) > expected {
 		actionsRunner := &items[0]
-		log.Info("more replicas than expected, deleting ActionsRunner " + actionsRunner.GetName())
+		logger.Info("more replicas than expected, deleting ActionsRunner " + actionsRunner.GetName())
 
 		return ctrl.Result{}, r.Delete(ctx, actionsRunner, deleteOpts...)
 	}
@@ -135,7 +139,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	for _, item := range items {
 		if !reflect.DeepEqual(item.Spec, actionsRunnerReplicaSet.Spec.Template) {
 			actionsRunner := item
-			log.Info("undesired replica, deleting ActionsRunner " + actionsRunner.GetName())
+			logger.Info("undesired replica, deleting ActionsRunner " + actionsRunner.GetName())
 
 			return ctrl.Result{}, r.Delete(ctx, &actionsRunner, deleteOpts...)
 		}

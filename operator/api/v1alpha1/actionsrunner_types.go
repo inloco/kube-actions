@@ -38,6 +38,7 @@ const (
 type ActionsRunnerSpec struct {
 	Repository   ActionsRunnerRepository   `json:"repository"`
 	Capabilities []ActionsRunnerCapability `json:"capabilities,omitempty"`
+	Annotations  map[string]string         `json:"annotations,omitempty"`
 	Labels       []string                  `json:"labels,omitempty"`
 
 	Volumes      []corev1.Volume                        `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
