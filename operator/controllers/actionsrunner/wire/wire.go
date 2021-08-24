@@ -111,7 +111,7 @@ func (w *Wire) destroy(ctx context.Context) error {
 		return err
 	}
 
-	if err := w.initADO(ctx, facades.RunnerEventRegister); err != nil {
+	if err := w.initADO(ctx, facades.RunnerEventRemove); err != nil {
 		return err
 	}
 
