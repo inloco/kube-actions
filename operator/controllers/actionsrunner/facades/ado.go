@@ -25,6 +25,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
@@ -36,7 +37,6 @@ import (
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/location"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
-	"github.com/microsoft/azure-devops-go-api/azuredevops/webapi"
 )
 
 var (
@@ -66,7 +66,7 @@ type AzureDevOps struct {
 	TaskAgentSession      *taskagent.TaskAgentSession
 }
 
-func (ado *AzureDevOps) Init(ctx context.Context, token string, url string, dotFiles *dot.Files, labels []string) error {
+func (ado *AzureDevOps) InitForCRUD(ctx context.Context, dotFiles *dot.Files, labels []string, token string, url string) error {
 	if err := ado.initRSAPrivateKey(dotFiles); err != nil {
 		return err
 	}
@@ -75,11 +75,19 @@ func (ado *AzureDevOps) Init(ctx context.Context, token string, url string, dotF
 		return err
 	}
 
-	if err := ado.initAzureDevOpsLocationClient(ctx); err != nil {
+	if err := ado.initAzureDevOpsTaskAgentClient(ctx); err != nil {
 		return err
 	}
 
-	if err := ado.initAzureDevOpsTaskAgentClient(ctx); err != nil {
+	if err := ado.initAzureDevOpsTaskAgent(ctx, dotFiles, append(agentLabelsBase, labels...)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ado *AzureDevOps) InitForRun(ctx context.Context, dotFiles *dot.Files, labels []string) error {
+	if err := ado.initRSAPrivateKey(dotFiles); err != nil {
 		return err
 	}
 
@@ -98,8 +106,8 @@ func (ado *AzureDevOps) Init(ctx context.Context, token string, url string, dotF
 	return nil
 }
 
-func (ado *AzureDevOps) initRSAPrivateKey(runner *dot.Files) error {
-	rsaPrivateKey, err := runner.RSAParameters.ToRSAPrivateKey()
+func (ado *AzureDevOps) initRSAPrivateKey(dotFiles *dot.Files) error {
+	rsaPrivateKey, err := dotFiles.RSAParameters.ToRSAPrivateKey()
 	if err != nil {
 		return err
 	}
@@ -121,15 +129,6 @@ func (ado *AzureDevOps) initAzureDevOpsConnection(token string, url string) erro
 		AuthorizationString: fmt.Sprintf("Bearer %v", token),
 		BaseUrl:             url,
 	}
-	return nil
-}
-
-func (ado *AzureDevOps) initAzureDevOpsLocationClient(ctx context.Context) error {
-	if ado.Connection == nil {
-		return errors.New(".Connection == nil")
-	}
-
-	ado.LocationClient = location.NewClient(ctx, ado.Connection)
 	return nil
 }
 
@@ -220,23 +219,27 @@ func (ado *AzureDevOps) DeleteAgent(ctx context.Context) error {
 	})
 }
 
-func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, runner *dot.Files, labels []string) error {
+func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, dotFiles *dot.Files, labels []string) error {
 	// TODO
 	//if rc.rsaParameters == nil {
 	//	return errors.New(".rsaParameters == nil")
 	//}
 
 	ado.TaskAgent = &taskagent.TaskAgent{
-		Id:      &runner.Runner.AgentId,
-		Name:    &runner.Runner.AgentName,
+		Id:      &dotFiles.Runner.AgentId,
+		Name:    &dotFiles.Runner.AgentName,
 		Version: &agentVersion,
 		Labels:  &labels,
 		Authorization: &taskagent.TaskAgentAuthorization{
 			PublicKey: &taskagent.TaskAgentPublicKey{
-				Exponent: &runner.RSAParameters.Exponent,
-				Modulus:  &runner.RSAParameters.Modulus,
+				Exponent: &dotFiles.RSAParameters.Exponent,
+				Modulus:  &dotFiles.RSAParameters.Modulus,
 			},
 		},
+	}
+
+	if ado.TaskAgentClient == nil {
+		return nil
 	}
 
 	if agent, err := ado.GetAgent(ctx); err == nil {
@@ -264,64 +267,40 @@ func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, runner *do
 		agent = taskAgent
 	}
 
-	runner.Runner.AgentId = *agent.Id
+	dotFiles.Runner.AgentId = *agent.Id
 
-	runner.Credentials.Data.ClientId = agent.Authorization.ClientId.String()
-	runner.Credentials.Data.AuthorizationURL = *agent.Authorization.AuthorizationUrl
-	runner.Credentials.Data.OAuthEndpointURL = *agent.Authorization.AuthorizationUrl
+	dotFiles.Credentials.Data.ClientId = agent.Authorization.ClientId.String()
+	dotFiles.Credentials.Data.AuthorizationURL = *agent.Authorization.AuthorizationUrl
+	dotFiles.Credentials.Data.OAuthEndpointURL = *agent.Authorization.AuthorizationUrl
 
-	runner.Credentials.Data.RequireFipsCryptography = "False"
+	dotFiles.Credentials.Data.RequireFipsCryptography = "False"
 	if v := util.GetPropertyValue(agent.Properties, "RequireFipsCryptography"); v == true {
-		runner.Credentials.Data.RequireFipsCryptography = "True"
+		dotFiles.Credentials.Data.RequireFipsCryptography = "True"
 	}
 
 	ado.TaskAgent = agent
 	return nil
 }
 
-func (ado *AzureDevOps) GetAzureDevOpsConnectionData(ctx context.Context) (*location.ConnectionData, error) {
-	if ado.LocationClient == nil {
-		return nil, errors.New(".LocationClient == nil")
-	}
-
-	connectOptions := webapi.ConnectOptions("1")
-	return ado.LocationClient.GetConnectionData(ctx, location.GetConnectionDataArgs{
-		ConnectOptions: &connectOptions,
-	})
-}
-
-func (ado *AzureDevOps) initAzureDevOpsBridgeConnection(ctx context.Context, runner *dot.Files) error {
+func (ado *AzureDevOps) initAzureDevOpsBridgeConnection(ctx context.Context, dotFiles *dot.Files) error {
 	// TODO
 	//if rc.credentials == nil {
 	//	return errors.New(".credentials == nil")
 	//}
 
-	assertion, err := util.ClientAssertion(runner.Credentials.Data.ClientId, runner.Credentials.Data.AuthorizationURL, ado.RSAPrivateKey)
+	assertion, err := util.ClientAssertion(dotFiles.Credentials.Data.ClientId, dotFiles.Credentials.Data.AuthorizationURL, ado.RSAPrivateKey)
 	if err != nil {
 		return err
 	}
 
-	token, err := util.AccessToken(ctx, runner.Credentials.Data.OAuthEndpointURL, assertion)
+	token, err := util.AccessToken(ctx, dotFiles.Credentials.Data.OAuthEndpointURL, assertion)
 	if err != nil {
 		return err
 	}
-
-	//data, err := ado.GetAzureDevOpsConnectionData(ctx)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//url := ado.Connection.BaseUrl
-	//for _, accessMapping := range *data.LocationServiceData.AccessMappings {
-	//	if *accessMapping.Moniker == "HostGuidAccessMapping" {
-	//		url = *accessMapping.AccessPoint
-	//		break
-	//	}
-	//}
 
 	ado.BridgeConnection = &azuredevops.Connection{
 		AuthorizationString: fmt.Sprintf("Bearer %v", token),
-		BaseUrl:             runner.ServerUrl,
+		BaseUrl:             dotFiles.ServerUrl,
 	}
 	return nil
 }
@@ -373,7 +352,15 @@ func (ado *AzureDevOps) CreateAgentSession(ctx context.Context) (*taskagent.Task
 func (ado *AzureDevOps) InitAzureDevOpsTaskAgentSession(ctx context.Context) error {
 	session, err := ado.CreateAgentSession(ctx)
 	if err != nil {
-		return err
+		unmarshalTypeError, ok := err.(*json.UnmarshalTypeError)
+		if !ok {
+			return err
+		}
+
+		// sometimes ADO returns TaskAgentStatus as an int instead of a string
+		if unmarshalTypeError.Struct != "TaskAgentReference" || unmarshalTypeError.Field != "agent.status" || unmarshalTypeError.Value != "number" {
+			return err
+		}
 	}
 
 	if !*session.EncryptionKey.Encrypted {
