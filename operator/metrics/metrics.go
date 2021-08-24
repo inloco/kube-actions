@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,6 +44,19 @@ var (
 			"client",
 			"request",
 			"response",
+		},
+	)
+
+	githubCacheHitCollector = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "kubeactions",
+			Subsystem: "github",
+			Name:      "cache_hit",
+			Help:      "GitHub Cache Hits.",
+		},
+		[]string{
+			"cache",
+			"hit",
 		},
 	)
 
@@ -96,23 +110,27 @@ func (o *observer) ObserveDeffered() {
 	o.observe(time.Since(o.start))
 }
 
-func SetGithubRateLimitCollector(clientName string, limit int) {
+func SetGitHubRateLimitCollector(clientName string, limit int) {
 	githubRateLimitCollector.WithLabelValues(clientName).Set(float64(limit))
 }
 
-func SetGithubRateRemainingCollector(clientName string, remaining int) {
+func SetGitHubRateRemainingCollector(clientName string, remaining int) {
 	githubRateRemainingCollector.WithLabelValues(clientName).Set(float64(remaining))
 }
 
-func IncGithubAPICallsCollector(clientName, request, response string) {
+func IncGitHubAPICallsCollector(clientName string, request string, response string) {
 	githubAPICallsCollector.WithLabelValues(clientName, request, response).Inc()
 }
 
-func IncGithubActionsEventCounter(runner, event string) {
+func IncGitHubCacheHitCollector(cacheName string, hit bool) {
+	githubCacheHitCollector.WithLabelValues(cacheName, strconv.FormatBool(hit)).Inc()
+}
+
+func IncGitHubActionsEventCounter(runner string, event string) {
 	githubActionsEventCounter.WithLabelValues(runner, event).Inc()
 }
 
-func ObserveGithubActionsEventConsumeDuration(runner, event string) *observer {
+func ObserveGitHubActionsEventConsumeDuration(runner string, event string) *observer {
 	promObserver := githubActionsEventConsumeDurationHistogram.WithLabelValues(runner, event)
 	return newObserver(func(duration time.Duration) {
 		promObserver.Observe(duration.Seconds())
