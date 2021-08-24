@@ -1,7 +1,0 @@
-apiVersion: inloco.com.br/v1alpha1
-kind: ActionsRunnerJob
-metadata:
-  name: actionsrunnerjob-sample
-spec:
-  # Add fields here
-  foo: bar

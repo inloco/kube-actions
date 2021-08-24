@@ -25,6 +25,7 @@ import (
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/wire"
+	"github.com/inloco/kube-actions/operator/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -42,6 +43,9 @@ func (c *Consumer) Consume(ctx context.Context) error {
 	ack, msg := c.wire.Channels(ctx)
 	select {
 	case msg := <-msg:
+		metrics.IncGitHubActionsEventCounter(c.wire.ActionsRunner.Name, string(msg.Type))
+		defer metrics.ObserveGitHubActionsEventConsumeDuration(c.wire.ActionsRunner.Name, string(msg.Type)).ObserveDeffered()
+
 		switch typ := msg.Type; typ {
 		case wire.MessageTypePipelineAgentJobRequest:
 			return c.onPipelineAgentJobRequest(ctx, ack, msg)

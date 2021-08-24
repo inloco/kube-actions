@@ -27,10 +27,11 @@ install: manifests
 uninstall: manifests
 	kustomize build ./config/crd | kubectl delete -f -
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
-	cd ./config/manager && kustomize edit set image controller=$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
-	kustomize build ./config/default | kubectl apply -f -
+deploy/production: manifests
+	kustomize build k8s/production | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "inloco/kube-actions=$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)"' | kubectl apply -f -
+
+deploy/development: manifests
+	kustomize build k8s/development | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "inloco/kube-actions=$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)"' | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:

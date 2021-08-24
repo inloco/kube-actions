@@ -33,7 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -43,7 +45,7 @@ var (
 	}
 
 	deleteOpts = []client.DeleteOption{
-		client.PropagationPolicy(metav1.DeletePropagationForeground),
+		client.PropagationPolicy(metav1.DeletePropagationBackground),
 	}
 )
 
@@ -52,6 +54,8 @@ type Reconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+
+	MaxConcurrentReconciles int
 
 	watchers WatcherCollection
 	wires    wire.Collection
@@ -81,7 +85,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		close(stop)
 
 		r.gone = true
-		r.wires.Deinit()
+		r.wires.Deinit(context.TODO())
 		r.watchers.Deinit()
 	}()
 
@@ -94,22 +98,22 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Watches(r.watchers.EventSource(), &handler.EnqueueRequestForObject{}).
 		Watches(r.wires.EventSource(), &handler.EnqueueRequestForObject{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		Complete(r)
 }
 
-func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	if r.gone {
-		r.Log.Info("Reconciler Gone")
+		logger.Info("Reconciler Gone")
 		return ctrl.Result{}, nil
 	}
-
-	ctx := context.Background()
-	log := r.Log.WithValues("actionsrunner", req.NamespacedName)
 
 	var actionsRunner inlocov1alpha1.ActionsRunner
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
 	case apierrors.IsNotFound(err):
-		return ctrl.Result{}, r.wires.TryClose(&actionsRunner)
+		return ctrl.Result{}, r.wires.TryClose(ctx, &actionsRunner)
 	case err != nil:
 		return ctrl.Result{}, err
 	}
@@ -117,7 +121,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
 	case err == nil:
-		r.watchers.Watch(ctx, log, &actionsRunnerJob, nil)
+		r.watchers.Watch(ctx, logger, &actionsRunnerJob, nil)
 		return ctrl.Result{}, nil
 	case !apierrors.IsNotFound(err):
 		return ctrl.Result{}, err
@@ -135,9 +139,10 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	dotFiles := util.ToDotFiles(&configMap, &secret)
 
-	wire, err := r.wires.WireFor(ctx, log, &actionsRunner, dotFiles)
+	wire, err := r.wires.WireFor(ctx, &actionsRunner, dotFiles)
 	if err != nil {
-		return ctrl.Result{}, err
+		logger.Error(err, err.Error())
+		return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, &actionsRunner, deleteOpts...))
 	}
 
 	desiredConfigMap, err := util.ToConfigMap(wire.DotFiles, &actionsRunner, r.Scheme)
@@ -161,8 +166,10 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		Log:    r.Log,
 		Scheme: r.Scheme,
 
-		wire:  wire,
-		watch: func(job *inlocov1alpha1.ActionsRunnerJob, ack <-chan struct{}) { r.watchers.Watch(ctx, log, job, ack) },
+		wire: wire,
+		watch: func(job *inlocov1alpha1.ActionsRunnerJob, ack <-chan struct{}) {
+			r.watchers.Watch(ctx, logger, job, ack)
+		},
 	}
 	if err := consumer.Consume(ctx); err != nil {
 		return ctrl.Result{}, err
