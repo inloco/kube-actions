@@ -102,8 +102,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("actionsrunnerreplicaset", req.NamespacedName)
 
 	var actionsRunnerReplicaSet inlocov1alpha1.ActionsRunnerReplicaSet

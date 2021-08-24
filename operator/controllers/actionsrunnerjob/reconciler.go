@@ -45,9 +45,8 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("actionsrunnerjob", req.NamespacedName)
+func (r *Reconciler) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.Log.WithValues("actionsrunnerjob", req.NamespacedName)
 
 	// your logic here
 

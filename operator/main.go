@@ -106,10 +106,6 @@ func main() {
 		setupLog.Error(err, "unable to create webhook", "webhook", "ActionsRunner")
 		os.Exit(1)
 	}
-	if err = (&inlocov1alpha1.ActionsRunner{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ActionsRunner")
-		os.Exit(1)
-	}
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")

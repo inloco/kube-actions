@@ -100,13 +100,12 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if r.gone {
 		r.Log.Info("Reconciler Gone")
 		return ctrl.Result{}, nil
 	}
 
-	ctx := context.Background()
 	log := r.Log.WithValues("actionsrunner", req.NamespacedName)
 
 	var actionsRunner inlocov1alpha1.ActionsRunner

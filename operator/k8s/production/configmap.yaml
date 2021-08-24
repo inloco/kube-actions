@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-manager
+data:
+  KUBEACTIONS_GITHUB_APP_ID: "77742"
+  KUBEACTIONS_GITHUB_INSTL_ID: "18974040"
+  KUBEACTIONS_GITHUB_OWNERS: inloco
+  KUBEACTIONS_GITHUB_VISIBILITIES: private
