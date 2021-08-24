@@ -3,13 +3,12 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-  name: system
+  name: kube-actions
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: kube-actions
   labels:
     control-plane: controller-manager
 spec:
@@ -22,13 +21,23 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
+      securityContext:
+        runAsNonRoot: true
       containers:
       - command:
         - /manager
         args:
         - --enable-leader-election
-        image: controller:latest
+        - --concurrency-level=100
+        image: inloco/kube-actions:to-be-replaced
         name: manager
+        envFrom:
+        - configMapRef:
+            name: controller-manager
+        - secretRef:
+            name: controller-manager
+        securityContext:
+          allowPrivilegeEscalation: false
         resources:
           limits:
             cpu: 100m
@@ -36,4 +45,5 @@ spec:
           requests:
             cpu: 100m
             memory: 20Mi
+      serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

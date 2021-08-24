@@ -35,7 +35,7 @@ func (r *ActionsRunner) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:verbs=create;update,path=/validate-inloco-com-br-v1alpha1-actionsrunner,mutating=false,failurePolicy=fail,groups=inloco.com.br,resources=actionsrunners,versions=v1alpha1,name=vactionsrunner.kb.io
+//+kubebuilder:webhook:verbs=create;update,sideEffects=none,admissionReviewVersions=v1,path=/validate-inloco-com-br-v1alpha1-actionsrunner,mutating=false,failurePolicy=fail,groups=inloco.com.br,resources=actionsrunners,versions=v1alpha1,name=vactionsrunner.kb.io
 
 var _ webhook.Validator = &ActionsRunner{}
 
