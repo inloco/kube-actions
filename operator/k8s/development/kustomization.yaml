@@ -1,5 +1,6 @@
 bases:
 - ../../config/default
 resources:
-- secret.yaml
 - configmap.yaml
+generators:
+- secret.yaml

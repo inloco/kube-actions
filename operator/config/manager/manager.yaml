@@ -27,8 +27,8 @@ spec:
       - command:
         - /manager
         args:
-        - --enable-leader-election
-        - --concurrency-level=100
+        - --leader-elect
+        - --max-concurrent-reconciles=1000
         image: inloco/kube-actions:to-be-replaced
         name: manager
         envFrom:
@@ -41,9 +41,9 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 30Mi
+            memory: 300Mi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 300Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
