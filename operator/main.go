@@ -126,6 +126,7 @@ func main() {
 
 	arrsReconciler := actionsrunnerreplicaset.Reconciler{
 		Client:                  mgr.GetClient(),
+		Log:                     mgr.GetLogger(),
 		Scheme:                  mgr.GetScheme(),
 		MaxConcurrentReconciles: maxConcurrentReconciles,
 	}
@@ -136,6 +137,7 @@ func main() {
 
 	arReconciler := actionsrunner.Reconciler{
 		Client:                  mgr.GetClient(),
+		Log:                     mgr.GetLogger(),
 		Scheme:                  mgr.GetScheme(),
 		MaxConcurrentReconciles: maxConcurrentReconciles,
 	}
