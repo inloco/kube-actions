@@ -36,6 +36,10 @@ var (
 		client.FieldOwner("kube-actions"),
 	}
 
+	updateOpts = []client.UpdateOption{
+		client.FieldOwner("kube-actions"),
+	}
+
 	deleteOpts = []client.DeleteOption{
 		client.PropagationPolicy(metav1.DeletePropagationForeground),
 	}
@@ -139,9 +143,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	for _, item := range items {
 		if !reflect.DeepEqual(item.Spec, actionsRunnerReplicaSet.Spec.Template) {
 			actionsRunner := item
-			logger.Info("undesired replica, deleting ActionsRunner " + actionsRunner.GetName())
 
-			return ctrl.Result{}, r.Delete(ctx, &actionsRunner, deleteOpts...)
+			logger.Info("undesired replica, patching ActionsRunner " + actionsRunner.GetName())
+			actionsRunner.Spec = actionsRunnerReplicaSet.Spec.Template
+			return ctrl.Result{}, r.Update(ctx, &actionsRunner, updateOpts...)
 		}
 	}
 
