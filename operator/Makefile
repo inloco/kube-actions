@@ -1,5 +1,5 @@
 IMAGE_NAME ?= inloco/kube-actions
-IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
+IMAGE_VERSION ?= $(shell git describe --always)
 IMAGE_VARIANT ?= -operator
 
 AGENT_VERSION ?= 2.280.3
@@ -28,10 +28,10 @@ uninstall: manifests
 	kustomize build ./config/crd | kubectl delete -f -
 
 deploy/production: manifests
-	kustomize build k8s/production | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "inloco/kube-actions=$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)"' | kubectl apply -f -
+	kustomize build --enable-alpha-plugins k8s/production | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
 
 deploy/development: manifests
-	kustomize build k8s/development | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "inloco/kube-actions=$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)"' | kubectl apply -f -
+	kustomize build --enable-alpha-plugins k8s/development | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
