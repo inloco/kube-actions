@@ -29,10 +29,10 @@ func main() {
 		logger.Panic(err)
 	}
 
-	logger.Println("patching runtime dirs")
-	if err := docker.PatchRuntimeDirs(); err != nil {
-		logger.Panic(err)
-	}
+	// logger.Println("patching runtime dirs")
+	// if err := docker.PatchRuntimeDirs(); err != nil {
+	// 	logger.Panic(err)
+	// }
 
 	logger.Println("starting dockerd")
 	cmdWait, err := docker.StartDockerd()
