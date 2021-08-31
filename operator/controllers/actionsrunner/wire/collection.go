@@ -19,11 +19,9 @@ package wire
 import (
 	"context"
 	"errors"
-	"reflect"
 	"sync"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -46,7 +44,7 @@ func (c *Collection) Deinit(ctx context.Context) {
 
 	c.wireRegistry.Range(func(key, i interface{}) bool {
 		wire, ok := i.(*Wire)
-		if ok && !wire.gone {
+		if ok && wire.active {
 			if err := wire.Close(ctx); err != nil {
 				logger.Error(err, err.Error())
 			}
@@ -62,9 +60,7 @@ func (c *Collection) EventSource() source.Source {
 	}
 }
 
-func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, error) {
-	logger := log.FromContext(ctx)
-
+func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner) (*Wire, error) {
 	if actionsRunner == nil {
 		return nil, errors.New("ActionsRunner == nil")
 	}
@@ -74,23 +70,17 @@ func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.
 		Name:      actionsRunner.GetName(),
 	}
 
-	if i, ok := c.wireRegistry.Load(namespacedName); ok {
-		wire, ok := i.(*Wire)
-		if ok && !wire.gone {
-			if reflect.DeepEqual(*wire.ActionsRunner, *actionsRunner) {
-				return wire, nil
-			}
+	logger := log.FromContext(ctx, "runner", namespacedName.String())
 
-			if err := wire.Close(ctx); err != nil {
-				logger.Error(err, err.Error())
-			}
+	if i, ok := c.wireRegistry.Load(namespacedName); ok {
+		if wire, ok := i.(*Wire); ok {
+			return wire, nil
 		}
 	}
 
 	wire := &Wire{
-		events:        c.eventChannel,
-		ActionsRunner: actionsRunner,
-		DotFiles:      dotFiles,
+		operatorNotifier: c.eventChannel,
+		actionsRunner:    actionsRunner,
 	}
 
 	logger.Info("Initializing Wire")
@@ -105,23 +95,14 @@ func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.
 	return wire, nil
 }
 
-func (c *Collection) TryClose(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner) error {
-	if actionsRunner == nil {
-		return errors.New("ActionsRunner == nil")
-	}
-
-	namespacedName := client.ObjectKey{
-		Namespace: actionsRunner.GetNamespace(),
-		Name:      actionsRunner.GetName(),
-	}
-
+func (c *Collection) TryClose(ctx context.Context, namespacedName client.ObjectKey) error {
 	i, ok := c.wireRegistry.Load(namespacedName)
 	if !ok {
 		return nil
 	}
 
 	wire, ok := i.(*Wire)
-	if !ok || wire.gone {
+	if !ok || !wire.active {
 		return nil
 	}
 

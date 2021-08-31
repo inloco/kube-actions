@@ -13,6 +13,8 @@ spec:
     kind: ActionsRunnerReplicaSet
     listKind: ActionsRunnerReplicaSetList
     plural: actionsrunnerreplicasets
+    shortNames:
+    - arrs
     singular: actionsrunnerreplicaset
   scope: Namespaced
   versions:

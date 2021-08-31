@@ -41,6 +41,9 @@ var _ webhook.Validator = &ActionsRunner{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ActionsRunner) ValidateCreate() error {
+	if r.State == "" {
+		return errors.New("missing Status.State for ActionsRunner")
+	}
 	return nil
 }
 
