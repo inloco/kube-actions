@@ -18,6 +18,7 @@ package actionsrunner
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -26,8 +27,6 @@ import (
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/wire"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,23 +43,24 @@ var (
 		client.FieldOwner("kube-actions"),
 	}
 
+	updateOpts = []client.UpdateOption{
+		client.FieldOwner("kube-actions"),
+	}
+
 	deleteOpts = []client.DeleteOption{
-		client.PropagationPolicy(metav1.DeletePropagationBackground),
+		client.PropagationPolicy(metav1.DeletePropagationForeground),
 	}
 )
 
 // Reconciler reconciles an actionsRunner object
 type Reconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
-
+	Log                     logr.Logger
+	Scheme                  *runtime.Scheme
 	MaxConcurrentReconciles int
 
-	watchers WatcherCollection
-	wires    wire.Collection
-
-	gone bool
+	gone  bool
+	wires wire.Collection
 }
 
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunners,verbs=get;list;watch;create;update;patch;delete
@@ -71,11 +71,8 @@ type Reconciler struct {
 
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.watchers.Init(r.Client)
 	r.wires.Init()
 
 	go func() {
@@ -86,102 +83,139 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 		r.gone = true
 		r.wires.Deinit(context.TODO())
-		r.watchers.Deinit()
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&inlocov1alpha1.ActionsRunner{}).
 		Owns(&inlocov1alpha1.ActionsRunnerJob{}).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.Secret{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&batchv1.Job{}).
-		Watches(r.watchers.EventSource(), &handler.EnqueueRequestForObject{}).
 		Watches(r.wires.EventSource(), &handler.EnqueueRequestForObject{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		Complete(r)
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx, "namespacedName", req.NamespacedName.String())
 
 	if r.gone {
-		logger.Info("Reconciler Gone")
+		logger.Info("Reconciler gone")
 		return ctrl.Result{}, nil
 	}
 
+	// if AR was deleted, close leftover connection to GitHub
 	var actionsRunner inlocov1alpha1.ActionsRunner
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
 	case apierrors.IsNotFound(err):
-		return ctrl.Result{}, r.wires.TryClose(ctx, &actionsRunner)
+		logger.Info("ActionsRunner not found, TryClose wire")
+		return ctrl.Result{}, r.wires.TryClose(ctx, client.ObjectKey(req.NamespacedName))
 	case err != nil:
 		return ctrl.Result{}, err
 	}
 
-	var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
-	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
-	case err == nil:
-		r.watchers.Watch(ctx, logger, &actionsRunnerJob, nil)
-		return ctrl.Result{}, nil
-	case !apierrors.IsNotFound(err):
-		return ctrl.Result{}, err
-	}
-
-	var configMap corev1.ConfigMap
-	if err := r.Get(ctx, req.NamespacedName, &configMap); client.IgnoreNotFound(err) != nil {
-		return ctrl.Result{}, err
-	}
-
-	var secret corev1.Secret
-	if err := r.Get(ctx, req.NamespacedName, &secret); client.IgnoreNotFound(err) != nil {
-		return ctrl.Result{}, err
-	}
-
-	dotFiles := util.ToDotFiles(&configMap, &secret)
-
-	wire, err := r.wires.WireFor(ctx, &actionsRunner, dotFiles)
+	wire, err := r.wires.WireFor(ctx, &actionsRunner)
 	if err != nil {
-		logger.Error(err, err.Error())
+		logger.Error(err, "Error retrieving ActionsRunner")
 		return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, &actionsRunner, deleteOpts...))
 	}
 
-	desiredConfigMap, err := util.ToConfigMap(wire.DotFiles, &actionsRunner, r.Scheme)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := r.Patch(ctx, desiredConfigMap, client.Apply, patchOpts...); err != nil {
-		return ctrl.Result{}, err
+	// if AR is pending, setup connection and create related resources
+	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStatePending {
+		logger.Info("ActionsRunner pending")
+
+		desiredConfigMap, err := util.ToConfigMap(wire.DotFiles, &actionsRunner, r.Scheme)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.Patch(ctx, desiredConfigMap, client.Apply, patchOpts...); err != nil {
+			logger.Error(err, "Error creating ConfigMap for ActionsRunner")
+			return ctrl.Result{}, err
+		}
+
+		desiredSecret, err := util.ToSecret(wire.DotFiles, &actionsRunner, r.Scheme)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.Patch(ctx, desiredSecret, client.Apply, patchOpts...); err != nil {
+			logger.Error(err, "Error creating Secret for ActionsRunner")
+			return ctrl.Result{}, err
+		}
+
+		desiredPodDisruptionBudget, err := util.ToPodDisruptionBudget(wire.DotFiles, &actionsRunner, r.Scheme)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.Patch(ctx, desiredPodDisruptionBudget, client.Apply, patchOpts...); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		actionsRunner.State = inlocov1alpha1.ActionsRunnerStateIdle
+		if err := r.Update(ctx, &actionsRunner, updateOpts...); err != nil {
+			logger.Error(err, "Error updating ActionsRunner.State to Idle")
+			return ctrl.Result{}, err
+		}
+
+		logger.Info("Listening for events")
+		wire.Listen(ctx)
+
+		return ctrl.Result{}, nil
 	}
 
-	desiredSecret, err := util.ToSecret(wire.DotFiles, &actionsRunner, r.Scheme)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := r.Patch(ctx, desiredSecret, client.Apply, patchOpts...); err != nil {
-		return ctrl.Result{}, err
+	// if AR is idle, look for job requests to be processed
+	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStateIdle {
+		logger.Info("ActionsRunner idle")
+
+		select {
+		case <-wire.JobRequests():
+			break
+		default:
+			logger.Info("No jobs to process")
+			return ctrl.Result{}, nil
+		}
+
+		logger.Info("New job request")
+
+		desiredActionsRunnerJob, err := util.ToActionsRunnerJob(&actionsRunner, r.Scheme)
+		if err != nil {
+			logger.Error(err, "Error generating ActionsRunnerJob definition")
+			return ctrl.Result{}, err
+		}
+		if err := r.Patch(ctx, desiredActionsRunnerJob, client.Apply, patchOpts...); err != nil {
+			logger.Error(err, "Error creating ActionsRunnerJob")
+			return ctrl.Result{}, err
+		}
+
+		actionsRunner.State = inlocov1alpha1.ActionsRunnerStateActive
+		if err := r.Update(ctx, &actionsRunner, updateOpts...); err != nil {
+			logger.Error(err, "Error updating ActionsRunner.State to Active")
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
 	}
 
-	desiredPodDisruptionBudget, err := util.ToPodDisruptionBudget(wire.DotFiles, &actionsRunner, r.Scheme)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := r.Patch(ctx, desiredPodDisruptionBudget, client.Apply, patchOpts...); err != nil {
-		return ctrl.Result{}, err
+	// if AR is active and ARJ is no more, than let's listen for events again
+	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStateActive {
+		logger.Info("ActionsRunner active")
+
+		var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
+		switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
+		case err == nil:
+			logger.Info("ActionsRunnerJob still present, waiting")
+			return ctrl.Result{}, nil
+		case !apierrors.IsNotFound(err):
+			logger.Error(err, "Error retrieving ActionsRunnerJob")
+			return ctrl.Result{}, err
+		}
+
+		actionsRunner.State = inlocov1alpha1.ActionsRunnerStateIdle
+		if err := r.Update(ctx, &actionsRunner, updateOpts...); err != nil {
+			logger.Error(err, "Error updating ActionsRunner.State to idle")
+			return ctrl.Result{}, err
+		}
+
+		wire.Listen(ctx)
+
+		return ctrl.Result{}, nil
 	}
 
-	consumer := &Consumer{
-		Client: r.Client,
-		Log:    r.Log,
-		Scheme: r.Scheme,
-
-		wire: wire,
-		watch: func(job *inlocov1alpha1.ActionsRunnerJob, ack <-chan struct{}) {
-			r.watchers.Watch(ctx, logger, job, ack)
-		},
-	}
-	if err := consumer.Consume(ctx); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, fmt.Errorf("ActionsRunner %s in invalid state", req.NamespacedName.String())
 }

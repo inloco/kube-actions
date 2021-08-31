@@ -23,10 +23,19 @@ import (
 // ActionsRunnerJobSpec defines the desired state of ActionsRunnerJob
 type ActionsRunnerJobSpec struct{}
 
+type ActionsRunnerJobState string
+
+const (
+	ActionsRunnerJobStatePending ActionsRunnerJobState = "Pending"
+	ActionsRunnerJobStateRunning ActionsRunnerJobState = "Running"
+)
+
 // ActionsRunnerJobStatus defines the observed state of ActionsRunnerJob
-type ActionsRunnerJobStatus struct{}
+type ActionsRunnerJobStatus struct {
+}
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName="arj"
 // +kubebuilder:subresource:status
 
 // ActionsRunnerJob is the Schema for the actionsrunnerjobs API
@@ -35,6 +44,7 @@ type ActionsRunnerJob struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   ActionsRunnerJobSpec   `json:"spec,omitempty"`
+	State  ActionsRunnerJobState  `json:"state,omitempty"`
 	Status ActionsRunnerJobStatus `json:"status,omitempty"`
 }
 

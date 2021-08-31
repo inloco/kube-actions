@@ -240,6 +240,7 @@ func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *run
 			Name:      actionsRunner.GetName(),
 			Namespace: actionsRunner.GetNamespace(),
 		},
+		State: inlocov1alpha1.ActionsRunnerJobStatePending,
 	}
 
 	if err := ctrl.SetControllerReference(actionsRunner, &actionsRunnerJob, scheme); err != nil {

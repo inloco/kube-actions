@@ -453,7 +453,7 @@ func (ado *AzureDevOps) GetMessage(ctx context.Context, lastMessageId *uint64) (
 	return message, nil
 }
 
-func (ado *AzureDevOps) DeleteMessage(ctx context.Context, taskAgentMessage taskagent.TaskAgentMessage) error {
+func (ado *AzureDevOps) DeleteMessage(ctx context.Context, messageId uint64) error {
 	if ado.TaskAgentBridgeClient == nil {
 		return errors.New(".TaskAgentBridgeClient == nil")
 	}
@@ -464,7 +464,7 @@ func (ado *AzureDevOps) DeleteMessage(ctx context.Context, taskAgentMessage task
 
 	return ado.TaskAgentBridgeClient.DeleteMessage(ctx, taskagent.DeleteMessageArgs{
 		PoolId:    &poolId,
-		MessageId: taskAgentMessage.MessageId,
+		MessageId: &messageId,
 		SessionId: ado.TaskAgentSession.SessionId,
 	})
 }

@@ -34,6 +34,14 @@ const (
 	ActionsRunnerCapabilityDocker ActionsRunnerCapability = "docker"
 )
 
+type ActionsRunnerState string
+
+const (
+	ActionsRunnerStatePending ActionsRunnerState = "Pending"
+	ActionsRunnerStateIdle    ActionsRunnerState = "Idle"
+	ActionsRunnerStateActive  ActionsRunnerState = "Active"
+)
+
 // ActionsRunnerSpec defines the desired state of ActionsRunner
 type ActionsRunnerSpec struct {
 	Repository   ActionsRunnerRepository   `json:"repository"`
@@ -53,25 +61,12 @@ type ActionsRunnerSpec struct {
 	NodeSelector       map[string]string   `json:"nodeSelector,omitempty"`
 }
 
-type ActionsRunnerState string
-
-const (
-	ActionsRunnerStatePending   ActionsRunnerState = "Pending"
-	ActionsRunnerStateRunning   ActionsRunnerState = "Running"
-	ActionsRunnerStateSucceeded ActionsRunnerState = "Succeeded"
-	ActionsRunnerStateFailed    ActionsRunnerState = "Failed"
-	ActionsRunnerStateUnknown   ActionsRunnerState = "Unknown"
-)
-
 // ActionsRunnerStatus defines the observed state of ActionsRunner
 type ActionsRunnerStatus struct {
-	State              ActionsRunnerState `json:"phase,omitempty"`
-	Message            string             `json:"message,omitempty"`
-	LastProbeTime      metav1.Time        `json:"lastProbeTime,omitempty"`
-	LastTransitionTime metav1.Time        `json:"lastTransitionTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName="ar"
 // +kubebuilder:subresource:status
 
 // ActionsRunner is the Schema for the actionsrunners API
@@ -80,6 +75,7 @@ type ActionsRunner struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   ActionsRunnerSpec   `json:"spec,omitempty"`
+	State  ActionsRunnerState  `json:"state"`
 	Status ActionsRunnerStatus `json:"status,omitempty"`
 }
 
