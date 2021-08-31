@@ -27,7 +27,6 @@ spec:
       - command:
         - /manager
         args:
-        - --leader-elect
         - --max-concurrent-reconciles=1000
         image: inloco/kube-actions:to-be-replaced
         name: manager
