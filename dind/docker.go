@@ -16,7 +16,6 @@ import (
 
 	dockerTypes "github.com/docker/docker/api/types"
 	docker "github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/mount"
 )
 
 const (
@@ -76,10 +75,6 @@ func NewDockerClient(logger *log.Logger, cache *Cache) (*DockerClient, error) {
 
 func (c *DockerClient) PatchRuntimeDirs() error {
 	for _, dir := range []string{"/var/lib/docker", "/home/rootless/.local/share/docker"} {
-		if err := mount.Unmount(dir); err != nil {
-			return err
-		}
-
 		if err := os.Chown(dir, os.Getuid(), os.Getgid()); err != nil {
 			return err
 		}
