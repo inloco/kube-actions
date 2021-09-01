@@ -97,6 +97,7 @@ func (c *DockerClient) StartDockerd() (chan error, error) {
 	if ok {
 		args = append(args, strings.Split(env, " ")...)
 	}
+	logger.Println("Dockerd args: %v", args)
 
 	logger.Println("starting dockerd-entrypoint.sh")
 	cmd := exec.Cmd{
