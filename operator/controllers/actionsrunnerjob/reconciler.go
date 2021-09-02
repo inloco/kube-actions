@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	batchv1 "k8s.io/api/batch/v1"
@@ -29,6 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -85,8 +87,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var actionsRunner inlocov1alpha1.ActionsRunner
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
 	case apierrors.IsNotFound(err):
-		logger.Info("ActionsRunner not found, ignore")
-		return ctrl.Result{}, nil
+		logger.Info("ActionsRunner not found, delete ActionsRunnerJob")
+		return ctrl.Result{}, client.IgnoreNotFound(r.deleteActionsRunnerJob(ctx, logger, &actionsRunnerJob))
 	case err != nil:
 		logger.Error(err, "Error retrieving ActionsRunner")
 		return ctrl.Result{}, err
@@ -143,9 +145,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 
 		logger.Info("Job finished running, deleting ActionsRunnerJob")
-
-		if err := r.Delete(ctx, &actionsRunnerJob, deleteOpts...); err != nil {
-			logger.Error(err, "Error deleting ActionsRunnerJob")
+		if err := r.deleteActionsRunnerJob(ctx, logger, &actionsRunnerJob); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -153,4 +153,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	return ctrl.Result{}, fmt.Errorf("ActionsRunnerJob %s in invalid state", req.NamespacedName.String())
+}
+
+func (r *Reconciler) deleteActionsRunnerJob(ctx context.Context, logger logr.Logger, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob) error {
+	controllerutil.RemoveFinalizer(actionsRunnerJob, inlocov1alpha1.ActionsRunnerJobFinalizer)
+	if err := r.Update(ctx, actionsRunnerJob); err != nil {
+		logger.Error(err, "Error removing ActionsRunnerJob's finalizer")
+		return err
+	}
+
+	if err := r.Delete(ctx, actionsRunnerJob, deleteOpts...); client.IgnoreNotFound(err) != nil {
+		logger.Error(err, "Error deleting ActionsRunnerJob")
+		return err
+	}
+
+	return nil
 }

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var (
@@ -242,6 +243,8 @@ func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *run
 		},
 		State: inlocov1alpha1.ActionsRunnerJobStatePending,
 	}
+
+	controllerutil.AddFinalizer(&actionsRunnerJob, inlocov1alpha1.ActionsRunnerJobFinalizer)
 
 	if err := ctrl.SetControllerReference(actionsRunner, &actionsRunnerJob, scheme); err != nil {
 		return nil, err
