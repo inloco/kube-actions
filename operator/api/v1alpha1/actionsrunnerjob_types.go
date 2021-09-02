@@ -30,6 +30,8 @@ const (
 	ActionsRunnerJobStateRunning ActionsRunnerJobState = "Running"
 )
 
+const ActionsRunnerJobFinalizer = "actionsrunnerjobs.inloco.com.br/finalizer"
+
 // ActionsRunnerJobStatus defines the observed state of ActionsRunnerJob
 type ActionsRunnerJobStatus struct {
 }
