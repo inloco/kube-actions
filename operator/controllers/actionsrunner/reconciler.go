@@ -27,6 +27,7 @@ import (
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/wire"
+	controllersutil "github.com/inloco/kube-actions/operator/controllers/util"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -90,7 +91,24 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&inlocov1alpha1.ActionsRunnerJob{}).
 		Watches(r.wires.EventSource(), &handler.EnqueueRequestForObject{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
+		WithEventFilter(controllersutil.PreficateOfFunction(eventFilter)).
 		Complete(r)
+}
+
+func eventFilter(object client.Object, event controllersutil.PredicateEvent) bool {
+	// ignore events for ActionsRunnerJob, except Delete
+	_, isActionRunnerJob := object.(*inlocov1alpha1.ActionsRunnerJob)
+	if isActionRunnerJob && event != controllersutil.PredicateEventDelete {
+		return false
+	}
+
+	// ignore Update for ActionsRunner
+	_, isActionRunner := object.(*inlocov1alpha1.ActionsRunner)
+	if isActionRunner && event == controllersutil.PredicateEventUpdate {
+		return false
+	}
+
+	return true
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

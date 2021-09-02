@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
+	controllersutil "github.com/inloco/kube-actions/operator/controllers/util"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +67,24 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&inlocov1alpha1.ActionsRunnerJob{}).
 		Owns(&batchv1.Job{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
+		WithEventFilter(controllersutil.PreficateOfFunction(eventFilter)).
 		Complete(r)
+}
+
+func eventFilter(object client.Object, event controllersutil.PredicateEvent) bool {
+	// ignore events for Job, except Delete
+	_, isJob := object.(*batchv1.Job)
+	if isJob && event != controllersutil.PredicateEventDelete {
+		return false
+	}
+
+	// ignore events for ActionsRunnerJob, except Create
+	_, isActionsRunnerJob := object.(*inlocov1alpha1.ActionsRunnerJob)
+	if isActionsRunnerJob && event != controllersutil.PredicateEventCreate {
+		return false
+	}
+
+	return true
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
