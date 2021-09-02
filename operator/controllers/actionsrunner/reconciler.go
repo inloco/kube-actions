@@ -28,6 +28,7 @@ import (
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/wire"
 	controllersutil "github.com/inloco/kube-actions/operator/controllers/util"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -129,7 +130,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	wire, err := r.wires.WireFor(ctx, &actionsRunner)
+	// reload setup in case of new connection (e.g. operator restarts)
+	var configMap corev1.ConfigMap
+	if err := r.Get(ctx, req.NamespacedName, &configMap); client.IgnoreNotFound(err) != nil {
+		logger.Error(err, "Error retrieving ActionsRunner's ConfigMap")
+		return ctrl.Result{}, err
+	}
+	var secret corev1.Secret
+	if err := r.Get(ctx, req.NamespacedName, &secret); client.IgnoreNotFound(err) != nil {
+		logger.Error(err, "Error retrieving ActionsRunner's Secret")
+		return ctrl.Result{}, err
+	}
+
+	dotFiles := util.ToDotFiles(&configMap, &secret)
+	wire, new_connection, err := r.wires.WireFor(ctx, &actionsRunner, dotFiles)
 	if err != nil {
 		logger.Error(err, "Error retrieving ActionsRunner")
 		return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, &actionsRunner, deleteOpts...))
