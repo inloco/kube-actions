@@ -60,9 +60,9 @@ func (c *Collection) EventSource() source.Source {
 	}
 }
 
-func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner) (*Wire, error) {
+func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, bool, error) {
 	if actionsRunner == nil {
-		return nil, errors.New("ActionsRunner == nil")
+		return nil, false, errors.New("ActionsRunner == nil")
 	}
 
 	namespacedName := client.ObjectKey{
@@ -74,25 +74,26 @@ func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.
 
 	if i, ok := c.wireRegistry.Load(namespacedName); ok {
 		if wire, ok := i.(*Wire); ok {
-			return wire, nil
+			return wire, false, nil
 		}
 	}
 
 	wire := &Wire{
 		operatorNotifier: c.eventChannel,
 		actionsRunner:    actionsRunner,
+		DotFiles:         dotFiles,
 	}
 
 	logger.Info("Initializing Wire")
 
 	if err := wire.Init(ctx); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	logger.Info("Wire Initialized")
 
 	c.wireRegistry.Store(namespacedName, wire)
-	return wire, nil
+	return wire, true, nil
 }
 
 func (c *Collection) TryClose(ctx context.Context, namespacedName client.ObjectKey) error {
