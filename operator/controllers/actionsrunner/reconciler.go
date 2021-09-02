@@ -84,7 +84,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		close(stop)
 
 		r.gone = true
-		r.wires.Deinit(context.TODO())
+		r.wires.Deinit(context.Background())
 	}()
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -124,8 +124,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var actionsRunner inlocov1alpha1.ActionsRunner
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
 	case apierrors.IsNotFound(err):
-		logger.Info("ActionsRunner not found, TryClose wire")
-		return ctrl.Result{}, r.wires.TryClose(ctx, client.ObjectKey(req.NamespacedName))
+		logger.Info("ActionsRunner not found, TryDestroy wire")
+		return ctrl.Result{}, r.wires.TryDestroy(ctx, client.ObjectKey(req.NamespacedName))
 	case err != nil:
 		return ctrl.Result{}, err
 	}
@@ -179,6 +179,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 
+		logger.Info("Set ActionsRunner.State to idle ")
+
 		actionsRunner.State = inlocov1alpha1.ActionsRunnerStateIdle
 		if err := r.Update(ctx, &actionsRunner, updateOpts...); err != nil {
 			logger.Error(err, "Error updating ActionsRunner.State to Idle")
@@ -186,7 +188,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 
 		logger.Info("Listening for events")
-		wire.Listen(ctx)
+		wire.Listen()
 
 		return ctrl.Result{}, nil
 	}
@@ -194,6 +196,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// if AR is idle, look for job requests to be processed
 	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStateIdle {
 		logger.Info("ActionsRunner idle")
+
+		// if operator restarts a new connection is made
+		if new_connection {
+			logger.Info("Listening for events on new wire for old ActionsRunner")
+			wire.Listen()
+		}
 
 		select {
 		case <-wire.JobRequests():
@@ -203,7 +211,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, nil
 		}
 
-		logger.Info("New job request")
+		logger.Info("New job request, creating ActionsRunnerJob")
 
 		desiredActionsRunnerJob, err := util.ToActionsRunnerJob(&actionsRunner, r.Scheme)
 		if err != nil {
@@ -214,6 +222,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			logger.Error(err, "Error creating ActionsRunnerJob")
 			return ctrl.Result{}, err
 		}
+
+		logger.Info("Set ActionsRunner.State to active ")
 
 		actionsRunner.State = inlocov1alpha1.ActionsRunnerStateActive
 		if err := r.Update(ctx, &actionsRunner, updateOpts...); err != nil {
@@ -238,13 +248,15 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 
+		logger.Info("ActionsRunnerJob not present, set ActionsRunner.State to idle ")
+
 		actionsRunner.State = inlocov1alpha1.ActionsRunnerStateIdle
 		if err := r.Update(ctx, &actionsRunner, updateOpts...); err != nil {
 			logger.Error(err, "Error updating ActionsRunner.State to idle")
 			return ctrl.Result{}, err
 		}
 
-		wire.Listen(ctx)
+		wire.Listen()
 
 		return ctrl.Result{}, nil
 	}

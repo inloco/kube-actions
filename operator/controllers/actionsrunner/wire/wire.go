@@ -18,7 +18,6 @@ package wire
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
@@ -40,8 +39,6 @@ type Wire struct {
 
 	jobRequests chan struct{}
 	loopClose   chan struct{}
-
-	active bool
 }
 
 func (w *Wire) initGH(ctx context.Context) error {
@@ -89,7 +86,13 @@ func (w *Wire) init(ctx context.Context) error {
 	return nil
 }
 
-func (w *Wire) destroy(ctx context.Context) error {
+func (w *Wire) Destroy() error {
+	ctx := context.Background()
+
+	if err := w.initGH(ctx); err != nil {
+		return err
+	}
+
 	if err := w.initADO(ctx, facades.RunnerEventRemove); err != nil {
 		return err
 	}
@@ -109,8 +112,12 @@ func (w *Wire) Init(ctx context.Context) error {
 		return nil
 	}
 
-	if err := w.destroy(ctx); err != nil {
-		logger.Error(err, err.Error())
+	if err := w.Destroy(); err != nil {
+		logger.Error(err, "Error destroying wire")
+	}
+
+	if err := w.Close(); err != nil {
+		logger.Error(err, "Error closing wire")
 	}
 
 	return err
@@ -145,7 +152,8 @@ func (w *Wire) JobRequests() <-chan struct{} {
 	return w.jobRequests
 }
 
-func (w *Wire) Listen(ctx context.Context) {
+func (w *Wire) Listen() {
+	ctx := context.Background()
 	logger := log.FromContext(ctx, "runner", w.actionsRunner.GetName())
 
 	w.loopClose = make(chan struct{})
@@ -158,33 +166,25 @@ func (w *Wire) Listen(ctx context.Context) {
 
 		defer func() {
 			if r := recover(); r != nil {
-				err := fmt.Errorf("%v", r)
-				logger.Error(err, err.Error())
+				logger.Error(fmt.Errorf("%v", r), "Recovering from error in wire listener")
+			}
 
-				if err := w.trySendEvent(genericEvent); err != nil {
-					logger.Error(err, err.Error())
-				}
-
-				if err := w.Close(ctx); err != nil {
-					logger.Error(err, err.Error())
-				}
+			logger.Info("Closing agent session")
+			if err := w.Close(); err != nil {
+				logger.Error(err, "Error closing agent session")
 			}
 		}()
 
 		if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
-			w.active = false
 			logger.Info("Wire gone")
 			panic(err)
 		}
-		defer w.adoFacade.DeinitAzureDevOpsTaskAgentSession(ctx)
 
 		logger.Info("Getting message")
 
 		var lastMessageId *uint64
 
 		for !w.isClosed() {
-			var err error
-
 			taMessage, err := w.adoFacade.GetMessage(ctx, lastMessageId)
 			if err != nil {
 				panic(err)
@@ -202,14 +202,6 @@ func (w *Wire) Listen(ctx context.Context) {
 
 			logger.Info("Message received", "id", message.Id, "type", message.Type)
 
-			if message.Type == MessageTypeAgentRefresh {
-				logger.Info("AgentRefresh, deleting agent", "id", message.Id, "type", message.Type)
-				if err := w.adoFacade.DeleteAgent(ctx); err != nil {
-					panic(err)
-				}
-				logger.Info("Agent deleted", "id", message.Id, "type", message.Type)
-			}
-
 			if message.Type == MessageTypePipelineAgentJobRequest {
 				logger.Info("PipelineAgentJobRequest, notifying manager")
 				w.jobRequests <- struct{}{}
@@ -223,21 +215,31 @@ func (w *Wire) Listen(ctx context.Context) {
 				panic(err)
 			}
 			logger.Info("Message deleted", "id", message.Id, "type", message.Type)
+
+			if message.Type == MessageTypeAgentRefresh {
+				logger.Info("AgentRefresh, deleting agent", "id", message.Id, "type", message.Type)
+				if err := w.adoFacade.DeleteAgent(ctx); err != nil {
+					panic(err)
+				}
+				logger.Info("Agent deleted", "id", message.Id, "type", message.Type)
+			}
 		}
 
 		logger.Info("Stop listening")
 	}()
 }
 
-func (w *Wire) Close(ctx context.Context) error {
+func (w *Wire) Close() error {
+	ctx := context.Background()
 	logger := log.FromContext(ctx)
 
-	if w.isClosed() {
-		return errors.New(".isClosed")
+	if !w.isClosed() {
+		close(w.loopClose)
 	}
 
-	close(w.loopClose)
-	w.adoFacade.DeinitAzureDevOpsTaskAgentSession(context.Background())
+	if err := w.adoFacade.DeinitAzureDevOpsTaskAgentSession(ctx); err != nil {
+		return err
+	}
 
 	logger.Info("Wire closed")
 	return nil
@@ -250,16 +252,4 @@ func (w *Wire) isClosed() bool {
 	default:
 		return w.loopClose == nil
 	}
-}
-
-func (w *Wire) trySendEvent(genericEvent event.GenericEvent) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-		}
-	}()
-
-	w.operatorNotifier <- genericEvent
-
-	return nil
 }

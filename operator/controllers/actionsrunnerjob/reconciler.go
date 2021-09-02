@@ -114,7 +114,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// if ARJ is still pending, create job
 	if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStatePending {
-		logger.Info("ActionsRunnerJob pending")
+		logger.Info("ActionsRunnerJob pending, creating Job")
 
 		desiredPersistentVolumeClaim, err := util.ToPersistentVolumeClaim(&actionsRunner, &actionsRunnerJob, r.Scheme)
 		if err != nil {
@@ -136,6 +136,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 
+		logger.Info("Set ActionsRunnerJob.State to running")
 		actionsRunnerJob.State = inlocov1alpha1.ActionsRunnerJobStateRunning
 		if err := r.Update(ctx, &actionsRunnerJob, updateOpts...); err != nil {
 			logger.Error(err, "Error updating ActionsRunnerJob.State to running")

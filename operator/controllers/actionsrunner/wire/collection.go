@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,11 +44,8 @@ func (c *Collection) Deinit(ctx context.Context) {
 	close(c.eventChannel)
 
 	c.wireRegistry.Range(func(key, i interface{}) bool {
-		wire, ok := i.(*Wire)
-		if ok && wire.active {
-			if err := wire.Close(ctx); err != nil {
-				logger.Error(err, err.Error())
-			}
+		if err := i.(*Wire).Close(); err != nil {
+			logger.Error(err, "Error closing wire on deinit")
 		}
 
 		return true
@@ -96,16 +94,24 @@ func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.
 	return wire, true, nil
 }
 
-func (c *Collection) TryClose(ctx context.Context, namespacedName client.ObjectKey) error {
-	i, ok := c.wireRegistry.Load(namespacedName)
+func (c *Collection) TryDestroy(ctx context.Context, namespacedName client.ObjectKey) error {
+	i, ok := c.wireRegistry.LoadAndDelete(namespacedName)
 	if !ok {
 		return nil
 	}
 
 	wire, ok := i.(*Wire)
-	if !ok || !wire.active {
+	if !ok {
 		return nil
 	}
 
-	return wire.Close(ctx)
+	if err := wire.Close(); err != nil {
+		return err
+	}
+
+	if err := wire.Destroy(); err != nil {
+		return err
+	}
+
+	return nil
 }

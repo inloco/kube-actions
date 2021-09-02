@@ -400,6 +400,10 @@ func (ado *AzureDevOps) DeleteAgentSession(ctx context.Context) error {
 }
 
 func (ado *AzureDevOps) DeinitAzureDevOpsTaskAgentSession(ctx context.Context) error {
+	if ado.TaskAgentSession == nil {
+		return nil
+	}
+
 	if err := ado.DeleteAgentSession(ctx); err != nil {
 		return err
 	}
