@@ -60,7 +60,7 @@ func (c *Collection) EventSource() source.Source {
 	}
 }
 
-func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, error) {
+func (c *Collection) GetWire(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner) (*Wire, error) {
 	if actionsRunner == nil {
 		return nil, errors.New("ActionsRunner == nil")
 	}
@@ -83,6 +83,21 @@ func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.
 			}
 		}
 	}
+
+	return nil, nil
+}
+
+func (c *Collection) MakeWire(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, error) {
+	if actionsRunner == nil {
+		return nil, errors.New("ActionsRunner == nil")
+	}
+
+	namespacedName := client.ObjectKey{
+		Namespace: actionsRunner.GetNamespace(),
+		Name:      actionsRunner.GetName(),
+	}
+
+	logger := log.FromContext(ctx, "runner", namespacedName.String())
 
 	wire := &Wire{
 		operatorNotifier: c.eventChannel,
