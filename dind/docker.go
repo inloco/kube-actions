@@ -176,7 +176,6 @@ func (c *DockerClient) GetResourcesInfoFromEvents() (chan NetworkInfo, chan Cont
 					kind, knownKind := resourceKindByString[msg.Type]
 					action, knownAction := resourceActionByString[msg.Action]
 					if !knownKind || !knownAction {
-						c.logger.Printf("unhandled event: %+v\n", msg)
 						continue
 					}
 
