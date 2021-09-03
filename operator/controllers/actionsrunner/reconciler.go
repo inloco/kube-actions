@@ -205,16 +205,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStateIdle {
 		logger.Info("ActionsRunner idle")
 
-		// wire should always be listening when idle, except when operator restarts or listener panics
-		if !wire.Listening() {
-			logger.Info("Wire not listening on idle, Listen() again")
-			wire.Listen()
-		}
-
 		select {
 		case <-wire.JobRequests():
 			break
 		default:
+			// wire should always be listening when idle, except when operator restarts or listener panics
+			if !wire.Listening() {
+				logger.Info("Wire not listening on idle, Listen() again")
+				wire.Listen()
+			}
+
 			logger.Info("No jobs to process")
 			return ctrl.Result{}, nil
 		}
