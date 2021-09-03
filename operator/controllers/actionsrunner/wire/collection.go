@@ -39,14 +39,16 @@ func (c *Collection) Init() {
 }
 
 func (c *Collection) Deinit(ctx context.Context) {
-	logger := log.FromContext(ctx)
-
 	close(c.eventChannel)
 
 	c.wireRegistry.Range(func(key, i interface{}) bool {
-		if err := i.(*Wire).Close(); err != nil {
-			logger.Error(err, "Error closing wire on deinit")
-		}
+		go func() {
+			wire := i.(*Wire)
+			logger := log.FromContext(ctx, "runner", wire.GetRunnerName())
+			if err := wire.Close(); err != nil {
+				logger.Error(err, "Error closing wire on deinit")
+			}
+		}()
 
 		return true
 	})
