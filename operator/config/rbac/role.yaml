@@ -140,11 +140,10 @@ rules:
   - poddisruptionbudgets
   - poddisruptionbudgets/status
   verbs:
-  - get
-  - list
-  - watch
   - create
   - delete
-  - deletecollection
+  - get
+  - list
   - patch
   - update
+  - watch
