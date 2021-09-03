@@ -13,6 +13,8 @@ spec:
     kind: ActionsRunnerJob
     listKind: ActionsRunnerJobList
     plural: actionsrunnerjobs
+    shortNames:
+    - arj
     singular: actionsrunnerjob
   scope: Namespaced
   versions:
@@ -32,6 +34,8 @@ spec:
           spec:
             description: ActionsRunnerJobSpec defines the desired state of ActionsRunnerJob
             type: object
+          state:
+            type: string
           status:
             description: ActionsRunnerJobStatus defines the observed state of ActionsRunnerJob
             type: object

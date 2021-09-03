@@ -67,7 +67,6 @@ var (
 		},
 		[]string{
 			"runner",
-			"event",
 		},
 	)
 
@@ -79,7 +78,6 @@ var (
 		},
 		[]string{
 			"runner",
-			"event",
 		},
 	)
 )
@@ -126,12 +124,12 @@ func IncGitHubCacheHitCollector(cacheName string, hit bool) {
 	githubCacheHitCollector.WithLabelValues(cacheName, strconv.FormatBool(hit)).Inc()
 }
 
-func IncGitHubActionsEventCounter(runner string, event string) {
-	githubActionsEventCounter.WithLabelValues(runner, event).Inc()
+func IncGitHubActionsEventCounter(runner string) {
+	githubActionsEventCounter.WithLabelValues(runner).Inc()
 }
 
-func ObserveGitHubActionsEventConsumeDuration(runner string, event string) *observer {
-	promObserver := githubActionsEventConsumeDurationHistogram.WithLabelValues(runner, event)
+func ObserveGitHubActionsEventConsumeDuration(runner string) *observer {
+	promObserver := githubActionsEventConsumeDurationHistogram.WithLabelValues(runner)
 	return newObserver(func(duration time.Duration) {
 		promObserver.Observe(duration.Seconds())
 	})

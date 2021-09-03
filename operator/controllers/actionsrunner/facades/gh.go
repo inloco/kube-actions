@@ -177,7 +177,7 @@ func handleGitHubResponse(ctx context.Context, client *github.Client, clientName
 	}
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return errors.New(response.Status)
+		return fmt.Errorf("Error response from GitHub: " + response.Status)
 	}
 
 	return nil
