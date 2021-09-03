@@ -194,7 +194,6 @@ func (w *Wire) Listen() {
 				}
 			}
 
-			logger.Info("Closing agent session")
 			if err := w.Close(); err != nil {
 				logger.Error(err, "Error closing agent session")
 			}
@@ -231,7 +230,7 @@ func (w *Wire) Listen() {
 			logger.Info("Message received", "id", message.Id, "type", message.Type)
 
 			if message.Type == MessageTypePipelineAgentJobRequest {
-				logger.Info("PipelineAgentJobRequest, notifying manager")
+				logger.Info("PipelineAgentJobRequest, notifying reconciler, disabling listener")
 				w.jobRequests <- struct{}{}
 				w.operatorNotifier <- genericEvent
 				break
@@ -265,6 +264,7 @@ func (w *Wire) Close() error {
 		close(w.loopClose)
 	}
 
+	logger.Info("Closing wire")
 	if err := w.adoFacade.DeinitAzureDevOpsTaskAgentSession(ctx); err != nil {
 		return err
 	}
