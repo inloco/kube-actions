@@ -73,6 +73,7 @@ type Reconciler struct {
 
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="policy",resources=poddisruptionbudgets;poddisruptionbudgets/status,verbs=get;list;watch;create;update;patch;delete
 
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.wires.Init()
