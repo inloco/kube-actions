@@ -40,7 +40,7 @@ type Wire struct {
 	jobRequests chan struct{}
 	loopClose   chan struct{}
 
-	invalid bool
+	invalid   bool
 	listening bool
 }
 

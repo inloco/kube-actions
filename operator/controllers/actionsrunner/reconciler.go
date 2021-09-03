@@ -131,23 +131,30 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	// reload setup in case of new connection (e.g. operator restarts)
-	var configMap corev1.ConfigMap
-	if err := r.Get(ctx, req.NamespacedName, &configMap); client.IgnoreNotFound(err) != nil {
-		logger.Error(err, "Error retrieving ActionsRunner's ConfigMap")
-		return ctrl.Result{}, err
-	}
-	var secret corev1.Secret
-	if err := r.Get(ctx, req.NamespacedName, &secret); client.IgnoreNotFound(err) != nil {
-		logger.Error(err, "Error retrieving ActionsRunner's Secret")
-		return ctrl.Result{}, err
-	}
-
-	dotFiles := util.ToDotFiles(&configMap, &secret)
-	wire, err := r.wires.WireFor(ctx, &actionsRunner, dotFiles)
+	wire, err := r.wires.GetWire(ctx, &actionsRunner)
 	if err != nil {
 		logger.Error(err, "Error retrieving ActionsRunner")
 		return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, &actionsRunner, deleteOpts...))
+	}
+
+	// reload setup in case of new connection (e.g. operator restarts)
+	if wire == nil {
+		var configMap corev1.ConfigMap
+		if err := r.Get(ctx, req.NamespacedName, &configMap); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Error retrieving ActionsRunner's ConfigMap")
+			return ctrl.Result{}, err
+		}
+		var secret corev1.Secret
+		if err := r.Get(ctx, req.NamespacedName, &secret); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Error retrieving ActionsRunner's Secret")
+			return ctrl.Result{}, err
+		}
+
+		dotFiles := util.ToDotFiles(&configMap, &secret)
+		if wire, err = r.wires.MakeWire(ctx, &actionsRunner, dotFiles); err != nil {
+			logger.Error(err, "Error initializing ActionsRunner's wire")
+			return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, &actionsRunner, deleteOpts...))
+		}
 	}
 
 	// if AR is pending, setup connection and create related resources
