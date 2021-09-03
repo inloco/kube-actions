@@ -88,6 +88,10 @@ func (w *Wire) init(ctx context.Context) error {
 	return nil
 }
 
+func (w *Wire) GetRunnerName() string {
+	return fmt.Sprintf("%s/%s", w.actionsRunner.GetNamespace(), w.actionsRunner.GetName())
+}
+
 func (w *Wire) Destroy() error {
 	ctx := context.Background()
 
@@ -137,7 +141,7 @@ func (w *Wire) initDotFiles() error {
 
 	w.DotFiles = &dot.Files{
 		Runner: dot.Runner{
-			AgentName:  strings.ShortenString(fmt.Sprintf("KA %s %s", w.actionsRunner.GetNamespace(), w.actionsRunner.GetName()), 64),
+			AgentName:  strings.ShortenString(fmt.Sprintf("KA %s", w.GetRunnerName()), 64),
 			PoolId:     1,
 			PoolName:   "Default",
 			WorkFolder: "_work",
@@ -160,7 +164,7 @@ func (w *Wire) Listening() bool {
 
 func (w *Wire) Listen() {
 	ctx := context.Background()
-	logger := log.FromContext(ctx, "runner", fmt.Sprintf("%s/%s", w.actionsRunner.GetNamespace(), w.actionsRunner.GetName()))
+	logger := log.FromContext(ctx, "runner", w.GetRunnerName())
 
 	w.loopClose = make(chan struct{})
 	logger.Info("Wire opened")
@@ -246,7 +250,7 @@ func (w *Wire) Listen() {
 
 func (w *Wire) Close() error {
 	ctx := context.Background()
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx, "runner", w.GetRunnerName())
 
 	if !w.isClosed() {
 		close(w.loopClose)
