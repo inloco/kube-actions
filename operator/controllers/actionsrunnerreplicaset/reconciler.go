@@ -66,7 +66,7 @@ func desiredActionsRunner(actionsRunnerReplicaSet *inlocov1alpha1.ActionsRunnerR
 	actionsRunner := inlocov1alpha1.ActionsRunner{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: inlocov1alpha1.GroupVersion.String(),
-			Kind:       "ActionsRunnerJob",
+			Kind:       "ActionsRunner",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: actionsRunnerReplicaSet.GetName() + "-",
@@ -75,7 +75,8 @@ func desiredActionsRunner(actionsRunnerReplicaSet *inlocov1alpha1.ActionsRunnerR
 				"kube-actions.inloco.com.br/actions-runner-replica-set": actionsRunnerReplicaSet.GetName(),
 			},
 		},
-		Spec: actionsRunnerReplicaSet.Spec.Template,
+		Spec:  actionsRunnerReplicaSet.Spec.Template,
+		State: inlocov1alpha1.ActionsRunnerStatePending,
 	}
 
 	if err := ctrl.SetControllerReference(actionsRunnerReplicaSet, &actionsRunner, scheme); err != nil {
@@ -128,14 +129,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		logger.Info("less replicas than expected, creating ActionsRunner " + actionsRunner.GetGenerateName())
+		logger.Info("Less replicas than expected, creating ActionsRunner " + actionsRunner.GetGenerateName())
 
 		return ctrl.Result{}, r.Create(ctx, actionsRunner, createOpts...)
 	}
 
 	if len(items) > expected {
 		actionsRunner := &items[0]
-		logger.Info("more replicas than expected, deleting ActionsRunner " + actionsRunner.GetName())
+		logger.Info("More replicas than expected, deleting ActionsRunner " + actionsRunner.GetName())
 
 		return ctrl.Result{}, r.Delete(ctx, actionsRunner, deleteOpts...)
 	}
@@ -144,7 +145,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if !reflect.DeepEqual(item.Spec, actionsRunnerReplicaSet.Spec.Template) {
 			actionsRunner := item
 
-			logger.Info("undesired replica, patching ActionsRunner " + actionsRunner.GetName())
+			logger.Info("Undesired replica, patching ActionsRunner " + actionsRunner.GetName())
 			actionsRunner.Spec = actionsRunnerReplicaSet.Spec.Template
 			return ctrl.Result{}, r.Update(ctx, &actionsRunner, updateOpts...)
 		}

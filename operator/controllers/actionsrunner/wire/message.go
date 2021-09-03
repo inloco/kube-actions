@@ -26,7 +26,6 @@ type MessageType string
 
 const (
 	MessageTypePipelineAgentJobRequest MessageType = "PipelineAgentJobRequest"
-	MessageTypeJobCancellation         MessageType = "JobCancellation"
 	MessageTypeAgentRefresh            MessageType = "AgentRefresh"
 )
 

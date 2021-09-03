@@ -19,7 +19,6 @@ package wire
 import (
 	"context"
 	"errors"
-	"reflect"
 	"sync"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
@@ -45,11 +44,8 @@ func (c *Collection) Deinit(ctx context.Context) {
 	close(c.eventChannel)
 
 	c.wireRegistry.Range(func(key, i interface{}) bool {
-		wire, ok := i.(*Wire)
-		if ok && !wire.gone {
-			if err := wire.Close(ctx); err != nil {
-				logger.Error(err, err.Error())
-			}
+		if err := i.(*Wire).Close(); err != nil {
+			logger.Error(err, "Error closing wire on deinit")
 		}
 
 		return true
@@ -62,11 +58,9 @@ func (c *Collection) EventSource() source.Source {
 	}
 }
 
-func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, error) {
-	logger := log.FromContext(ctx)
-
+func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, bool, error) {
 	if actionsRunner == nil {
-		return nil, errors.New("ActionsRunner == nil")
+		return nil, false, errors.New("ActionsRunner == nil")
 	}
 
 	namespacedName := client.ObjectKey{
@@ -74,56 +68,50 @@ func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.
 		Name:      actionsRunner.GetName(),
 	}
 
-	if i, ok := c.wireRegistry.Load(namespacedName); ok {
-		wire, ok := i.(*Wire)
-		if ok && !wire.gone {
-			if reflect.DeepEqual(*wire.ActionsRunner, *actionsRunner) {
-				return wire, nil
-			}
+	logger := log.FromContext(ctx, "runner", namespacedName.String())
 
-			if err := wire.Close(ctx); err != nil {
-				logger.Error(err, err.Error())
-			}
+	if i, ok := c.wireRegistry.Load(namespacedName); ok {
+		if wire, ok := i.(*Wire); ok {
+			return wire, false, nil
 		}
 	}
 
 	wire := &Wire{
-		events:        c.eventChannel,
-		ActionsRunner: actionsRunner,
-		DotFiles:      dotFiles,
+		operatorNotifier: c.eventChannel,
+		actionsRunner:    actionsRunner,
+		DotFiles:         dotFiles,
 	}
 
 	logger.Info("Initializing Wire")
 
 	if err := wire.Init(ctx); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	logger.Info("Wire Initialized")
 
 	c.wireRegistry.Store(namespacedName, wire)
-	return wire, nil
+	return wire, true, nil
 }
 
-func (c *Collection) TryClose(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner) error {
-	if actionsRunner == nil {
-		return errors.New("ActionsRunner == nil")
-	}
-
-	namespacedName := client.ObjectKey{
-		Namespace: actionsRunner.GetNamespace(),
-		Name:      actionsRunner.GetName(),
-	}
-
-	i, ok := c.wireRegistry.Load(namespacedName)
+func (c *Collection) TryDestroy(ctx context.Context, namespacedName client.ObjectKey) error {
+	i, ok := c.wireRegistry.LoadAndDelete(namespacedName)
 	if !ok {
 		return nil
 	}
 
 	wire, ok := i.(*Wire)
-	if !ok || wire.gone {
+	if !ok {
 		return nil
 	}
 
-	return wire.Close(ctx)
+	if err := wire.Close(); err != nil {
+		return err
+	}
+
+	if err := wire.Destroy(); err != nil {
+		return err
+	}
+
+	return nil
 }
