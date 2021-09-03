@@ -39,6 +39,8 @@ type Wire struct {
 
 	jobRequests chan struct{}
 	loopClose   chan struct{}
+
+	listening bool
 }
 
 func (w *Wire) initGH(ctx context.Context) error {
@@ -152,9 +154,13 @@ func (w *Wire) JobRequests() <-chan struct{} {
 	return w.jobRequests
 }
 
+func (w *Wire) Listening() bool {
+	return w.listening
+}
+
 func (w *Wire) Listen() {
 	ctx := context.Background()
-	logger := log.FromContext(ctx, "runner", w.actionsRunner.GetName())
+	logger := log.FromContext(ctx, "runner", fmt.Sprintf("%s/%s", w.actionsRunner.GetNamespace(), w.actionsRunner.GetName()))
 
 	w.loopClose = make(chan struct{})
 	logger.Info("Wire opened")
@@ -165,8 +171,15 @@ func (w *Wire) Listen() {
 		}
 
 		defer func() {
+			w.listening = false
+
 			if r := recover(); r != nil {
 				logger.Error(fmt.Errorf("%v", r), "Recovering from error in wire listener")
+
+				// trigger reconciliation on error to setup listener again
+				if err := w.trySendEvent(genericEvent); err != nil {
+					logger.Error(err, "Error notifying event on recover")
+				}
 			}
 
 			logger.Info("Closing agent session")
@@ -179,6 +192,8 @@ func (w *Wire) Listen() {
 			logger.Info("Wire gone")
 			panic(err)
 		}
+
+		w.listening = true
 
 		logger.Info("Getting message")
 
@@ -252,4 +267,16 @@ func (w *Wire) isClosed() bool {
 	default:
 		return w.loopClose == nil
 	}
+}
+
+func (w *Wire) trySendEvent(genericEvent event.GenericEvent) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
+	w.operatorNotifier <- genericEvent
+
+	return nil
 }

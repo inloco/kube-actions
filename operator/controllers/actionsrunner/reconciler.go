@@ -144,7 +144,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	dotFiles := util.ToDotFiles(&configMap, &secret)
-	wire, new_connection, err := r.wires.WireFor(ctx, &actionsRunner, dotFiles)
+	wire, err := r.wires.WireFor(ctx, &actionsRunner, dotFiles)
 	if err != nil {
 		logger.Error(err, "Error retrieving ActionsRunner")
 		return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, &actionsRunner, deleteOpts...))
@@ -198,9 +198,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStateIdle {
 		logger.Info("ActionsRunner idle")
 
-		// if operator restarts a new connection is made
-		if new_connection {
-			logger.Info("Listening for events on new wire for old ActionsRunner")
+		// wire should always be listening when idle, except when operator restarts or listener panics
+		if !wire.Listening() {
+			logger.Info("Wire not listening on idle, Listen() again")
 			wire.Listen()
 		}
 
