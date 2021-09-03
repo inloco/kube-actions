@@ -74,7 +74,13 @@ func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.
 
 	if i, ok := c.wireRegistry.Load(namespacedName); ok {
 		if wire, ok := i.(*Wire); ok {
-			return wire, nil
+			if wire.Valid() {
+				return wire, nil
+			} else {
+				if err := c.Destroy(ctx, wire); err != nil {
+					logger.Error(err, "Error destroying invalid wire")
+				}
+			}
 		}
 	}
 
@@ -102,18 +108,16 @@ func (c *Collection) TryDestroy(ctx context.Context, namespacedName client.Objec
 		return nil
 	}
 
-	wire, ok := i.(*Wire)
-	if !ok {
-		return nil
-	}
+	wire := i.(*Wire)
+	return c.Destroy(ctx, wire)
+}
+
+func (c *Collection) Destroy(ctx context.Context, wire *Wire) error {
+	logger := log.FromContext(ctx, "runner", wire.GetRunnerName())
 
 	if err := wire.Close(); err != nil {
-		return err
+		logger.Error(err, "Error closing wire on Destroy")
 	}
 
-	if err := wire.Destroy(); err != nil {
-		return err
-	}
-
-	return nil
+	return wire.Destroy()
 }

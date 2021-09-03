@@ -40,6 +40,7 @@ type Wire struct {
 	jobRequests chan struct{}
 	loopClose   chan struct{}
 
+	invalid bool
 	listening bool
 }
 
@@ -126,6 +127,8 @@ func (w *Wire) Init(ctx context.Context) error {
 		logger.Error(err, "Error closing wire")
 	}
 
+	w.invalid = true
+
 	return err
 }
 
@@ -158,6 +161,10 @@ func (w *Wire) JobRequests() <-chan struct{} {
 	return w.jobRequests
 }
 
+func (w *Wire) Valid() bool {
+	return !w.invalid
+}
+
 func (w *Wire) Listening() bool {
 	return w.listening
 }
@@ -181,6 +188,7 @@ func (w *Wire) Listen() {
 				logger.Error(fmt.Errorf("%v", r), "Recovering from error in wire listener")
 
 				// trigger reconciliation on error to setup listener again
+				logger.Info("Trigger reconciliation to setup listener again")
 				if err := w.trySendEvent(genericEvent); err != nil {
 					logger.Error(err, "Error notifying event on recover")
 				}
@@ -193,6 +201,7 @@ func (w *Wire) Listen() {
 		}()
 
 		if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
+			w.invalid = true
 			logger.Info("Wire gone")
 			panic(err)
 		}
