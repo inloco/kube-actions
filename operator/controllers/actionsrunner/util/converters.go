@@ -24,7 +24,6 @@ import (
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/constants"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +48,7 @@ var (
 	dindContainerName   = "dind"
 	dindResourcesKey    = "docker"
 
-	labelApp = "app"
+	LabelApp = "app"
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -210,7 +209,7 @@ func ToPodDisruptionBudget(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.Ac
 			MaxUnavailable: &intstr.IntOrString{IntVal: 0},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					labelApp: actionsRunner.GetName(),
+					LabelApp: actionsRunner.GetName(),
 				},
 			},
 		},
@@ -290,7 +289,7 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 	return &persistentVolumeClaim, nil
 }
 
-func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob, scheme *runtime.Scheme) (*batchv1.Job, error) {
+func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob, scheme *runtime.Scheme) (*corev1.Pod, error) {
 	if actionsRunner == nil {
 		return nil, errors.New("actionsRunner == nil")
 	}
@@ -307,57 +306,47 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		return nil, errors.New("missing resources for runner container")
 	}
 
-	job := batchv1.Job{
+	pod := corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: batchv1.SchemeGroupVersion.String(),
-			Kind:       "Job",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "Pod",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      actionsRunner.GetName(),
-			Namespace: actionsRunner.GetNamespace(),
+			GenerateName: actionsRunner.GetName() + "-",
+			Namespace:    actionsRunner.GetNamespace(),
+			Annotations:  actionsRunner.Spec.Annotations,
+			Labels: map[string]string{
+				LabelApp: actionsRunner.GetName(),
+			},
 		},
-		Spec: batchv1.JobSpec{
-			Parallelism:           pointer.Int32Ptr(1),
-			Completions:           pointer.Int32Ptr(1),
+		Spec: corev1.PodSpec{
 			ActiveDeadlineSeconds: pointer.Int64Ptr(3000),
-			BackoffLimit:          pointer.Int32Ptr(0),
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: actionsRunner.Spec.Annotations,
-					Labels: map[string]string{
-						labelApp: actionsRunner.GetName(),
-					},
-				},
-				Spec: corev1.PodSpec{
-					Volumes: withVolumes(actionsRunner),
-					Containers: []corev1.Container{
-						{
-							Name:  runnerContainerName,
-							Image: fmt.Sprintf("%s:%s%s", runnerImageName, runnerImageVersion, runnerImageVariant),
-							EnvFrom: FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
-								return envFromSource.SecretRef == nil
-							}),
-							Env: FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
-								return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
-							}),
-							Resources:    FilterResources(actionsRunner.Spec.Resources[runnerResourcesKey], corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
-							VolumeMounts: withVolumeMounts(actionsRunner),
-						},
-					},
-					RestartPolicy:                corev1.RestartPolicyNever,
-					AutomountServiceAccountToken: pointer.BoolPtr(false),
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser:    pointer.Int64Ptr(1000),
-						RunAsGroup:   pointer.Int64Ptr(1000),
-						RunAsNonRoot: pointer.BoolPtr(true),
-						FSGroup:      pointer.Int64Ptr(1000),
-					},
-					Affinity:     withRuntimeAffinity(actionsRunner.Spec.Affinity),
-					Tolerations:  actionsRunner.Spec.Tolerations,
-					NodeSelector: actionsRunner.Spec.NodeSelector,
+			Volumes:               withVolumes(actionsRunner),
+			Containers: []corev1.Container{
+				{
+					Name:  runnerContainerName,
+					Image: fmt.Sprintf("%s:%s%s", runnerImageName, runnerImageVersion, runnerImageVariant),
+					EnvFrom: FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
+						return envFromSource.SecretRef == nil
+					}),
+					Env: FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
+						return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
+					}),
+					Resources:    FilterResources(actionsRunner.Spec.Resources[runnerResourcesKey], corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
+					VolumeMounts: withVolumeMounts(actionsRunner),
 				},
 			},
-			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
+			RestartPolicy:                corev1.RestartPolicyNever,
+			AutomountServiceAccountToken: pointer.BoolPtr(false),
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsUser:    pointer.Int64Ptr(1000),
+				RunAsGroup:   pointer.Int64Ptr(1000),
+				RunAsNonRoot: pointer.BoolPtr(true),
+				FSGroup:      pointer.Int64Ptr(1000),
+			},
+			Affinity:     withRuntimeAffinity(actionsRunner.Spec.Affinity),
+			Tolerations:  actionsRunner.Spec.Tolerations,
+			NodeSelector: actionsRunner.Spec.NodeSelector,
 		},
 	}
 
@@ -366,19 +355,19 @@ func ToJob(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		capabilities[capability] = struct{}{}
 	}
 	if _, ok := capabilities[inlocov1alpha1.ActionsRunnerCapabilitySecret]; ok {
-		addSecretCapability(&job, actionsRunner)
+		addSecretCapability(&pod, actionsRunner)
 	}
 	if _, ok := capabilities[inlocov1alpha1.ActionsRunnerCapabilityDocker]; ok {
-		if err := addDockerCapability(&job, actionsRunner); err != nil {
+		if err := addDockerCapability(&pod, actionsRunner); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := ctrl.SetControllerReference(actionsRunnerJob, &job, scheme); err != nil {
+	if err := ctrl.SetControllerReference(actionsRunnerJob, &pod, scheme); err != nil {
 		return nil, err
 	}
 
-	return &job, nil
+	return &pod, nil
 }
 
 func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
@@ -514,9 +503,8 @@ func withRuntimeAffinity(affinity *corev1.Affinity) *corev1.Affinity {
 	return affinity
 }
 
-func addSecretCapability(job *batchv1.Job, actionsRunner *inlocov1alpha1.ActionsRunner) {
-	podSpec := &job.Spec.Template.Spec
-	runnerContainer := &podSpec.Containers[0]
+func addSecretCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsRunner) {
+	runnerContainer := &pod.Spec.Containers[0]
 
 	envFrom := FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
 		return envFromSource.SecretRef != nil
@@ -528,14 +516,12 @@ func addSecretCapability(job *batchv1.Job, actionsRunner *inlocov1alpha1.Actions
 	})
 	runnerContainer.Env = append(runnerContainer.Env, env...)
 
-	podSpec.ServiceAccountName = actionsRunner.Spec.ServiceAccountName
-	podSpec.AutomountServiceAccountToken = pointer.BoolPtr(true)
+	pod.Spec.ServiceAccountName = actionsRunner.Spec.ServiceAccountName
+	pod.Spec.AutomountServiceAccountToken = pointer.BoolPtr(true)
 }
 
-func addDockerCapability(job *batchv1.Job, actionsRunner *inlocov1alpha1.ActionsRunner) error {
-	podSpec := &job.Spec.Template.Spec
-	runnerContainer := &podSpec.Containers[0]
-
+func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsRunner) error {
+	runnerContainer := &pod.Spec.Containers[0]
 	runnerContainer.Env = append(runnerContainer.Env, corev1.EnvVar{
 		Name:  "DOCKER_HOST",
 		Value: "tcp://localhost:2375",
@@ -545,7 +531,7 @@ func addDockerCapability(job *batchv1.Job, actionsRunner *inlocov1alpha1.Actions
 		return errors.New("missing resources for dind container")
 	}
 
-	podSpec.Containers = append(podSpec.Containers, corev1.Container{
+	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
 		Name:  dindContainerName,
 		Image: fmt.Sprintf("%s:%s%s", dindImageName, dindImageVersion, dindImageVariant),
 		Env: []corev1.EnvVar{

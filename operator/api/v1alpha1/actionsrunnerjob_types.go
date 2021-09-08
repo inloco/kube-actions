@@ -28,6 +28,7 @@ type ActionsRunnerJobState string
 const (
 	ActionsRunnerJobStatePending ActionsRunnerJobState = "Pending"
 	ActionsRunnerJobStateRunning ActionsRunnerJobState = "Running"
+	ActionsRunnerJobStateCompleted ActionsRunnerJobState = "Completed"
 )
 
 const ActionsRunnerJobFinalizer = "actionsrunnerjobs.inloco.com.br/finalizer"

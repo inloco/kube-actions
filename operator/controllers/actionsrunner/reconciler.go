@@ -35,6 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -93,14 +94,22 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&inlocov1alpha1.ActionsRunnerJob{}).
 		Watches(r.wires.EventSource(), &handler.EnqueueRequestForObject{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
-		WithEventFilter(controllersutil.PreficateOfFunction(eventFilter)).
+		WithEventFilter(controllersutil.PredicateOfFunction(eventFilter)).
 		Complete(r)
 }
 
 func eventFilter(object client.Object, event controllersutil.PredicateEvent) bool {
 	// ignore events for ActionsRunnerJob, except Delete
-	_, isActionRunnerJob := object.(*inlocov1alpha1.ActionsRunnerJob)
-	if isActionRunnerJob && event != controllersutil.PredicateEventDelete {
+	actionsRunnerJob, isActionRunnerJob := object.(*inlocov1alpha1.ActionsRunnerJob)
+	if isActionRunnerJob {
+		if event == controllersutil.PredicateEventDelete {
+			return true
+		}
+
+		if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStateCompleted {
+			return true
+		}
+
 		return false
 	}
 
@@ -247,13 +256,37 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Info("ActionsRunner active")
 
 		var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
-		switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
-		case err == nil:
-			logger.Info("ActionsRunnerJob still present, waiting")
-			return ctrl.Result{}, nil
-		case !apierrors.IsNotFound(err):
+		err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob)
+		if err != nil && !apierrors.IsNotFound(err) {
 			logger.Error(err, "Error retrieving ActionsRunnerJob")
 			return ctrl.Result{}, err
+		}
+
+		if err == nil {
+			if actionsRunnerJob.State != inlocov1alpha1.ActionsRunnerJobStateCompleted {
+				logger.Info(fmt.Sprintf("ActionsRunnerJob still running (%s), wait", actionsRunnerJob.State))
+				return ctrl.Result{}, nil
+			}
+
+			if controllerutil.ContainsFinalizer(&actionsRunnerJob, inlocov1alpha1.ActionsRunnerJobFinalizer) {
+				logger.Info("Removing finalizer")
+
+				controllerutil.RemoveFinalizer(&actionsRunnerJob, inlocov1alpha1.ActionsRunnerJobFinalizer)
+				if err := r.Update(ctx, &actionsRunnerJob); err != nil {
+					logger.Error(err, "Error removing ActionsRunnerJob's finalizer")
+					return ctrl.Result{}, nil
+				}
+
+				return ctrl.Result{}, nil
+			}
+
+			logger.Info("ActionsRunnerJob completed, delete it")
+			if err := r.Delete(ctx, &actionsRunnerJob, deleteOpts...); client.IgnoreNotFound(err) != nil {
+				logger.Error(err, "Error deleting ActionsRunnerJob")
+				return ctrl.Result{}, nil
+			}
+
+			return ctrl.Result{}, nil
 		}
 
 		logger.Info("ActionsRunnerJob not present, set ActionsRunner.State to idle ")
