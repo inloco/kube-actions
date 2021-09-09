@@ -140,63 +140,67 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	wire, err := r.wires.GetWire(ctx, &actionsRunner)
-	if err != nil {
-		logger.Error(err, "Error retrieving ActionsRunner")
+	wire, wireErr := r.wires.GetWire(ctx, &actionsRunner)
+	if wireErr != nil {
+		logger.Error(wireErr, "Error retrieving ActionsRunner")
 		return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, &actionsRunner, deleteOpts...))
 	}
 
 	// reload setup in case of new connection (e.g. operator restarts)
 	if wire == nil {
 		var configMap corev1.ConfigMap
-		if err := r.Get(ctx, req.NamespacedName, &configMap); client.IgnoreNotFound(err) != nil {
-			logger.Error(err, "Error retrieving ActionsRunner's ConfigMap")
-			return ctrl.Result{}, err
+		cmErr := r.Get(ctx, req.NamespacedName, &configMap)
+		if client.IgnoreNotFound(cmErr) != nil {
+			logger.Error(cmErr, "Error retrieving ActionsRunner's ConfigMap")
+			return ctrl.Result{}, cmErr
 		}
+
 		var secret corev1.Secret
-		if err := r.Get(ctx, req.NamespacedName, &secret); client.IgnoreNotFound(err) != nil {
-			logger.Error(err, "Error retrieving ActionsRunner's Secret")
-			return ctrl.Result{}, err
+		secErr := r.Get(ctx, req.NamespacedName, &secret);
+		if client.IgnoreNotFound(secErr) != nil {
+			logger.Error(secErr, "Error retrieving ActionsRunner's Secret")
+			return ctrl.Result{}, secErr
 		}
 
 		dotFiles := util.ToDotFiles(&configMap, &secret)
-		if wire, err = r.wires.MakeWire(ctx, &actionsRunner, dotFiles); err != nil {
-			logger.Error(err, "Error initializing ActionsRunner's wire")
+		if wire, wireErr = r.wires.MakeWire(ctx, &actionsRunner, dotFiles); wireErr != nil {
+			logger.Error(wireErr, "Error initializing ActionsRunner's wire")
 			return ctrl.Result{}, client.IgnoreNotFound(r.Delete(ctx, &actionsRunner, deleteOpts...))
 		}
 	}
 
+	// ensure configmap is always set
+	desiredConfigMap, err := util.ToConfigMap(wire.DotFiles, &actionsRunner, r.Scheme)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.Patch(ctx, desiredConfigMap, client.Apply, patchOpts...); err != nil {
+		logger.Error(err, "Error creating ConfigMap for ActionsRunner")
+		return ctrl.Result{}, err
+	}
+
+	// ensure secret is always set
+	desiredSecret, err := util.ToSecret(wire.DotFiles, &actionsRunner, r.Scheme)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.Patch(ctx, desiredSecret, client.Apply, patchOpts...); err != nil {
+		logger.Error(err, "Error creating Secret for ActionsRunner")
+		return ctrl.Result{}, err
+	}
+
+	// ensure pdb is always set
+	desiredPodDisruptionBudget, err := util.ToPodDisruptionBudget(wire.DotFiles, &actionsRunner, r.Scheme)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.Patch(ctx, desiredPodDisruptionBudget, client.Apply, patchOpts...); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// if AR is pending, setup connection and create related resources
 	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStatePending {
-		logger.Info("ActionsRunner pending")
-
-		desiredConfigMap, err := util.ToConfigMap(wire.DotFiles, &actionsRunner, r.Scheme)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if err := r.Patch(ctx, desiredConfigMap, client.Apply, patchOpts...); err != nil {
-			logger.Error(err, "Error creating ConfigMap for ActionsRunner")
-			return ctrl.Result{}, err
-		}
-
-		desiredSecret, err := util.ToSecret(wire.DotFiles, &actionsRunner, r.Scheme)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if err := r.Patch(ctx, desiredSecret, client.Apply, patchOpts...); err != nil {
-			logger.Error(err, "Error creating Secret for ActionsRunner")
-			return ctrl.Result{}, err
-		}
-
-		desiredPodDisruptionBudget, err := util.ToPodDisruptionBudget(wire.DotFiles, &actionsRunner, r.Scheme)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if err := r.Patch(ctx, desiredPodDisruptionBudget, client.Apply, patchOpts...); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		logger.Info("Set ActionsRunner.State to idle ")
+		logger.Info("ActionsRunner pending, set ActionsRunner.State to idle ")
 
 		actionsRunner.State = inlocov1alpha1.ActionsRunnerStateIdle
 		if err := r.Update(ctx, &actionsRunner, updateOpts...); err != nil {
