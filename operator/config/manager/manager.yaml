@@ -28,6 +28,7 @@ spec:
         - /manager
         args:
         - --max-concurrent-reconciles=1000
+        - --metrics-bind-address=:9102
         image: inloco/kube-actions:to-be-replaced
         name: manager
         envFrom:

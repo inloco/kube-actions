@@ -15,7 +15,7 @@ const (
 	PredicateEventGeneric PredicateEvent = "Generic"
 )
 
-func PreficateOfFunction(filter func(client.Object, PredicateEvent) bool) predicate.Predicate {
+func PredicateOfFunction(filter func(client.Object, PredicateEvent) bool) predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return filter(e.Object, PredicateEventCreate)

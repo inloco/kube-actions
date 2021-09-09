@@ -39,14 +39,16 @@ func (c *Collection) Init() {
 }
 
 func (c *Collection) Deinit(ctx context.Context) {
-	logger := log.FromContext(ctx)
-
 	close(c.eventChannel)
 
 	c.wireRegistry.Range(func(key, i interface{}) bool {
-		if err := i.(*Wire).Close(); err != nil {
-			logger.Error(err, "Error closing wire on deinit")
-		}
+		go func() {
+			wire := i.(*Wire)
+			logger := log.FromContext(ctx, "runner", wire.GetRunnerName())
+			if err := wire.Close(); err != nil {
+				logger.Error(err, "Error closing wire on deinit")
+			}
+		}()
 
 		return true
 	})
@@ -58,9 +60,9 @@ func (c *Collection) EventSource() source.Source {
 	}
 }
 
-func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, bool, error) {
+func (c *Collection) GetWire(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner) (*Wire, error) {
 	if actionsRunner == nil {
-		return nil, false, errors.New("ActionsRunner == nil")
+		return nil, errors.New("ActionsRunner == nil")
 	}
 
 	namespacedName := client.ObjectKey{
@@ -72,9 +74,30 @@ func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.
 
 	if i, ok := c.wireRegistry.Load(namespacedName); ok {
 		if wire, ok := i.(*Wire); ok {
-			return wire, false, nil
+			if wire.Valid() {
+				return wire, nil
+			} else {
+				if err := c.Destroy(ctx, wire); err != nil {
+					logger.Error(err, "Error destroying invalid wire")
+				}
+			}
 		}
 	}
+
+	return nil, nil
+}
+
+func (c *Collection) MakeWire(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, error) {
+	if actionsRunner == nil {
+		return nil, errors.New("ActionsRunner == nil")
+	}
+
+	namespacedName := client.ObjectKey{
+		Namespace: actionsRunner.GetNamespace(),
+		Name:      actionsRunner.GetName(),
+	}
+
+	logger := log.FromContext(ctx, "runner", namespacedName.String())
 
 	wire := &Wire{
 		operatorNotifier: c.eventChannel,
@@ -85,13 +108,13 @@ func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.
 	logger.Info("Initializing Wire")
 
 	if err := wire.Init(ctx); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	logger.Info("Wire Initialized")
 
 	c.wireRegistry.Store(namespacedName, wire)
-	return wire, true, nil
+	return wire, nil
 }
 
 func (c *Collection) TryDestroy(ctx context.Context, namespacedName client.ObjectKey) error {
@@ -100,18 +123,16 @@ func (c *Collection) TryDestroy(ctx context.Context, namespacedName client.Objec
 		return nil
 	}
 
-	wire, ok := i.(*Wire)
-	if !ok {
-		return nil
-	}
+	wire := i.(*Wire)
+	return c.Destroy(ctx, wire)
+}
+
+func (c *Collection) Destroy(ctx context.Context, wire *Wire) error {
+	logger := log.FromContext(ctx, "runner", wire.GetRunnerName())
 
 	if err := wire.Close(); err != nil {
-		return err
+		logger.Error(err, "Error closing wire on Destroy")
 	}
 
-	if err := wire.Destroy(); err != nil {
-		return err
-	}
-
-	return nil
+	return wire.Destroy()
 }

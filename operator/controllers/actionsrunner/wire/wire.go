@@ -39,6 +39,9 @@ type Wire struct {
 
 	jobRequests chan struct{}
 	loopClose   chan struct{}
+
+	invalid   bool
+	listening bool
 }
 
 func (w *Wire) initGH(ctx context.Context) error {
@@ -86,6 +89,10 @@ func (w *Wire) init(ctx context.Context) error {
 	return nil
 }
 
+func (w *Wire) GetRunnerName() string {
+	return fmt.Sprintf("%s/%s", w.actionsRunner.GetNamespace(), w.actionsRunner.GetName())
+}
+
 func (w *Wire) Destroy() error {
 	ctx := context.Background()
 
@@ -120,6 +127,8 @@ func (w *Wire) Init(ctx context.Context) error {
 		logger.Error(err, "Error closing wire")
 	}
 
+	w.invalid = true
+
 	return err
 }
 
@@ -152,9 +161,17 @@ func (w *Wire) JobRequests() <-chan struct{} {
 	return w.jobRequests
 }
 
+func (w *Wire) Valid() bool {
+	return !w.invalid
+}
+
+func (w *Wire) Listening() bool {
+	return w.listening
+}
+
 func (w *Wire) Listen() {
 	ctx := context.Background()
-	logger := log.FromContext(ctx, "runner", w.actionsRunner.GetName())
+	logger := log.FromContext(ctx, "runner", w.GetRunnerName())
 
 	w.loopClose = make(chan struct{})
 	logger.Info("Wire opened")
@@ -165,20 +182,30 @@ func (w *Wire) Listen() {
 		}
 
 		defer func() {
+			w.listening = false
+
 			if r := recover(); r != nil {
 				logger.Error(fmt.Errorf("%v", r), "Recovering from error in wire listener")
+
+				// trigger reconciliation on error to setup listener again
+				logger.Info("Trigger reconciliation to setup listener again")
+				if err := w.trySendEvent(genericEvent); err != nil {
+					logger.Error(err, "Error notifying event on recover")
+				}
 			}
 
-			logger.Info("Closing agent session")
 			if err := w.Close(); err != nil {
 				logger.Error(err, "Error closing agent session")
 			}
 		}()
 
 		if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
+			w.invalid = true
 			logger.Info("Wire gone")
 			panic(err)
 		}
+
+		w.listening = true
 
 		logger.Info("Getting message")
 
@@ -203,7 +230,7 @@ func (w *Wire) Listen() {
 			logger.Info("Message received", "id", message.Id, "type", message.Type)
 
 			if message.Type == MessageTypePipelineAgentJobRequest {
-				logger.Info("PipelineAgentJobRequest, notifying manager")
+				logger.Info("PipelineAgentJobRequest, notifying reconciler, disabling listener")
 				w.jobRequests <- struct{}{}
 				w.operatorNotifier <- genericEvent
 				break
@@ -231,12 +258,13 @@ func (w *Wire) Listen() {
 
 func (w *Wire) Close() error {
 	ctx := context.Background()
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx, "runner", w.GetRunnerName())
 
 	if !w.isClosed() {
 		close(w.loopClose)
 	}
 
+	logger.Info("Closing wire")
 	if err := w.adoFacade.DeinitAzureDevOpsTaskAgentSession(ctx); err != nil {
 		return err
 	}
@@ -252,4 +280,16 @@ func (w *Wire) isClosed() bool {
 	default:
 		return w.loopClose == nil
 	}
+}
+
+func (w *Wire) trySendEvent(genericEvent event.GenericEvent) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
+	w.operatorNotifier <- genericEvent
+
+	return nil
 }

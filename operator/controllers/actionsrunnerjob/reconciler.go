@@ -20,22 +20,24 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	controllersutil "github.com/inloco/kube-actions/operator/controllers/util"
-	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
+	createOpts = []client.CreateOption{
+		client.FieldOwner("kube-actions"),
+	}
+
 	patchOpts = []client.PatchOption{
 		client.ForceOwnership,
 		client.FieldOwner("kube-actions"),
@@ -60,21 +62,25 @@ type Reconciler struct {
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunnerjobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunnerjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;update;patch;delete
 
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&inlocov1alpha1.ActionsRunnerJob{}).
-		Owns(&batchv1.Job{}).
+		Owns(&corev1.Pod{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
-		WithEventFilter(controllersutil.PreficateOfFunction(eventFilter)).
+		WithEventFilter(controllersutil.PredicateOfFunction(eventFilter)).
 		Complete(r)
 }
 
 func eventFilter(object client.Object, event controllersutil.PredicateEvent) bool {
-	// ignore events for Job, except Delete
-	_, isJob := object.(*batchv1.Job)
-	if isJob && event != controllersutil.PredicateEventDelete {
+	// ignore events for Pod, except Delete and completion Update
+	if pod, isPod := object.(*corev1.Pod); isPod {
+		isDelete := event == controllersutil.PredicateEventDelete
+		isUpdate := event == controllersutil.PredicateEventUpdate
+		if isDelete || (isUpdate && (pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded)) {
+			return true
+		}
 		return false
 	}
 
@@ -105,8 +111,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var actionsRunner inlocov1alpha1.ActionsRunner
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
 	case apierrors.IsNotFound(err):
-		logger.Info("ActionsRunner not found, delete ActionsRunnerJob")
-		return ctrl.Result{}, client.IgnoreNotFound(r.deleteActionsRunnerJob(ctx, logger, &actionsRunnerJob))
+		logger.Info("ActionsRunner not found, ignore")
+		return ctrl.Result{}, nil
 	case err != nil:
 		logger.Error(err, "Error retrieving ActionsRunner")
 		return ctrl.Result{}, err
@@ -114,7 +120,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// if ARJ is still pending, create job
 	if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStatePending {
-		logger.Info("ActionsRunnerJob pending, creating Job")
+		logger.Info("ActionsRunnerJob pending, creating Pod")
 
 		desiredPersistentVolumeClaim, err := util.ToPersistentVolumeClaim(&actionsRunner, &actionsRunnerJob, r.Scheme)
 		if err != nil {
@@ -126,13 +132,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 
-		desiredJob, err := util.ToJob(&actionsRunner, &actionsRunnerJob, r.Scheme)
+		desiredPod, err := util.ToPod(&actionsRunner, &actionsRunnerJob, r.Scheme)
 		if err != nil {
-			logger.Error(err, "Error generating Job definition")
+			logger.Error(err, "Error generating Pod definition")
 			return ctrl.Result{}, err
 		}
-		if err := r.Patch(ctx, desiredJob, client.Apply, patchOpts...); err != nil {
-			logger.Error(err, "Error creating Job")
+		if err := r.Create(ctx, desiredPod, createOpts...); err != nil {
+			logger.Error(err, "Error creating Pod")
 			return ctrl.Result{}, err
 		}
 
@@ -145,46 +151,41 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	// if ARJ is running, check if job is already finished
+	// if ARJ is running, check if pod is already finished
 	if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStateRunning {
 		logger.Info("ActionsRunnerJob running")
 
-		var job batchv1.Job
-		err := r.Get(ctx, req.NamespacedName, &job)
-
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Error(err, "Error retrieving Job")
+		var pods corev1.PodList
+		if err := r.List(ctx, &pods, client.InNamespace(req.Namespace), client.MatchingLabels{util.LabelApp: req.Name}); err != nil {
+			logger.Error(err, "Error retrieving Pod list")
 			return ctrl.Result{}, err
 		}
 
-		// if job is still running, ignore
-		if err == nil && job.Status.Succeeded+job.Status.Failed == 0 {
-			logger.Info("Job still running, wait")
-			return ctrl.Result{}, nil
+		// if pod is still running, ignore
+		if len(pods.Items) > 0 {
+			for _, pod := range pods.Items {
+				if pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed {
+					logger.Info("Pod still running, wait")
+					return ctrl.Result{}, nil
+				}
+			}
 		}
 
-		logger.Info("Job finished running, deleting ActionsRunnerJob")
-		if err := r.deleteActionsRunnerJob(ctx, logger, &actionsRunnerJob); err != nil {
+		// if pod is no longer present, delete ARJ
+		logger.Info("Pod no longer active, set ActionsRunnerJob.State to completed")
+		actionsRunnerJob.State = inlocov1alpha1.ActionsRunnerJobStateCompleted
+		if err := r.Update(ctx, &actionsRunnerJob, updateOpts...); err != nil {
 			return ctrl.Result{}, err
 		}
 
 		return ctrl.Result{}, nil
 	}
 
+	// if ARJ is completed, ignore event, ARJ will be deleted
+	if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStateCompleted {
+		logger.Info("ActionsRunnerJob completed, waiting to be deleted")
+		return ctrl.Result{}, nil
+	}
+
 	return ctrl.Result{}, fmt.Errorf("ActionsRunnerJob %s in invalid state", req.NamespacedName.String())
-}
-
-func (r *Reconciler) deleteActionsRunnerJob(ctx context.Context, logger logr.Logger, actionsRunnerJob *inlocov1alpha1.ActionsRunnerJob) error {
-	controllerutil.RemoveFinalizer(actionsRunnerJob, inlocov1alpha1.ActionsRunnerJobFinalizer)
-	if err := r.Update(ctx, actionsRunnerJob); err != nil {
-		logger.Error(err, "Error removing ActionsRunnerJob's finalizer")
-		return err
-	}
-
-	if err := r.Delete(ctx, actionsRunnerJob, deleteOpts...); client.IgnoreNotFound(err) != nil {
-		logger.Error(err, "Error deleting ActionsRunnerJob")
-		return err
-	}
-
-	return nil
 }
