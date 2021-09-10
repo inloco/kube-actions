@@ -26,8 +26,8 @@ type ActionsRunnerJobSpec struct{}
 type ActionsRunnerJobState string
 
 const (
-	ActionsRunnerJobStatePending ActionsRunnerJobState = "Pending"
-	ActionsRunnerJobStateRunning ActionsRunnerJobState = "Running"
+	ActionsRunnerJobStatePending   ActionsRunnerJobState = "Pending"
+	ActionsRunnerJobStateRunning   ActionsRunnerJobState = "Running"
 	ActionsRunnerJobStateCompleted ActionsRunnerJobState = "Completed"
 )
 

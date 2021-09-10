@@ -156,7 +156,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 
 		var secret corev1.Secret
-		secErr := r.Get(ctx, req.NamespacedName, &secret);
+		secErr := r.Get(ctx, req.NamespacedName, &secret)
 		if client.IgnoreNotFound(secErr) != nil {
 			logger.Error(secErr, "Error retrieving ActionsRunner's Secret")
 			return ctrl.Result{}, secErr
