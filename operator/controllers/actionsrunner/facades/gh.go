@@ -34,6 +34,7 @@ import (
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/google/go-github/v32/github"
 	"github.com/inloco/kube-actions/operator/metrics"
+	"github.com/patrickmn/go-cache"
 	"golang.org/x/oauth2"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -96,16 +97,16 @@ var (
 	githubClientExpiry time.Time
 	githubClientMutext sync.Mutex
 
-	githubRepositories       sync.Map
+	githubRepositories       = cache.New(time.Hour, time.Hour)
 	githubRepositoriesMutext sync.Mutex
 
-	githubRegistrationTokens       sync.Map
+	githubRegistrationTokens       = cache.New(time.Hour, time.Hour)
 	githubRegistrationTokensMutext sync.Mutex
 
-	githubRemoveTokens       sync.Map
+	githubRemoveTokens       = cache.New(time.Hour, time.Hour)
 	githubRemoveTokensMutext sync.Mutex
 
-	githubTenantCredentials       sync.Map
+	githubTenantCredentials       = cache.New(time.Hour, time.Hour)
 	githubTenantCredentialsMutext sync.Mutex
 )
 
@@ -331,7 +332,7 @@ func initGitHubClient(ctx context.Context) error {
 func getGitHubRepository(ctx context.Context, owner string, name string) (*github.Repository, error) {
 	key := fmt.Sprintf("%s/%s", owner, name)
 
-	if repository, ok := githubRepositories.Load(key); ok {
+	if repository, ok := githubRepositories.Get(key); ok {
 		metrics.IncGitHubCacheHitCollector("repository", true)
 		return repository.(*github.Repository), nil
 	}
@@ -339,7 +340,7 @@ func getGitHubRepository(ctx context.Context, owner string, name string) (*githu
 	githubRepositoriesMutext.Lock()
 	defer githubRepositoriesMutext.Unlock()
 
-	if repository, ok := githubRepositories.Load(key); ok {
+	if repository, ok := githubRepositories.Get(key); ok {
 		metrics.IncGitHubCacheHitCollector("repository", true)
 		return repository.(*github.Repository), nil
 	}
@@ -363,7 +364,7 @@ func getGitHubRepository(ctx context.Context, owner string, name string) (*githu
 		return nil, errors.New("not in githubVisibilities")
 	}
 
-	githubRepositories.Store(key, repository)
+	githubRepositories.SetDefault(key, repository)
 
 	return repository, nil
 }
@@ -374,7 +375,7 @@ type registrationTokenContainer struct {
 }
 
 func tryGetGitHubRegistrationToken(key string) (*github.RegistrationToken, error) {
-	i, ok := githubRegistrationTokens.Load(key)
+	i, ok := githubRegistrationTokens.Get(key)
 	if !ok {
 		return nil, errors.New("githubRegistrationTokens.Load(key) !ok")
 	}
@@ -423,7 +424,7 @@ func getGitHubRegistrationToken(ctx context.Context, repository *github.Reposito
 		return nil, err
 	}
 
-	githubRegistrationTokens.Store(key, &registrationTokenContainer{
+	githubRegistrationTokens.SetDefault(key, &registrationTokenContainer{
 		Token: registrationToken,
 	})
 
@@ -465,9 +466,9 @@ type removeTokenContainer struct {
 }
 
 func tryGetGitHubRemoveToken(key string) (*github.RemoveToken, error) {
-	i, ok := githubRemoveTokens.Load(key)
+	i, ok := githubRemoveTokens.Get(key)
 	if !ok {
-		return nil, errors.New("githubRemoveTokens.Load(key) !ok")
+		return nil, errors.New("githubRemoveTokens.Get(key) !ok")
 	}
 
 	container, ok := i.(*removeTokenContainer)
@@ -514,7 +515,7 @@ func getGitHubRemoveToken(ctx context.Context, repository *github.Repository) (*
 		return nil, err
 	}
 
-	githubRemoveTokens.Store(key, &removeTokenContainer{
+	githubRemoveTokens.SetDefault(key, &removeTokenContainer{
 		Token: removeToken,
 	})
 
@@ -551,7 +552,7 @@ func newGitHubBridgeClientWithRemoveToken(ctx context.Context, repository *githu
 }
 
 func tryGetGitHubTenantCredential(key string) (*github.TenantCredential, error) {
-	i, ok := githubTenantCredentials.Load(key)
+	i, ok := githubTenantCredentials.Get(key)
 	if !ok {
 		return nil, errors.New("githubTenantCredentials.Load(key) !ok")
 	}
@@ -632,7 +633,7 @@ func GetGitHubTenantCredential(ctx context.Context, repository *github.Repositor
 		return nil, err
 	}
 
-	githubTenantCredentials.Store(key, tenantCredential)
+	githubTenantCredentials.SetDefault(key, tenantCredential)
 
 	return tenantCredential, nil
 }
