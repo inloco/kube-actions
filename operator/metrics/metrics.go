@@ -87,6 +87,7 @@ func init() {
 		githubRateLimitCollector,
 		githubRateRemainingCollector,
 		githubAPICallsCollector,
+		githubCacheHitCollector,
 		githubActionsEventCounter,
 		githubActionsEventConsumeDurationHistogram,
 	)
