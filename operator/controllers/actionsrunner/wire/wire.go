@@ -23,6 +23,7 @@ import (
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/facades"
+	"github.com/inloco/kube-actions/operator/metrics"
 	"k8s.io/utils/strings"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -228,6 +229,7 @@ func (w *Wire) Listen() {
 			}
 
 			logger.Info("Message received", "id", message.Id, "type", message.Type)
+			metrics.IncGitHubActionsEventCounter(w.actionsRunner.GetNamespace(), w.GetRunnerName(), string(message.Type))
 
 			if message.Type == MessageTypePipelineAgentJobRequest {
 				logger.Info("PipelineAgentJobRequest, notifying reconciler, disabling listener")

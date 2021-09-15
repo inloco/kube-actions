@@ -62,22 +62,14 @@ var (
 
 	githubActionsEventCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "kube_actions_operator",
-			Name:      "github_actions_event_counter",
+			Namespace: "kubeactions",
+			Subsystem: "actions",
+			Name:      "events",
 		},
 		[]string{
+			"repository",
 			"runner",
-		},
-	)
-
-	githubActionsEventConsumeDurationHistogram = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Namespace: "kube_actions_operator",
-			Name:      "github_actions_event_consume_duration_histogram",
-			Buckets:   []float64{.1, .5, 1, 2.5, 5, 7.5, 10, 15, 20},
-		},
-		[]string{
-			"runner",
+			"event",
 		},
 	)
 )
@@ -89,7 +81,6 @@ func init() {
 		githubAPICallsCollector,
 		githubCacheHitCollector,
 		githubActionsEventCounter,
-		githubActionsEventConsumeDurationHistogram,
 	)
 }
 
@@ -125,13 +116,6 @@ func IncGitHubCacheHitCollector(cacheName string, hit bool) {
 	githubCacheHitCollector.WithLabelValues(cacheName, strconv.FormatBool(hit)).Inc()
 }
 
-func IncGitHubActionsEventCounter(runner string) {
-	githubActionsEventCounter.WithLabelValues(runner).Inc()
-}
-
-func ObserveGitHubActionsEventConsumeDuration(runner string) *observer {
-	promObserver := githubActionsEventConsumeDurationHistogram.WithLabelValues(runner)
-	return newObserver(func(duration time.Duration) {
-		promObserver.Observe(duration.Seconds())
-	})
+func IncGitHubActionsEventCounter(repository, runner, event string) {
+	githubActionsEventCounter.WithLabelValues(repository, runner, event).Inc()
 }
