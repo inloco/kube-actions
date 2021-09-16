@@ -1,4 +1,5 @@
-IMAGE_NAME ?= inloco/kube-actions
+IMAGE_REPO ?= 779099367007.dkr.ecr.us-east-1.amazonaws.com
+IMAGE_NAME ?= incognia/kube-actions
 IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -dind
 
@@ -13,12 +14,13 @@ docker-build:
 
 # Tag the docker image
 docker-tag:
-	docker tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION) $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
+	docker tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION) $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION)
+	docker tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION) $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
 
 # Push the docker image
 docker-push:
-	docker push $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION)
-	docker push $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
+	docker push $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION)
+	docker push $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
 
 docker-save:
 	docker save $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)-$(DOCKER_VERSION) > ./image.tar
