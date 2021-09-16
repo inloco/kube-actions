@@ -11,9 +11,12 @@ continuous-upgrade:
 	if grep -qE "^RUNNER_VERSION \?= $${LATEST}$$" ./runner/Makefile
 	then
 		echo 'Everything up-to-date'
-	elif git ls-remote --exit-code "$$(git remote show)" "feat/actions-runner-v$${LATEST}"
+	elif git ls-remote --exit-code origin "feat/actions-runner-v$${LATEST}"
 	then
 		echo 'Pending merge'
+	if [ "$$(git ls-remote origin master | cut -f 1)" = "$$(git rev-parse master)" ]
+	then
+		echo 'Master already changed'
 	else
 		sed -Ei "s/^AGENT_VERSION \?= .*/AGENT_VERSION ?= $${LATEST}/" ./operator/Makefile
 		sed -Ei "s/^RUNNER_VERSION \?= .*/RUNNER_VERSION ?= $${LATEST}/" ./runner/Makefile
