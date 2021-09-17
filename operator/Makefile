@@ -29,10 +29,10 @@ uninstall: manifests
 	kustomize build ./config/crd | kubectl delete -f -
 
 deploy/production: manifests
-	kustomize build --enable-alpha-plugins k8s/production | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
+	kustomize build --enable-alpha-plugins k8s/production | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
 
 deploy/development: manifests
-	kustomize build --enable-alpha-plugins k8s/development | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
+	kustomize build --enable-alpha-plugins k8s/development | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
