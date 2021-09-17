@@ -44,7 +44,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     export ECRLOGIN_VERSION=$(curl -Lf https://api.github.com/repos/awslabs/amazon-ecr-credential-helper/releases/latest | jq -r '.tag_name' | sed 's/^v//g') && \
     curl -Lfo /usr/local/bin/docker-credential-ecr-login "https://amazon-ecr-credential-helper-releases.s3.us-east-2.amazonaws.com/${ECRLOGIN_VERSION}/linux-amd64/docker-credential-ecr-login" && \
     chmod 0755 /usr/local/bin/docker-credential-ecr-login && \
-    pip3 install git-remote-codecommit && \
+    pip3 install git-remote-codecommit yq && \
     useradd -u 1000 -m user && \
     echo 'user ALL=(root) NOPASSWD:ALL' > /etc/sudoers.d/user && \
     chmod 0440 /etc/sudoers.d/user && \
