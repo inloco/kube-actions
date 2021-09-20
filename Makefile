@@ -14,7 +14,7 @@ continuous-upgrade:
 	elif git ls-remote --exit-code origin "feat/actions-runner-v$${LATEST}"
 	then
 		echo 'Pending merge'
-	elif [ "$$(git ls-remote origin master | cut -f 1)" = "$$(git rev-parse master)" ]
+	elif [ "$$(git ls-remote origin master | cut -f 1)" != "$$(git rev-parse master)" ]
 	then
 		echo 'Master already changed'
 	else
