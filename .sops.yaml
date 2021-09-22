@@ -1,7 +1,7 @@
 creation_rules:
   - path_regex: operator/k8s/production/
-    kms: arn:aws:kms:us-east-1:779099367007:alias/kube-actions
+    kms: arn:aws:kms:us-east-1:779099367007:alias/sops-kube-actions
     encrypted_regex: ^(data|stringData)$
   - path_regex: operator/k8s/development/
-    kms: arn:aws:kms:us-east-1:779099367007:alias/kube-actions
+    kms: arn:aws:kms:us-east-1:779099367007:alias/sops-kube-actions
     encrypted_regex: ^(data|stringData)$
