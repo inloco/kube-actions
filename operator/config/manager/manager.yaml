@@ -36,6 +36,11 @@ spec:
             name: controller-manager
         - secretRef:
             name: controller-manager
+        env:
+        - name: KUBEACTIONS_RUNNER_IMAGE_NAME
+          value: 779099367007.dkr.ecr.us-east-1.amazonaws.com/incognia/kube-actions
+        - name: KUBEACTIONS_DIND_IMAGE_NAME
+          value: 779099367007.dkr.ecr.us-east-1.amazonaws.com/incognia/kube-actions
         securityContext:
           allowPrivilegeEscalation: false
         resources:
