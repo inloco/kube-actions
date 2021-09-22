@@ -1,4 +1,5 @@
-IMAGE_NAME ?= inloco/kube-actions
+IMAGE_REPO ?= 779099367007.dkr.ecr.us-east-1.amazonaws.com
+IMAGE_NAME ?= incognia/kube-actions
 IMAGE_VERSION ?= $(shell git describe --always)
 IMAGE_VARIANT ?= -operator
 
@@ -28,14 +29,14 @@ uninstall: manifests
 	kustomize build ./config/crd | kubectl delete -f -
 
 deploy/production: manifests
-	kustomize build --enable-alpha-plugins k8s/production | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
+	kustomize build --enable-alpha-plugins k8s/production | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
 
 deploy/development: manifests
-	kustomize build --enable-alpha-plugins k8s/development | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
+	kustomize build --enable-alpha-plugins k8s/development | yq -y '(select(.kind=="Deployment" and .metadata.name=="controller-manager") | .spec.template.spec.containers[] | select(.name=="manager") | .image) |= "$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)"' | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
-	controller-gen crd rbac:roleName=manager-role webhook paths='./...' output:crd:artifacts:config='./config/crd/bases'
+	CGO_ENABLED=0 controller-gen crd rbac:roleName=manager-role webhook paths='./...' output:crd:artifacts:config='./config/crd/bases'
 
 # Run go fmt against code
 fmt:
@@ -47,7 +48,7 @@ vet:
 
 # Generate code
 generate:
-	controller-gen object:headerFile='./hack/boilerplate.go.txt' paths='./...'
+	CGO_ENABLED=0 controller-gen object:headerFile='./hack/boilerplate.go.txt' paths='./...'
 
 # Build, tag, and push the docker image
 docker: docker-build docker-tag docker-push
@@ -58,12 +59,13 @@ docker-build:
 
 # Tag the docker image
 docker-tag:
-	docker tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT) $(IMAGE_NAME):$(IMAGE_VERSION)
+	docker tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT) $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
+	docker tag $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT) $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)
 
 # Push the docker image
 docker-push:
-	docker push $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
-	docker push $(IMAGE_NAME):$(IMAGE_VERSION)
+	docker push $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT)
+	docker push $(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)
 
 docker-save:
 	docker save $(IMAGE_NAME):$(IMAGE_VERSION)$(IMAGE_VARIANT) > ./image.tar
