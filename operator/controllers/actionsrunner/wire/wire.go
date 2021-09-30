@@ -185,6 +185,10 @@ func (w *Wire) Listen() {
 		defer func() {
 			w.listening = false
 
+			if err := w.Close(); err != nil {
+				logger.Error(err, "Error closing agent session")
+			}
+
 			if r := recover(); r != nil {
 				logger.Error(fmt.Errorf("%v", r), "Recovering from error in wire listener")
 
@@ -193,10 +197,6 @@ func (w *Wire) Listen() {
 				if err := w.trySendEvent(genericEvent); err != nil {
 					logger.Error(err, "Error notifying event on recover")
 				}
-			}
-
-			if err := w.Close(); err != nil {
-				logger.Error(err, "Error closing agent session")
 			}
 		}()
 
