@@ -1,8 +1,13 @@
+FROM golang:1.16-alpine AS build
+WORKDIR /go/src/github.com/inloco/kube-actions/runner
+COPY ./go.mod ./go.sum ./
+RUN go mod download
+COPY ./main.go ./
+RUN CGO_ENABLED=0 go install -a -gcflags 'all=-N -l' -ldflags '-d -extldflags "-fno-PIC -static"' -tags 'netgo osusergo static_build' -trimpath -v ./...
+
 ARG UBUNTU_VERSION
-
-FROM ubuntu:${UBUNTU_VERSION}
-
 ARG RUNNER_VERSION
+FROM ubuntu:${UBUNTU_VERSION}
 
 RUN export DEBIAN_FRONTEND=noninteractive && \
     export IFS="$(printf '\n\b')" && \
@@ -54,6 +59,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     /opt/actions-runner/bin/installdependencies.sh && \
     rm -fRv ${XDG_CACHE_HOME:-${HOME}/.cache}/pip/* /var/lib/apt/lists/* /tmp/*
 
+COPY --from=build /go/bin/runner /sbin/runner
 COPY ./init /sbin/init
 
 ENV ACTIONS_ALLOW_UNSECURE_COMMANDS true
