@@ -30,8 +30,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     export BUILDX_URL=$(curl -Lf https://api.github.com/repos/docker/buildx/releases/latest | jq -r '.assets[] | select(.name | match("linux-amd64$")) | .browser_download_url') && \
     curl -Lfo /usr/local/lib/docker/cli-plugins/docker-buildx ${BUILDX_URL} && \
     chmod 0755 /usr/local/lib/docker/cli-plugins/docker-buildx && \
-    export COMPOSE_URL=$(curl -Lf https://api.github.com/repos/docker/compose/releases/latest | jq -r '.assets[] | select(.name | match("Linux-x86_64$")) | .browser_download_url') && \
-    curl -Lfo /usr/local/bin/docker-compose ${COMPOSE_URL} && \
+    curl -Lfo /usr/local/bin/docker-compose https://github.com/docker/compose/releases/download/1.29.2/docker-compose-Linux-x86_64 && \
     chmod 0755 /usr/local/bin/docker-compose && \
     export KUBERNETES_VERSION=$(curl -Lf https://storage.googleapis.com/kubernetes-release/release/stable.txt) && \
     curl -Lfo /usr/local/bin/kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl" && \
