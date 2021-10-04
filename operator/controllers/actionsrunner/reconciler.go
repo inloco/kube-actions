@@ -199,7 +199,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	// if AR is pending, setup connection and create related resources
+	// if AR is pending, setup connection
 	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStatePending {
 		logger.Info("ActionsRunner pending, set ActionsRunner.State to idle ")
 
