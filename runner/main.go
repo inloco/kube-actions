@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path"
 	"strings"
@@ -70,18 +69,27 @@ func main() {
 	logger.Println("Initializing runner")
 	ctx := context.Background()
 
+	logger.Println("Updating CA certificates")
+	if err := updateCaCertificates(); err != nil {
+		panic(err)
+	}
+
+	logger.Println("Assuring AWS environment")
 	if err := assureAwsEnv(ctx); err != nil {
 		panic(err)
 	}
 
+	logger.Println("Waiting Docker daemon")
 	if err := waitForDocker(); err != nil {
 		panic(err)
 	}
 
+	logger.Println("Preparing Docker config")
 	if err := setupDockerConfig(); err != nil {
 		panic(err)
 	}
 
+	logger.Println("Starting metrics server")
 	if err := startMetricsServer(); err != nil {
 		panic(err)
 	}
@@ -95,9 +103,26 @@ func main() {
 
 	runnerRunningGauge.WithLabelValues(runnerRepository, runnerJob).Set(1)
 
+	logger.Println("Running GitHub Actions Runner")
 	if err := runGitHubActionsRunner(); err != nil {
 		panic(err)
 	}
+}
+
+func updateCaCertificates() error {
+	return <-run("sudo", "update-ca-certificates")
+}
+
+func setupGitCredentials() error {
+	if err := <-run("git", "config", "--global", "user.name", "github-actions[bot]"); err != nil {
+		return err
+	}
+
+	if err := <-run("git", "config", "--global", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func assureAwsEnv(ctx context.Context) error {
@@ -273,27 +298,7 @@ func requestDindTermination() error {
 }
 
 func runGitHubActionsRunner() error {
-	cmd := exec.Command(gitHubActionsRunnerPath, gitHubActionsRunnerArgs...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGINT}
-
-	if err := cmd.Start(); err != nil {
-		return errors.Wrap(err, "Error starting GitHub Actions Runner")
-	}
-
-	signals := make(chan os.Signal, 1)
-	go func() {
-		for sig := range signals {
-			if err := cmd.Process.Signal(sig); err != nil {
-				logger.Printf("Error sending signal for GitHub Actions Runner: %v\n", err)
-			}
-		}
-	}()
-	signal.Notify(signals)
-
-	if err := cmd.Wait(); err != nil {
+	if err := <-run(gitHubActionsRunnerPath, gitHubActionsRunnerArgs...); err != nil {
 		return errors.Wrap(err, "Error waiting for GitHub Actions Runner process")
 	}
 
