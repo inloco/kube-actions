@@ -4,7 +4,7 @@ FROM golang:1.16-alpine AS build
 WORKDIR /go/src/github.com/inloco/kube-actions/runner
 COPY ./go.mod ./go.sum ./
 RUN go mod download
-COPY ./main.go ./
+COPY ./main.go ./exec.go ./
 RUN CGO_ENABLED=0 go install -a -gcflags 'all=-N -l' -ldflags '-d -extldflags "-fno-PIC -static"' -tags 'netgo osusergo static_build' -trimpath -v ./...
 
 FROM ubuntu:${UBUNTU_VERSION}
@@ -60,7 +60,6 @@ RUN set -x && \
     rm -fRv ${XDG_CACHE_HOME:-${HOME}/.cache}/pip/* /var/lib/apt/lists/* /tmp/*
 
 COPY --from=build /go/bin/runner /sbin/runner
-COPY ./init /sbin/init
 
 ENV ACTIONS_ALLOW_UNSECURE_COMMANDS true
 ENV AWS_EC2_METADATA_DISABLED true
@@ -73,4 +72,4 @@ ENV RUNNER_ALLOW_RUNASROOT true
 # languages tools-specific
 ENV GRADLE_OPTS -Dorg.gradle.daemon=false
 
-ENTRYPOINT ["/sbin/init"]
+ENTRYPOINT ["/sbin/runner"]
