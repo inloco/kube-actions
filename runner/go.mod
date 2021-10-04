@@ -13,5 +13,6 @@ require (
 	github.com/docker/docker-credential-helpers v0.6.4 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/prometheus/client_golang v1.11.0 // indirect
 	google.golang.org/grpc v1.41.0 // indirect
 )

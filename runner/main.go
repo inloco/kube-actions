@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -21,6 +22,9 @@ import (
 	dockerconfig "github.com/docker/docker/cli/config"
 	docker "github.com/docker/docker/client"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -38,6 +42,9 @@ const (
 	dockerConfigAuthsKey = "auths"
 	dockerConfigCredHelpersKey = "credHelpers"
 	dockerConfigPluginsKey = "plugins"
+
+	prometheusAddr = ":9102"
+	prometheusMetricsPath = "/metrics"
 )
 
 var (
@@ -45,6 +52,18 @@ var (
 
 	gitHubActionsRunnerPath = "/opt/actions-runner/run.sh"
 	gitHubActionsRunnerArgs = []string{"--once"}
+
+	runnerRepository = os.Getenv("RUNNER_REPOSITORY")
+	runnerJob = os.Getenv("RUNNER_JOB")
+
+	runnerRunningGauge = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "kubeactions",
+			Subsystem: "actions",
+			Name: "job_running",
+		},
+		[]string{"repository", "job"},
+	)
 )
 
 func main() {
@@ -63,12 +82,18 @@ func main() {
 		panic(err)
 	}
 
+	if err := startMetricsServer(); err != nil {
+		panic(err)
+	}
+
 	setupTerminationListener()
 	defer func() {
 		if err := requestDindTermination(); err != nil {
 			logger.Println(err)
 		}
 	}()
+
+	runnerRunningGauge.WithLabelValues(runnerRepository, runnerJob).Set(1)
 
 	if err := runGitHubActionsRunner(); err != nil {
 		panic(err)
@@ -203,6 +228,21 @@ func setupDockerConfig() error {
 
 func wrapInJson(key, value string) string {
 	return fmt.Sprintf(`{ "%s": %s }`, key, os.ExpandEnv(value))
+}
+
+func startMetricsServer() error {
+	http.Handle(prometheusMetricsPath, promhttp.Handler())
+	errC := make(chan error)
+	go func() {
+		errC <- http.ListenAndServe(prometheusAddr, nil)
+	}()
+
+	select {
+	case err := <-errC:
+		return err
+	case <-time.After(time.Second):
+		return nil
+	}
 }
 
 func setupTerminationListener() {
