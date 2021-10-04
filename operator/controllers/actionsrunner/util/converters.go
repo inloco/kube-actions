@@ -314,7 +314,14 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: actionsRunner.GetName() + "-",
 			Namespace:    actionsRunner.GetNamespace(),
-			Annotations:  actionsRunner.Spec.Annotations,
+			Annotations:  ConcatAnnotations(
+				map[string]string {
+					"prometheus.io/path": "/metrics",
+					"prometheus.io/port": "9102",
+					"prometheus.io/scrape": "true",
+				},
+				actionsRunner.Spec.Annotations,
+			),
 			Labels: map[string]string{
 				LabelApp: actionsRunner.GetName(),
 			},
@@ -348,6 +355,12 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 							return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
 						}),
 					),
+					Ports: []corev1.ContainerPort{
+						{
+							Name: "prometheus",
+							ContainerPort: 9102,
+						},
+					},
 					Resources:    FilterResources(actionsRunner.Spec.Resources[runnerResourcesKey], corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
 					VolumeMounts: withVolumeMounts(actionsRunner),
 				},
