@@ -3,7 +3,7 @@ IMAGE_NAME ?= incognia/kube-actions
 IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -runner
 
-RUNNER_VERSION ?= 2.283.2
+RUNNER_VERSION ?= 2.283.3
 UBUNTU_VERSION ?= focal
 
 # Build, tag, and push the docker image
