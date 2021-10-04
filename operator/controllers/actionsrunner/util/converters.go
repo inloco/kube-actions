@@ -329,9 +329,25 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 					EnvFrom: FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
 						return envFromSource.SecretRef == nil
 					}),
-					Env: FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
-						return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
-					}),
+					Env: ConcatEnvVars(
+						[]corev1.EnvVar{
+							{
+								Name: "RUNNER_REPOSITORY",
+								Value: actionsRunner.Spec.Repository.Name,
+							},
+							{
+								Name: "RUNNER_JOB",
+								ValueFrom: &corev1.EnvVarSource{
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: "metadata.name",
+									},
+								},
+							},
+						},
+						FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
+							return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
+						}),
+					),
 					Resources:    FilterResources(actionsRunner.Spec.Resources[runnerResourcesKey], corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
 					VolumeMounts: withVolumeMounts(actionsRunner),
 				},
