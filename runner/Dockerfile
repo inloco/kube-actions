@@ -21,10 +21,8 @@ RUN set -x && \
     apt-add-repository https://cli.github.com/packages && \
     curl -sSLf https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
-    curl -Lf "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/Release.key" | sudo apt-key add - && \
-    echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && \
     apt-get update && \
-    apt-get install -y docker-ce-cli gh skopeo && \
+    apt-get install -y docker-ce-cli gh && \
     busybox --install && \
     curl -sSLf https://bootstrap.pypa.io/get-pip.py | python3 - && \
     export HUB_URL=$(curl -sSLf https://api.github.com/repos/github/hub/releases/latest | jq -r '.assets[] | select(.name | match("linux-amd64")) | .browser_download_url') && \
