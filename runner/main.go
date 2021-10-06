@@ -92,19 +92,18 @@ func main() {
 		return updateCaCertificates()
 	})
 
-	assureAwsEnvC := async(func() error {
-		return assureAwsEnv(ctx)
+	assureAwsAndDockerEnvC := async(func() error {
+		if err := assureAwsEnv(ctx); err != nil {
+			return err
+		}
+		return setupDockerConfig()
 	})
 
 	waitForDockerC := async(func() error {
 		return waitForDocker()
 	})
 
-	setupDockerConfigC := async(func() error {
-		return setupDockerConfig()
-	})
-
-	for _, c := range []chan error{updateCaCertificatesC, assureAwsEnvC, waitForDockerC, setupDockerConfigC} {
+	for _, c := range []chan error{updateCaCertificatesC, assureAwsAndDockerEnvC, waitForDockerC} {
 		if err := <-c; err != nil {
 			panic(err)
 		}
