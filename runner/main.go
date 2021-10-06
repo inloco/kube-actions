@@ -29,7 +29,6 @@ const (
 	awsCallerIdEnv  = "AWS_CALLER_ID"
 
 	dockerHostEnv = "DOCKER_HOST"
-	dockerConfigEnv = "DOCKER_CONFIG"
 	dockerAuthsEnv = "DOCKER_AUTHS"
 	dockerCredHelpersEnv = "DOCKER_CREDENTIAL_HELPERS"
 	dockerPluginsEnv = "DOCKER_PLUGINS"
@@ -49,6 +48,8 @@ var (
 
 	runnerRepository = os.Getenv("RUNNER_REPOSITORY")
 	runnerJob = os.Getenv("RUNNER_JOB")
+
+	_, hasDockerCapability = os.LookupEnv(dockerHostEnv)
 
 	runnerRunningGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -88,22 +89,18 @@ func main() {
 	ctx := context.Background()
 
 	updateCaCertificatesC := async(func() error {
-		logger.Println("Updating CA certificates")
 		return updateCaCertificates()
 	})
 
 	assureAwsEnvC := async(func() error {
-		logger.Println("Assuring AWS environment")
 		return assureAwsEnv(ctx)
 	})
 
 	waitForDockerC := async(func() error {
-		logger.Println("Waiting Docker daemon")
 		return waitForDocker()
 	})
 
 	setupDockerConfigC := async(func() error {
-		logger.Println("Preparing Docker config")
 		return setupDockerConfig()
 	})
 
@@ -140,6 +137,8 @@ func main() {
 }
 
 func updateCaCertificates() error {
+	logger.Println("Updating CA certificates")
+
 	if err := <-run("sudo", "update-ca-certificates"); err != nil {
 		return errors.Wrap(err, "Error running update-ca-certificates")
 	}
@@ -160,6 +159,8 @@ func setupGitCredentials() error {
 }
 
 func assureAwsEnv(ctx context.Context) error {
+	logger.Println("Assuring AWS environment")
+
 	awsRegion, ok := os.LookupEnv(awsRegionEnv)
 	if !ok {
 		logger.Println("AWS_REGION not present, calling metadata server")
@@ -210,6 +211,12 @@ func assureAwsEnv(ctx context.Context) error {
 }
 
 func waitForDocker() error {
+	if !hasDockerCapability {
+		return nil
+	}
+
+	logger.Println("Waiting Docker daemon")
+
 	docker, err := docker.NewEnvClient()
 	if err != nil {
 		return errors.Wrap(err, "Error creating docker client")
@@ -230,8 +237,13 @@ func waitForDocker() error {
 }
 
 func setupDockerConfig() error {
-	dockerConfigDir := dockerconfig.Dir()
+	if !hasDockerCapability {
+		return nil
+	}
 
+	logger.Println("Preparing Docker config")
+
+	dockerConfigDir := dockerconfig.Dir()
 	if err := os.MkdirAll(dockerConfigDir, 0700); err != nil {
 		return errors.Wrap(err, "Error assuring existence of docker config dir")
 	}
@@ -293,6 +305,10 @@ func pushMetrics() error {
 }
 
 func requestDindTermination() error {
+	if !hasDockerCapability {
+		return nil
+	}
+
 	logger.Println("Requesting dind termination")
 	conn, err := net.Dial("tcp", ":2378")
 
