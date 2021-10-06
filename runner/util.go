@@ -46,3 +46,12 @@ func run(command string, args ...string) chan error {
 
 	return ret
 }
+
+func async(f func() error) chan error {
+	c := make(chan error)
+	go func() {
+		c <- f()
+	}()
+
+	return c
+}

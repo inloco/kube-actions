@@ -4,7 +4,7 @@ FROM golang:1.16-alpine AS build
 WORKDIR /go/src/github.com/inloco/kube-actions/runner
 COPY ./go.mod ./go.sum ./
 RUN go mod download
-COPY ./main.go ./exec.go ./
+COPY ./main.go ./util.go ./
 RUN CGO_ENABLED=0 go install -a -gcflags 'all=-N -l' -ldflags '-d -extldflags "-fno-PIC -static"' -tags 'netgo osusergo static_build' -trimpath -v ./...
 
 FROM ubuntu:${UBUNTU_VERSION}

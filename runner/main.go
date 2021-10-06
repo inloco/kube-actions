@@ -87,24 +87,30 @@ func main() {
 	logger.Println("Initializing runner")
 	ctx := context.Background()
 
-	logger.Println("Updating CA certificates")
-	if err := updateCaCertificates(); err != nil {
-		panic(err)
-	}
+	updateCaCertificatesC := async(func() error {
+		logger.Println("Updating CA certificates")
+		return updateCaCertificates()
+	})
 
-	logger.Println("Assuring AWS environment")
-	if err := assureAwsEnv(ctx); err != nil {
-		panic(err)
-	}
+	assureAwsEnvC := async(func() error {
+		logger.Println("Assuring AWS environment")
+		return assureAwsEnv(ctx)
+	})
 
-	logger.Println("Waiting Docker daemon")
-	if err := waitForDocker(); err != nil {
-		panic(err)
-	}
+	waitForDockerC := async(func() error {
+		logger.Println("Waiting Docker daemon")
+		return waitForDocker()
+	})
 
-	logger.Println("Preparing Docker config")
-	if err := setupDockerConfig(); err != nil {
-		panic(err)
+	setupDockerConfigC := async(func() error {
+		logger.Println("Preparing Docker config")
+		return setupDockerConfig()
+	})
+
+	for _, c := range []chan error{updateCaCertificatesC, assureAwsEnvC, waitForDockerC, setupDockerConfigC} {
+		if err := <-c; err != nil {
+			panic(err)
+		}
 	}
 
 	defer func() {
