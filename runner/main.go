@@ -199,12 +199,12 @@ func waitForDocker() error {
 func setupDockerConfig() error {
 	dockerConfigDir := dockerconfig.Dir()
 
-	if err := os.MkdirAll(dockerConfigDir, os.ModeDir); err != nil {
+	if err := os.MkdirAll(dockerConfigDir, 0700); err != nil {
 		return errors.Wrap(err, "Error assuring existence of docker config dir")
 	}
 
-	dockerConfig := dockercliconfigfile.New("")
 	dockerConfigPath := path.Join(dockerConfigDir, "config.json")
+	dockerConfig := dockercliconfigfile.New(dockerConfigPath)
 	if _, err := os.Stat(dockerConfigPath); err == nil {
 		file, err := os.Open(dockerConfigPath)
 		defer file.Close()
@@ -240,12 +240,7 @@ func setupDockerConfig() error {
 		}
 	}
 
-	file, err := os.Create(dockerConfigPath)
-	if err != nil {
-		return errors.Wrap(err, "Error opening docker config file for writing")
-	}
-
-	if err := dockerConfig.SaveToWriter(file); err != nil {
+	if err := dockerConfig.Save(); err != nil {
 		return errors.Wrap(err, "Error writing new docker config to file")
 	}
 
