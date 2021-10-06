@@ -81,6 +81,24 @@ var (
 		},
 		[]string{"repository", "job"},
 	)
+
+	githubActionsJobStartedTimestampGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "kubeactions",
+			Subsystem: "actions",
+			Name: "job_started_timestamp_seconds",
+		},
+		[]string{"repository", "job"},
+	)
+
+	githubActionsJobFinishedTimestampGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "kubeactions",
+			Subsystem: "actions",
+			Name: "job_finished_timestamp_seconds",
+		},
+		[]string{"repository", "job"},
+	)
 )
 
 func init() {
@@ -91,6 +109,8 @@ func init() {
 		githubCacheHitCollector,
 		githubActionsEventCounter,
 		githubActionsJobAliveGauge,
+		githubActionsJobStartedTimestampGauge,
+		githubActionsJobFinishedTimestampGauge,
 	)
 }
 
@@ -132,8 +152,10 @@ func IncGitHubActionsEventCounter(repository, runner, event string) {
 
 func SetGitHubActionsJobAlive(repository, job string) {
 	githubActionsJobAliveGauge.WithLabelValues(repository, job).Set(1)
+	githubActionsJobStartedTimestampGauge.WithLabelValues(repository, job).SetToCurrentTime()
 }
 
 func SetGitHubActionsJobDone(repository, job string) {
 	githubActionsJobAliveGauge.WithLabelValues(repository, job).Set(0)
+	githubActionsJobFinishedTimestampGauge.WithLabelValues(repository, job).SetToCurrentTime()
 }
