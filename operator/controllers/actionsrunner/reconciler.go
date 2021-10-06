@@ -42,6 +42,10 @@ import (
 )
 
 var (
+	createOpts = []client.CreateOption{
+		client.FieldOwner("kube-actions"),
+	}
+
 	patchOpts = []client.PatchOption{
 		client.ForceOwnership,
 		client.FieldOwner("kube-actions"),
@@ -240,7 +244,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			logger.Error(err, "Error generating ActionsRunnerJob definition")
 			return ctrl.Result{}, err
 		}
-		if err := r.Patch(ctx, desiredActionsRunnerJob, client.Apply, patchOpts...); err != nil {
+		if err := r.Create(ctx, desiredActionsRunnerJob, createOpts...); err != nil {
 			logger.Error(err, "Error creating ActionsRunnerJob")
 			return ctrl.Result{}, err
 		}
@@ -261,14 +265,15 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStateActive {
 		logger.Info("ActionsRunner active")
 
-		var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
-		err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Error(err, "Error retrieving ActionsRunnerJob")
+		var jobs inlocov1alpha1.ActionsRunnerJobList
+		if err := r.List(ctx, &jobs, client.InNamespace(req.Namespace), client.MatchingLabels{util.LabelRunner: req.Name}); err != nil {
+			logger.Error(err, "Error retrieving ActionsRunnerJob list")
 			return ctrl.Result{}, err
 		}
 
-		if err == nil {
+		if len(jobs.Items) > 0 {
+			actionsRunnerJob := jobs.Items[0]
+
 			if actionsRunnerJob.State != inlocov1alpha1.ActionsRunnerJobStateCompleted {
 				logger.Info(fmt.Sprintf("ActionsRunnerJob still running (%s), wait", actionsRunnerJob.State))
 				return ctrl.Result{}, nil

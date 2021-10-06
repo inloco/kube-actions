@@ -108,8 +108,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	// if AR was deleted, ignore it
+	actionsRunnerNamespacedName := req.NamespacedName
+	actionsRunnerNamespacedName.Name = actionsRunnerJob.Labels[util.LabelRunner]
 	var actionsRunner inlocov1alpha1.ActionsRunner
-	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
+	switch err := r.Get(ctx, actionsRunnerNamespacedName, &actionsRunner); {
 	case apierrors.IsNotFound(err):
 		logger.Info("ActionsRunner not found, ignore")
 		return ctrl.Result{}, nil
@@ -155,19 +157,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStateRunning {
 		logger.Info("ActionsRunnerJob running")
 
-		var pods corev1.PodList
-		if err := r.List(ctx, &pods, client.InNamespace(req.Namespace), client.MatchingLabels{util.LabelApp: req.Name}); err != nil {
-			logger.Error(err, "Error retrieving Pod list")
+		var pod corev1.Pod
+		err := r.Get(ctx, req.NamespacedName, &pod)
+
+		if client.IgnoreNotFound(err) != nil {
 			return ctrl.Result{}, err
 		}
 
-		// if pod is still running, ignore
-		if len(pods.Items) > 0 {
-			for _, pod := range pods.Items {
-				if pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed {
-					logger.Info("Pod still running, wait")
-					return ctrl.Result{}, nil
-				}
+		if err == nil {
+			if pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed {
+				logger.Info("Pod still running, wait")
+				return ctrl.Result{}, nil
 			}
 		}
 
