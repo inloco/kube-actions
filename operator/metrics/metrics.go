@@ -79,7 +79,7 @@ var (
 			Subsystem: "actions",
 			Name: "job_alive",
 		},
-		[]string{"repository", "job"},
+		[]string{"repository", "runner_job"},
 	)
 
 	githubActionsJobStartedTimestampGauge = prometheus.NewGaugeVec(
@@ -88,7 +88,7 @@ var (
 			Subsystem: "actions",
 			Name: "job_started_timestamp_seconds",
 		},
-		[]string{"repository", "job"},
+		[]string{"repository", "runner_job"},
 	)
 
 	githubActionsJobFinishedTimestampGauge = prometheus.NewGaugeVec(
@@ -97,7 +97,7 @@ var (
 			Subsystem: "actions",
 			Name: "job_finished_timestamp_seconds",
 		},
-		[]string{"repository", "job"},
+		[]string{"repository", "runner_job"},
 	)
 )
 
