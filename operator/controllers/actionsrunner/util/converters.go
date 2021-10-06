@@ -589,10 +589,7 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 		LivenessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				Exec: &corev1.ExecAction{
-					Command: []string{
-						"nc",
-						"localhost", "2375",
-					},
+					Command: []string{"nc", "-z", "127.0.0.1", "2375"},
 				},
 			},
 			InitialDelaySeconds: 3,
