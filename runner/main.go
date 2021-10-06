@@ -94,7 +94,6 @@ func main() {
 		panic(err)
 	}
 
-	setupTerminationListener()
 	defer func() {
 		if err := requestDindTermination(); err != nil {
 			logger.Println(err)
@@ -268,18 +267,6 @@ func startMetricsServer() error {
 	case <-time.After(time.Second):
 		return nil
 	}
-}
-
-func setupTerminationListener() {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-signals
-		logger.Println("Termination signal received")
-		if err := requestDindTermination(); err != nil {
-			logger.Printf("Error in termination listener: %v\n", err)
-		}
-	}()
 }
 
 func requestDindTermination() error {
