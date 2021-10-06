@@ -72,6 +72,15 @@ var (
 			"event",
 		},
 	)
+
+	githubActionsJobAliveGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "kubeactions",
+			Subsystem: "actions",
+			Name: "job_alive",
+		},
+		[]string{"repository", "job"},
+	)
 )
 
 func init() {
@@ -118,4 +127,12 @@ func IncGitHubCacheHitCollector(cacheName string, hit bool) {
 
 func IncGitHubActionsEventCounter(repository, runner, event string) {
 	githubActionsEventCounter.WithLabelValues(repository, runner, event).Inc()
+}
+
+func SetGitHubActionsJobAlive(repository, job string) {
+	githubActionsJobAliveGauge.WithLabelValues(repository, job).Set(1)
+}
+
+func SetGitHubActionsJobDone(repository, job string) {
+	githubActionsJobAliveGauge.WithLabelValues(repository, job).Set(0)
 }

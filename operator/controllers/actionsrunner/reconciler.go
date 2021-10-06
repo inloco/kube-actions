@@ -28,6 +28,7 @@ import (
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/wire"
 	controllersutil "github.com/inloco/kube-actions/operator/controllers/util"
+	"github.com/inloco/kube-actions/operator/metrics"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -198,7 +199,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	// if AR is pending, setup connection and create related resources
+	// if AR is pending, setup connection
 	if actionsRunner.State == inlocov1alpha1.ActionsRunnerStatePending {
 		logger.Info("ActionsRunner pending, set ActionsRunner.State to idle ")
 
@@ -244,6 +245,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 
+		metrics.SetGitHubActionsJobAlive(actionsRunner.Spec.Repository.Name, desiredActionsRunnerJob.Name)
 		logger.Info("Set ActionsRunner.State to active ")
 
 		actionsRunner.State = inlocov1alpha1.ActionsRunnerStateActive
@@ -289,6 +291,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				logger.Error(err, "Error deleting ActionsRunnerJob")
 				return ctrl.Result{}, nil
 			}
+
+			metrics.SetGitHubActionsJobDone(actionsRunner.Spec.Repository.Name, actionsRunnerJob.Name)
 
 			return ctrl.Result{}, nil
 		}
