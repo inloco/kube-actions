@@ -57,7 +57,25 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "actions",
-			Name: "job_running",
+			Name: "job_runner_running",
+		},
+		[]string{"repository", "job"},
+	)
+
+	runnerStartedTimestampGauge = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "kubeactions",
+			Subsystem: "actions",
+			Name: "job_runner_started",
+		},
+		[]string{"repository", "job"},
+	)
+
+	runnerFinishedTimestampGauge = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "kubeactions",
+			Subsystem: "actions",
+			Name: "job_runner_finished",
 		},
 		[]string{"repository", "job"},
 	)
@@ -99,6 +117,11 @@ func main() {
 	}()
 
 	runnerRunningGauge.WithLabelValues(runnerRepository, runnerJob).Set(1)
+	runnerStartedTimestampGauge.WithLabelValues(runnerRepository, runnerJob).SetToCurrentTime()
+	defer func() {
+		runnerRunningGauge.WithLabelValues(runnerRepository, runnerJob).Set(0)
+		runnerFinishedTimestampGauge.WithLabelValues(runnerRepository, runnerJob).SetToCurrentTime()
+	}()
 
 	logger.Println("Running GitHub Actions Runner")
 	if err := runGitHubActionsRunner(); err != nil {
