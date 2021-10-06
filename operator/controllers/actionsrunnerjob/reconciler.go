@@ -118,7 +118,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	// if ARJ is still pending, create job
+	// if ARJ is still pending, create pod
 	if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStatePending {
 		logger.Info("ActionsRunnerJob pending, creating Pod")
 
@@ -171,7 +171,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			}
 		}
 
-		// if pod is no longer present, delete ARJ
+		// if pod is no longer present, set ARJ to completed
 		logger.Info("Pod no longer active, set ActionsRunnerJob.State to completed")
 		actionsRunnerJob.State = inlocov1alpha1.ActionsRunnerJobStateCompleted
 		if err := r.Update(ctx, &actionsRunnerJob, updateOpts...); err != nil {
