@@ -7,10 +7,8 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path"
 	"strings"
-	"syscall"
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -109,16 +107,20 @@ func main() {
 }
 
 func updateCaCertificates() error {
-	return <-run("sudo", "update-ca-certificates")
+	if err := <-run("sudo", "update-ca-certificates"); err != nil {
+		return errors.Wrap(err, "Error running update-ca-certificates")
+	}
+
+	return nil
 }
 
 func setupGitCredentials() error {
 	if err := <-run("git", "config", "--global", "user.name", "github-actions[bot]"); err != nil {
-		return err
+		return errors.Wrap(err, "Error setting global username for git")
 	}
 
 	if err := <-run("git", "config", "--global", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"); err != nil {
-		return err
+		return errors.Wrap(err, "Error setting global email for git")
 	}
 
 	return nil
