@@ -48,7 +48,7 @@ var (
 	dindContainerName   = "dind"
 	dindResourcesKey    = "docker"
 
-	LabelApp = "app"
+	LabelRunner = "runner"
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -209,7 +209,7 @@ func ToPodDisruptionBudget(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.Ac
 			MaxUnavailable: &intstr.IntOrString{IntVal: 0},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					LabelApp: actionsRunner.GetName(),
+					LabelRunner: actionsRunner.GetName(),
 				},
 			},
 		},
@@ -237,8 +237,11 @@ func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *run
 			Kind:       "ActionsRunnerJob",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      actionsRunner.GetName(),
-			Namespace: actionsRunner.GetNamespace(),
+			GenerateName: actionsRunner.GetName() + "-",
+			Namespace:    actionsRunner.GetNamespace(),
+			Labels:       map[string]string{
+				LabelRunner: actionsRunner.GetName(),
+			},
 		},
 		State: inlocov1alpha1.ActionsRunnerJobStatePending,
 	}
@@ -312,9 +315,9 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 			Kind:       "Pod",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: actionsRunner.GetName() + "-",
-			Namespace:    actionsRunner.GetNamespace(),
-			Annotations:  ConcatAnnotations(
+			Name:        actionsRunnerJob.GetName(),
+			Namespace:   actionsRunner.GetNamespace(),
+			Annotations: ConcatAnnotations(
 				map[string]string {
 					"prometheus.io/path": "/metrics",
 					"prometheus.io/port": "9102",
@@ -323,7 +326,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 				actionsRunner.Spec.Annotations,
 			),
 			Labels: map[string]string{
-				LabelApp: actionsRunner.GetName(),
+				LabelRunner: actionsRunner.GetName(),
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -344,11 +347,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 							},
 							{
 								Name: "RUNNER_JOB",
-								ValueFrom: &corev1.EnvVarSource{
-									FieldRef: &corev1.ObjectFieldSelector{
-										FieldPath: "metadata.name",
-									},
-								},
+								Value: actionsRunnerJob.GetName(),
 							},
 						},
 						FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
