@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -20,8 +19,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/push"
 )
 
 const (
@@ -40,8 +38,7 @@ const (
 	dockerConfigCredHelpersKey = "credHelpers"
 	dockerConfigPluginsKey = "plugins"
 
-	prometheusAddr = ":9102"
-	prometheusMetricsPath = "/metrics"
+	prometheusPushGatewayAddr = "push-gateway.prometheus.svc.cluster.local:9091"
 )
 
 var (
@@ -53,32 +50,37 @@ var (
 	runnerRepository = os.Getenv("RUNNER_REPOSITORY")
 	runnerJob = os.Getenv("RUNNER_JOB")
 
-	runnerRunningGauge = promauto.NewGaugeVec(
+	runnerRunningGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
-			Subsystem: "actions",
-			Name: "job_runner_running",
+			Subsystem: "runner",
+			Name: "job_running",
 		},
 		[]string{"repository", "job"},
 	)
 
-	runnerStartedTimestampGauge = promauto.NewGaugeVec(
+	runnerStartedTimestampGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
-			Subsystem: "actions",
-			Name: "job_runner_started",
+			Subsystem: "runner",
+			Name: "job_started",
 		},
 		[]string{"repository", "job"},
 	)
 
-	runnerFinishedTimestampGauge = promauto.NewGaugeVec(
+	runnerFinishedTimestampGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
-			Subsystem: "actions",
-			Name: "job_runner_finished",
+			Subsystem: "runner",
+			Name: "job_finished",
 		},
 		[]string{"repository", "job"},
 	)
+
+	prometheusPusher = push.New(prometheusPushGatewayAddr, "kubeactions_runner").
+		Collector(runnerRunningGauge).
+		Collector(runnerStartedTimestampGauge).
+		Collector(runnerFinishedTimestampGauge)
 )
 
 func main() {
@@ -105,11 +107,6 @@ func main() {
 		panic(err)
 	}
 
-	logger.Println("Starting metrics server")
-	if err := startMetricsServer(); err != nil {
-		panic(err)
-	}
-
 	defer func() {
 		if err := requestDindTermination(); err != nil {
 			logger.Println(err)
@@ -118,9 +115,16 @@ func main() {
 
 	runnerRunningGauge.WithLabelValues(runnerRepository, runnerJob).Set(1)
 	runnerStartedTimestampGauge.WithLabelValues(runnerRepository, runnerJob).SetToCurrentTime()
+	if err := pushMetrics(); err != nil {
+		panic(err)
+	}
+
 	defer func() {
 		runnerRunningGauge.WithLabelValues(runnerRepository, runnerJob).Set(0)
 		runnerFinishedTimestampGauge.WithLabelValues(runnerRepository, runnerJob).SetToCurrentTime()
+		if err := pushMetrics(); err != nil {
+			logger.Println(err)
+		}
 	}()
 
 	logger.Println("Running GitHub Actions Runner")
@@ -274,19 +278,12 @@ func wrapInJson(key, value string) string {
 	return fmt.Sprintf(`{ "%s": %s }`, key, os.ExpandEnv(value))
 }
 
-func startMetricsServer() error {
-	http.Handle(prometheusMetricsPath, promhttp.Handler())
-	errC := make(chan error)
-	go func() {
-		errC <- http.ListenAndServe(prometheusAddr, nil)
-	}()
-
-	select {
-	case err := <-errC:
-		return err
-	case <-time.After(time.Second):
-		return nil
+func pushMetrics() error {
+	if err := prometheusPusher.Push(); err != nil {
+		panic(errors.Wrap(err, "Error pushing metrics to Prometheus' Push Gateway"))
 	}
+
+	return nil
 }
 
 func requestDindTermination() error {
