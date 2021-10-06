@@ -90,6 +90,7 @@ func init() {
 		githubAPICallsCollector,
 		githubCacheHitCollector,
 		githubActionsEventCounter,
+		githubActionsJobAliveGauge,
 	)
 }
 
