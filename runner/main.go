@@ -57,7 +57,7 @@ var (
 			Subsystem: "runner",
 			Name: "job_running",
 		},
-		[]string{"repository", "job"},
+		[]string{"runner_repository", "runner_job"},
 	)
 
 	runnerStartedTimestampGauge = prometheus.NewGaugeVec(
@@ -66,7 +66,7 @@ var (
 			Subsystem: "runner",
 			Name: "job_started",
 		},
-		[]string{"repository", "job"},
+		[]string{"runner_repository", "runner_job"},
 	)
 
 	runnerFinishedTimestampGauge = prometheus.NewGaugeVec(
@@ -75,7 +75,7 @@ var (
 			Subsystem: "runner",
 			Name: "job_finished",
 		},
-		[]string{"repository", "job"},
+		[]string{"runner_repository", "runner_job"},
 	)
 
 	prometheusPusher = push.New(prometheusPushGatewayAddr, "kubeactions_runner").
