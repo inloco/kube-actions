@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -19,6 +20,8 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
 )
 
@@ -37,6 +40,8 @@ const (
 	dockerConfigCredHelpersKey = "credHelpers"
 	dockerConfigPluginsKey = "plugins"
 
+	prometheusAddr = ":9102"
+	prometheusMetricsPath = "/metrics"
 	prometheusPushGatewayAddr = "push-gateway.prometheus.svc.cluster.local:9091"
 )
 
@@ -51,7 +56,7 @@ var (
 
 	_, hasDockerCapability = os.LookupEnv(dockerHostEnv)
 
-	runnerRunningGauge = prometheus.NewGaugeVec(
+	runnerRunningGauge = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "runner",
@@ -60,7 +65,7 @@ var (
 		[]string{"repository", "runner_job"},
 	)
 
-	runnerStartedTimestampGauge = prometheus.NewGaugeVec(
+	runnerStartedTimestampGauge = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "runner",
@@ -69,7 +74,7 @@ var (
 		[]string{"repository", "runner_job"},
 	)
 
-	runnerFinishedTimestampGauge = prometheus.NewGaugeVec(
+	runnerFinishedTimestampGauge = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "runner",
@@ -103,7 +108,11 @@ func main() {
 		return waitForDocker()
 	})
 
-	for _, c := range []chan error{updateCaCertificatesC, assureAwsAndDockerEnvC, waitForDockerC} {
+	startMetricsServerC := async(func() error {
+		return startMetricsServer()
+	})
+
+	for _, c := range []chan error{updateCaCertificatesC, assureAwsAndDockerEnvC, waitForDockerC, startMetricsServerC} {
 		if err := <-c; err != nil {
 			panic(err)
 		}
@@ -293,6 +302,23 @@ func setupDockerConfig() error {
 
 func wrapInJson(key, value string) string {
 	return fmt.Sprintf(`{ "%s": %s }`, key, os.ExpandEnv(value))
+}
+
+func startMetricsServer() error {
+	logger.Println("Starting metrics server")
+
+	http.Handle(prometheusMetricsPath, promhttp.Handler())
+	errC := make(chan error)
+	go func() {
+		errC <- http.ListenAndServe(prometheusAddr, nil)
+	}()
+
+	select {
+	case err := <-errC:
+		return errors.Wrap(err, "Error creating prometheus metrics server")
+	case <-time.After(time.Second):
+		return nil
+	}
 }
 
 func pushMetrics() error {
