@@ -43,6 +43,7 @@ const (
 	prometheusAddr = ":9102"
 	prometheusMetricsPath = "/metrics"
 	prometheusPushGatewayAddr = "push-gateway.prometheus.svc.cluster.local:9091"
+	prometheusPushJob = "kubeactions_runner"
 )
 
 var (
@@ -83,10 +84,11 @@ var (
 		[]string{"repository", "runner_job"},
 	)
 
-	prometheusPusher = push.New(prometheusPushGatewayAddr, "kubeactions_runner").
-		Collector(runnerRunningGauge).
-		Collector(runnerStartedTimestampGauge).
-		Collector(runnerFinishedTimestampGauge)
+	collectorsToPush = []prometheus.Collector{
+		runnerRunningGauge,
+		runnerStartedTimestampGauge,
+		runnerFinishedTimestampGauge,
+	}
 )
 
 func main() {
@@ -322,6 +324,11 @@ func startMetricsServer() error {
 }
 
 func pushMetrics() error {
+	prometheusPusher := push.New(prometheusPushGatewayAddr, prometheusPushJob)
+	for _, collector := range collectorsToPush {
+		prometheusPusher = prometheusPusher.Collector(collector)
+	}
+
 	if err := prometheusPusher.Push(); err != nil {
 		panic(errors.Wrap(err, "Error pushing metrics to Prometheus' Push Gateway"))
 	}
