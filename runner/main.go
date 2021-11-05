@@ -99,6 +99,10 @@ func main() {
 		return updateCaCertificates()
 	})
 
+	setupGitCredentialsC := async(func() error {
+		return setupGitCredentials()
+	})
+
 	assureAwsAndDockerEnvC := async(func() error {
 		if err := assureAwsEnv(ctx); err != nil {
 			return err
@@ -114,7 +118,7 @@ func main() {
 		return startMetricsServer()
 	})
 
-	for _, c := range []chan error{updateCaCertificatesC, assureAwsAndDockerEnvC, waitForDockerC, startMetricsServerC} {
+	for _, c := range []chan error{updateCaCertificatesC, setupGitCredentialsC, assureAwsAndDockerEnvC, waitForDockerC, startMetricsServerC} {
 		if err := <-c; err != nil {
 			panic(err)
 		}
