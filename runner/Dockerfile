@@ -40,6 +40,8 @@ RUN set -x && \
     export KUBERNETES_VERSION=$(curl -sSLf https://storage.googleapis.com/kubernetes-release/release/stable.txt) && \
     curl -sSLfo /usr/local/bin/kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl" && \
     chmod 0755 /usr/local/bin/kubectl && \
+    curl -sSLf "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s /usr/local/bin && \
+    chmod 0755 /usr/local/bin/kustomize && \
     curl -sSLfo /usr/local/bin/ec2-metadata http://s3.amazonaws.com/ec2metadata/ec2-metadata && \
     chmod 0755 /usr/local/bin/ec2-metadata && \
     curl -sSLfo /tmp/awscli2.zip https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip && \
