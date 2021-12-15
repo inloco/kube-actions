@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -21,7 +20,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
 )
 
@@ -31,19 +29,17 @@ const (
 	awsCallerArnEnv = "AWS_CALLER_ARN"
 	awsCallerIdEnv  = "AWS_CALLER_ID"
 
-	dockerHostEnv = "DOCKER_HOST"
-	dockerAuthsEnv = "DOCKER_AUTHS"
+	dockerHostEnv        = "DOCKER_HOST"
+	dockerAuthsEnv       = "DOCKER_AUTHS"
 	dockerCredHelpersEnv = "DOCKER_CREDENTIAL_HELPERS"
-	dockerPluginsEnv = "DOCKER_PLUGINS"
+	dockerPluginsEnv     = "DOCKER_PLUGINS"
 
-	dockerConfigAuthsKey = "auths"
+	dockerConfigAuthsKey       = "auths"
 	dockerConfigCredHelpersKey = "credHelpers"
-	dockerConfigPluginsKey = "plugins"
+	dockerConfigPluginsKey     = "plugins"
 
-	prometheusAddr = ":9102"
-	prometheusMetricsPath = "/metrics"
 	prometheusPushGatewayAddr = "push-gateway.prometheus.svc.cluster.local:9091"
-	prometheusPushJob = "kubeactions_runner"
+	prometheusPushJob         = "kubeactions_runner"
 )
 
 var (
@@ -53,7 +49,7 @@ var (
 	gitHubActionsRunnerArgs = []string{"--once"}
 
 	runnerRepository = os.Getenv("RUNNER_REPOSITORY")
-	runnerJob = os.Getenv("RUNNER_JOB")
+	runnerJob        = os.Getenv("RUNNER_JOB")
 
 	_, hasDockerCapability = os.LookupEnv(dockerHostEnv)
 
@@ -61,7 +57,7 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "runner",
-			Name: "job_running",
+			Name:      "job_running",
 		},
 		[]string{"repository", "runner_job"},
 	)
@@ -70,7 +66,7 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "runner",
-			Name: "job_started",
+			Name:      "job_started",
 		},
 		[]string{"repository", "runner_job"},
 	)
@@ -79,7 +75,7 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "runner",
-			Name: "job_finished",
+			Name:      "job_finished",
 		},
 		[]string{"repository", "runner_job"},
 	)
@@ -114,11 +110,7 @@ func main() {
 		return waitForDocker()
 	})
 
-	startMetricsServerC := async(func() error {
-		return startMetricsServer()
-	})
-
-	for _, c := range []chan error{updateCaCertificatesC, setupGitCredentialsC, assureAwsAndDockerEnvC, waitForDockerC, startMetricsServerC} {
+	for _, c := range []chan error{updateCaCertificatesC, setupGitCredentialsC, assureAwsAndDockerEnvC, waitForDockerC} {
 		if err := <-c; err != nil {
 			panic(err)
 		}
@@ -308,23 +300,6 @@ func setupDockerConfig() error {
 
 func wrapInJson(key, value string) string {
 	return fmt.Sprintf(`{ "%s": %s }`, key, os.ExpandEnv(value))
-}
-
-func startMetricsServer() error {
-	logger.Println("Starting metrics server")
-
-	http.Handle(prometheusMetricsPath, promhttp.Handler())
-	errC := make(chan error)
-	go func() {
-		errC <- http.ListenAndServe(prometheusAddr, nil)
-	}()
-
-	select {
-	case err := <-errC:
-		return errors.Wrap(err, "Error creating prometheus metrics server")
-	case <-time.After(time.Second):
-		return nil
-	}
 }
 
 func pushMetrics() error {
