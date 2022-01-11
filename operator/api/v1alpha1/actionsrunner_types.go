@@ -34,14 +34,6 @@ const (
 	ActionsRunnerCapabilityDocker ActionsRunnerCapability = "docker"
 )
 
-type ActionsRunnerState string
-
-const (
-	ActionsRunnerStatePending ActionsRunnerState = "Pending"
-	ActionsRunnerStateIdle    ActionsRunnerState = "Idle"
-	ActionsRunnerStateActive  ActionsRunnerState = "Active"
-)
-
 // ActionsRunnerSpec defines the desired state of ActionsRunner
 type ActionsRunnerSpec struct {
 	Repository   ActionsRunnerRepository   `json:"repository"`
@@ -65,6 +57,14 @@ type ActionsRunnerSpec struct {
 type ActionsRunnerStatus struct {
 }
 
+type ActionsRunnerState string
+
+const (
+	ActionsRunnerStatePending ActionsRunnerState = "Pending"
+	ActionsRunnerStateIdle    ActionsRunnerState = "Idle"
+	ActionsRunnerStateActive  ActionsRunnerState = "Active"
+)
+
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:categories=actions,shortName=ar
 // +kubebuilder:subresource:status
@@ -75,8 +75,10 @@ type ActionsRunner struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   ActionsRunnerSpec   `json:"spec,omitempty"`
-	State  ActionsRunnerState  `json:"state"`
 	Status ActionsRunnerStatus `json:"status,omitempty"`
+
+	// TODO: remove internal state from resource definition
+	State ActionsRunnerState `json:"state"`
 }
 
 // +kubebuilder:object:root=true
