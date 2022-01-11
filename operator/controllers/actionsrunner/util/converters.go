@@ -239,7 +239,7 @@ func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *run
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: actionsRunner.GetName() + "-",
 			Namespace:    actionsRunner.GetNamespace(),
-			Labels:       map[string]string{
+			Labels: map[string]string{
 				LabelRunner: actionsRunner.GetName(),
 			},
 		},
@@ -315,12 +315,12 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 			Kind:       "Pod",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        actionsRunnerJob.GetName(),
-			Namespace:   actionsRunner.GetNamespace(),
+			Name:      actionsRunnerJob.GetName(),
+			Namespace: actionsRunner.GetNamespace(),
 			Annotations: ConcatAnnotations(
-				map[string]string {
-					"prometheus.io/path": "/metrics",
-					"prometheus.io/port": "9102",
+				map[string]string{
+					"prometheus.io/path":   "/metrics",
+					"prometheus.io/port":   "9102",
 					"prometheus.io/scrape": "true",
 				},
 				actionsRunner.Spec.Annotations,
@@ -342,11 +342,19 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 					Env: ConcatEnvVars(
 						[]corev1.EnvVar{
 							{
-								Name: "RUNNER_REPOSITORY",
+								Name:  "ACTIONS_RUNNER_NAME",
+								Value: actionsRunner.GetName(),
+							},
+							{
+								Name:  "ACTIONS_RUNNER_REPOSITORY_OWNER",
+								Value: actionsRunner.Spec.Repository.Owner,
+							},
+							{
+								Name:  "ACTIONS_RUNNER_REPOSITORY_NAME",
 								Value: actionsRunner.Spec.Repository.Name,
 							},
 							{
-								Name: "RUNNER_JOB",
+								Name:  "ACTIONS_RUNNER_JOB_NAME",
 								Value: actionsRunnerJob.GetName(),
 							},
 						},
@@ -356,7 +364,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 					),
 					Ports: []corev1.ContainerPort{
 						{
-							Name: "prometheus",
+							Name:          "prometheus",
 							ContainerPort: 9102,
 						},
 					},
