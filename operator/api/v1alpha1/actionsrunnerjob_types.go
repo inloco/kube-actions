@@ -38,7 +38,7 @@ type ActionsRunnerJobStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName="arj"
+// +kubebuilder:resource:categories=actions,shortName=arj
 // +kubebuilder:subresource:status
 
 // ActionsRunnerJob is the Schema for the actionsrunnerjobs API

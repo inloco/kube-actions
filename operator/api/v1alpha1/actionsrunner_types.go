@@ -66,7 +66,7 @@ type ActionsRunnerStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName="ar"
+// +kubebuilder:resource:categories=actions,shortName=ar
 // +kubebuilder:subresource:status
 
 // ActionsRunner is the Schema for the actionsrunners API
