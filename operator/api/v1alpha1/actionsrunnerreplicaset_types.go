@@ -32,6 +32,7 @@ type ActionsRunnerReplicaSetStatus struct{}
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:categories=actions,shortName=arrs
 // +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.labelSelector
 
 // ActionsRunnerReplicaSet is the Schema for the actionsrunnerjobs API
 type ActionsRunnerReplicaSet struct {
