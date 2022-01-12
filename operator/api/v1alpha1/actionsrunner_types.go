@@ -27,6 +27,13 @@ type ActionsRunnerRepository struct {
 	APIEndpoint string `json:"apiEndpoint,omitempty"`
 }
 
+type ActionsRunnerPolicyRule string
+
+type ActionsRunnerPolicy struct {
+	Must    []ActionsRunnerPolicyRule `json:"must"`
+	MustNot []ActionsRunnerPolicyRule `json:"mustNot"`
+}
+
 type ActionsRunnerCapability string
 
 const (
@@ -37,6 +44,7 @@ const (
 // ActionsRunnerSpec defines the desired state of ActionsRunner
 type ActionsRunnerSpec struct {
 	Repository   ActionsRunnerRepository   `json:"repository"`
+	Policy       ActionsRunnerPolicy       `json:"policy"`
 	Capabilities []ActionsRunnerCapability `json:"capabilities,omitempty"`
 	Annotations  map[string]string         `json:"annotations,omitempty"`
 	Labels       []string                  `json:"labels,omitempty"`
