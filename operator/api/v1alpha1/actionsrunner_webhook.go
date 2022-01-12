@@ -18,8 +18,10 @@ package v1alpha1
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 
+	"github.com/itchyny/gojq"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -56,12 +58,24 @@ func (r *ActionsRunner) ValidateUpdate(old runtime.Object) error {
 		return errors.New("could not read old object to validate update operation")
 	}
 
+	if !reflect.DeepEqual(r.Spec.Repository, oldRunner.Spec.Repository) {
+		return errors.New("ActionsRunner's repository field is immutable")
+	}
+
 	if !reflect.DeepEqual(r.Spec.Labels, oldRunner.Spec.Labels) {
 		return errors.New("ActionsRunner's labels field is immutable")
 	}
 
-	if !reflect.DeepEqual(r.Spec.Repository, oldRunner.Spec.Repository) {
-		return errors.New("ActionsRunner's repository field is immutable")
+	for _, policyRule := range r.Spec.Policy.Must {
+		if err := validatePolicyRule(policyRule); err != nil {
+			return err
+		}
+	}
+
+	for _, policyRule := range r.Spec.Policy.MustNot {
+		if err := validatePolicyRule(policyRule); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -69,5 +83,31 @@ func (r *ActionsRunner) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *ActionsRunner) ValidateDelete() error {
+	return nil
+}
+
+func validatePolicyRule(policyRule ActionsRunnerPolicyRule) error {
+	q, err := gojq.Parse(string(policyRule))
+	if err != nil {
+		return fmt.Errorf("unable to parse policy rule `%s`: %w", policyRule, err)
+	}
+
+	c, err := gojq.Compile(q)
+	if err != nil {
+		return fmt.Errorf("unable to compile policy rule `%s`: %w", policyRule, err)
+	}
+
+	var input map[string]interface{}
+	it := c.Run(input)
+
+	v, ok := it.Next()
+	if !ok {
+		return nil
+	}
+
+	if err, ok := v.(error); ok {
+		return fmt.Errorf("unable to run policy rule `%s`: %w", policyRule, err)
+	}
+
 	return nil
 }

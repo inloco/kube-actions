@@ -7,6 +7,7 @@ require (
 	github.com/go-logr/logr v0.4.0
 	github.com/google/go-github/v32 v32.1.0
 	github.com/google/uuid v1.3.0
+	github.com/itchyny/gojq v0.12.6
 	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b3
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.11.0
