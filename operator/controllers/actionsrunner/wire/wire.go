@@ -43,6 +43,8 @@ type Wire struct {
 
 	invalid   bool
 	listening bool
+
+	validator *PolicyValidator
 }
 
 func (w *Wire) initGH(ctx context.Context) error {
@@ -85,6 +87,10 @@ func (w *Wire) init(ctx context.Context) error {
 
 	if w.jobRequests == nil {
 		w.jobRequests = make(chan struct{}, 1)
+	}
+
+	if w.validator == nil {
+		w.validator = NewPolicyValidator()
 	}
 
 	return nil
@@ -232,10 +238,25 @@ func (w *Wire) Listen() {
 			metrics.IncGitHubActionsEventCounter(w.actionsRunner.GetNamespace(), w.GetRunnerName(), string(message.Type))
 
 			if message.Type == MessageTypePipelineAgentJobRequest {
-				logger.Info("PipelineAgentJobRequest, notifying reconciler, disabling listener")
-				w.jobRequests <- struct{}{}
-				w.operatorNotifier <- genericEvent
-				break
+				pajr, err := toPipelineAgentJobRequest(message)
+				if err != nil {
+					panic(err)
+				}
+
+				violatedRule, err := w.validator.Validate(ctx, &w.actionsRunner.Spec.Policy, pajr)
+				if err != nil {
+					panic(err)
+				}
+
+				if violatedRule == nil {
+					logger.Info("PipelineAgentJobRequest validated, notifying reconciler and disabling listener")
+					w.jobRequests <- struct{}{}
+					w.operatorNotifier <- genericEvent
+					break
+				}
+
+				logger.Info("PipelineAgentJobRequest aborted, job request violated rule: %s", violatedRule)
+				// TODO: fail job
 			}
 
 			// send ack unless it's a job request (ack will be sent by actual runner)
