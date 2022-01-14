@@ -17,7 +17,6 @@ limitations under the License.
 package wire
 
 import (
-	"encoding/json"
 	"errors"
 
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
@@ -61,42 +60,4 @@ func toMessage(taMessage taskagent.TaskAgentMessage) (*Message, error) {
 		body: *taMessage.Body,
 	}
 	return &message, nil
-}
-
-type PipelineAgentJobRequest struct {
-	// MessageType          interface{} `json:"messageType"`
-	// Plan                 interface{} `json:"plan"`
-	// Timeline             interface{} `json:"timeline"`
-	// JobId                interface{} `json:"jobId"`
-	// JobDisplayName       interface{} `json:"jobDisplayName"`
-	// JobName              interface{} `json:"jobName"`
-	// JobContainer         interface{} `json:"jobContainer"`
-	// JobServiceContainers interface{} `json:"jobServiceContainers"`
-	// JobOutputs           interface{} `json:"jobOutputs"`
-	// RequestId            interface{} `json:"requestId"`
-	// LockedUntil          interface{} `json:"lockedUntil"`
-	// Resources            interface{} `json:"resources"`
-
-	ContextData map[string]PipelineContextData `json:"contextData"`
-
-	// Workspace            interface{} `json:"workspace"`
-	// ActionsEnvironment   interface{} `json:"actionsEnvironment"`
-	// EnvironmentVariables interface{} `json:"environmentVariables"`
-	// Defaults             interface{} `json:"defaults"`
-	// FileTable            interface{} `json:"fileTable"`
-	// Mask                 interface{} `json:"mask"`
-	// Steps                interface{} `json:"steps"`
-	// Variables            interface{} `json:"variables"`
-	// JobSidecarContainers interface{} `json:"jobSidecarContainers"`
-}
-
-func toPipelineAgentJobRequest(message Message) (*PipelineAgentJobRequest, error) {
-	body := message.String()
-
-	var pajr PipelineAgentJobRequest
-	if err := json.Unmarshal([]byte(body), &pajr); err != nil {
-		return nil, err
-	}
-
-	return &pajr, nil
 }
