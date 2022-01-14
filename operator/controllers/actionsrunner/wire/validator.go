@@ -19,17 +19,19 @@ func NewPolicyValidator() *PolicyValidator {
 }
 
 func (pv *PolicyValidator) Validate(ctx context.Context, policy *inlocov1alpha1.ActionsRunnerPolicy, pajr *PipelineAgentJobRequest) (*inlocov1alpha1.ActionsRunnerPolicyRule, error) {
-	contextData := make(map[string]interface{}, len(pajr.ContextData))
-	for k, v := range pajr.ContextData {
+	contextData := *pajr.ContextData
+
+	cd := make(map[string]interface{}, len(contextData))
+	for k, v := range contextData {
 		flattened, err := v.Flatten()
 		if err != nil {
 			return nil, err
 		}
 
-		contextData[k] = flattened
+		cd[k] = flattened
 	}
 
-	must, err := pv.validateMust(ctx, policy.Must, contextData)
+	must, err := pv.validateMust(ctx, policy.Must, cd)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +39,7 @@ func (pv *PolicyValidator) Validate(ctx context.Context, policy *inlocov1alpha1.
 		return must, nil
 	}
 
-	mustNot, err := pv.validateMustNot(ctx, policy.MustNot, contextData)
+	mustNot, err := pv.validateMustNot(ctx, policy.MustNot, cd)
 	if err != nil {
 		return nil, err
 	}

@@ -249,8 +249,8 @@ github.com/imdario/mergo v0.3.5/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJ
 github.com/imdario/mergo v0.3.12 h1:b6R2BslTbIEToALKP7LxUvijTsNI9TAe80pLWN2g/HU=
 github.com/imdario/mergo v0.3.12/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20210107205147-d721430e92a7 h1:klymiqrGFcAIuyvVAiCZpMg2L2cdBN89/tvHSyPMKI8=
-github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20210107205147-d721430e92a7/go.mod h1:PoGiBqKSQK1vIfQ+yVaFcGjDySHvym6FM1cNYnwzbrY=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20220114021817-482b325b31a5 h1:DANkW1N9Yfw1krnZ26+9NU9r1fuo01dIZ80t9R5KTKM=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20220114021817-482b325b31a5/go.mod h1:PoGiBqKSQK1vIfQ+yVaFcGjDySHvym6FM1cNYnwzbrY=
 github.com/inloco/go-github/v32 v32.0.0-20200716220920-8f1b474407bc h1:muZkeXP0Cwi1LqKgkBnDzAvw+hj2BuhuKZeQ3gcVRY0=
 github.com/inloco/go-github/v32 v32.0.0-20200716220920-8f1b474407bc/go.mod h1:rIEpZD9CTDQwDK9GDrtMTycQNA4JU3qBsCizh3q2WCI=
 github.com/itchyny/gojq v0.12.6 h1:VjaFn59Em2wTxDNGcrRkDK9ZHMNa8IksOgL13sLL4d0=

@@ -18,7 +18,10 @@ package wire
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
@@ -256,7 +259,9 @@ func (w *Wire) Listen() {
 				}
 
 				logger.Info("PipelineAgentJobRequest aborted, job request violated rule: %s", violatedRule)
-				// TODO: fail job
+				if err := w.onPolicyViolation(ctx, pajr, violatedRule); err != nil {
+					panic(err)
+				}
 			}
 
 			// send ack unless it's a job request (ack will be sent by actual runner)
@@ -277,6 +282,43 @@ func (w *Wire) Listen() {
 
 		logger.Info("Stop listening")
 	}()
+}
+
+func (w *Wire) onPolicyViolation(ctx context.Context, pajr *PipelineAgentJobRequest, violatedRule *inlocov1alpha1.ActionsRunnerPolicyRule) error {
+	if violatedRule == nil {
+		return errors.New("violatedRule == nil")
+	}
+
+	if pajr == nil {
+		return errors.New("pajr == nil")
+	}
+
+	if pajr.JobId == nil {
+		return errors.New("pajr.JobId == nil")
+	}
+
+	if pajr.RequestId == nil {
+		return errors.New("pajr.RequestId == nil")
+	}
+
+	if pajr.Resources == nil {
+		return errors.New("pajr.Resources == nil")
+	}
+
+	if pajr.Resources.Endpoints == nil {
+		return errors.New("pajr.Resources.Endpoints == nil")
+	}
+
+	if err := w.adoFacade.InitAzureDevOpsTaskClient(pajr.Plan, *pajr.Resources.Endpoints); err != nil {
+		return err
+	}
+
+	return w.adoFacade.RaisePlanEvent(ctx, &task.JobEvent{
+		Name:      JobCompleted.StringReference(),
+		JobId:     pajr.JobId,
+		RequestId: pajr.RequestId,
+		Result:    &task.TaskResultValues.Failed,
+	})
 }
 
 func (w *Wire) Close() error {

@@ -30,6 +30,10 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
+
+	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
+
 	"github.com/google/uuid"
 	"github.com/inloco/kube-actions/operator/constants"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
@@ -53,6 +57,12 @@ var (
 	poolId = 1
 )
 
+type WellKnownServiceEndpointName string
+
+const (
+	WellKnownServiceEndpointNameSystemVssConnection WellKnownServiceEndpointName = "SystemVssConnection"
+)
+
 type AzureDevOps struct {
 	RSAPrivateKey *rsa.PrivateKey
 
@@ -64,6 +74,10 @@ type AzureDevOps struct {
 	BridgeConnection      *azuredevops.Connection
 	TaskAgentBridgeClient taskagent.Client
 	TaskAgentSession      *taskagent.TaskAgentSession
+
+	Plan          *task.TaskOrchestrationPlanReference
+	JobConnection *azuredevops.Connection
+	TaskClient    task.Client
 }
 
 func (ado *AzureDevOps) InitForCRUD(ctx context.Context, dotFiles *dot.Files, labels []string, token string, url string) error {
@@ -470,5 +484,110 @@ func (ado *AzureDevOps) DeleteMessage(ctx context.Context, messageId uint64) err
 		PoolId:    &poolId,
 		MessageId: &messageId,
 		SessionId: ado.TaskAgentSession.SessionId,
+	})
+}
+
+func (ado *AzureDevOps) initAzureDevOpsPlan(plan *task.TaskOrchestrationPlanReference) error {
+	if plan == nil {
+		return errors.New("plan == nil")
+	}
+
+	if plan.ScopeIdentifier == nil {
+		return errors.New("plan.ScopeIdentifier == nil")
+	}
+
+	if plan.PlanType == nil {
+		return errors.New("plan.PlanType == nil")
+	}
+
+	if plan.PlanId == nil {
+		return errors.New("plan.PlanId == nil")
+	}
+
+	ado.Plan = plan
+	return nil
+}
+
+func (ado *AzureDevOps) initAzureDevOpsJobConnection(serviceEndpoints []serviceendpoint.ServiceEndpoint) error {
+	var serviceEndpoint *serviceendpoint.ServiceEndpoint
+	for _, se := range serviceEndpoints {
+		if name := se.Name; name == nil || *name != string(WellKnownServiceEndpointNameSystemVssConnection) {
+			continue
+		}
+
+		serviceEndpoint = &se
+		break
+	}
+	if serviceEndpoint == nil {
+		return errors.New("serviceEndpoint == nil")
+	}
+
+	if serviceEndpoint.Url == nil {
+		return errors.New("url == nil")
+	}
+	url := *serviceEndpoint.Url
+
+	if serviceEndpoint.Authorization == nil {
+		return errors.New("authorization == nil")
+	}
+	authorization := *serviceEndpoint.Authorization
+
+	if authorization.Scheme == nil {
+		return errors.New("scheme == nil")
+	}
+	scheme := *authorization.Scheme
+
+	if scheme != "OAuth" {
+		return errors.New(`scheme != "OAuth"`)
+	}
+
+	if authorization.Parameters == nil {
+		return errors.New("parameters == nil")
+	}
+	parameters := *authorization.Parameters
+
+	accessToken, ok := parameters["AccessToken"]
+	if !ok {
+		return errors.New(`parameters["AccessToken"] == nil`)
+	}
+
+	ado.JobConnection = &azuredevops.Connection{
+		AuthorizationString: fmt.Sprintf("Bearer %s", accessToken),
+		BaseUrl:             url,
+	}
+	return nil
+}
+
+func (ado *AzureDevOps) InitAzureDevOpsTaskClient(plan *task.TaskOrchestrationPlanReference, endpoints []serviceendpoint.ServiceEndpoint) error {
+	if err := ado.initAzureDevOpsPlan(plan); err != nil {
+		return err
+	}
+
+	if err := ado.initAzureDevOpsJobConnection(endpoints); err != nil {
+		return err
+	}
+
+	ado.TaskClient = task.NewClient(context.TODO(), ado.JobConnection)
+	return nil
+}
+
+func (ado *AzureDevOps) RaisePlanEvent(ctx context.Context, eventData *task.JobEvent) error {
+	if ado.Plan == nil {
+		return errors.New(".Plan == nil")
+	}
+
+	if ado.TaskClient == nil {
+		return errors.New(".TaskClient == nil")
+	}
+
+	if eventData == nil {
+		return errors.New("eventData == nil")
+	}
+
+	return ado.TaskClient.RaisePlanEvent(ctx, task.RaisePlanEventArgs{
+		EventData:       eventData,
+		ScopeIdentifier: ado.Plan.ScopeIdentifier,
+		HubName:         ado.Plan.PlanType,
+		PlanId:          ado.Plan.PlanId,
 	})
 }
