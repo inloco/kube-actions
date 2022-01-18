@@ -29,10 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-
-	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
-
-	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/inloco/kube-actions/operator/constants"
@@ -40,7 +37,10 @@ import (
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/location"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
+	"golang.org/x/text/encoding/unicode"
 )
 
 var (
@@ -463,10 +463,18 @@ func (ado *AzureDevOps) GetMessage(ctx context.Context, lastMessageId *uint64) (
 	}
 
 	cipher.NewCBCDecrypter(block, *message.Iv).CryptBlocks(bytes, bytes)
-	message.Iv = nil
 
-	body := string(bytes)
+	body, err := unicode.UTF8BOM.NewDecoder().String(string(bytes))
+	if err != nil {
+		return nil, err
+	}
+	body = strings.TrimRightFunc(body, func(r rune) bool {
+		i := int(r)
+		return i > 0 && i <= block.BlockSize()
+	})
+
 	message.Body = &body
+	message.Iv = nil
 
 	return message, nil
 }
@@ -484,6 +492,29 @@ func (ado *AzureDevOps) DeleteMessage(ctx context.Context, messageId uint64) err
 		PoolId:    &poolId,
 		MessageId: &messageId,
 		SessionId: ado.TaskAgentSession.SessionId,
+	})
+}
+
+func (ado *AzureDevOps) UpdateAgentRequest(ctx context.Context, request *taskagent.TaskAgentJobRequest, orchestrationId *string) (*taskagent.TaskAgentJobRequest, error) {
+	// TODO
+	//if rc.runnerSettings == nil {
+	//	return errors.New(".runnerSettings == nil")
+	//}
+
+	if ado.TaskAgentBridgeClient == nil {
+		return nil, errors.New(".TaskAgentBridgeClient == nil")
+	}
+
+	if request == nil {
+		return nil, errors.New("request == nil")
+	}
+
+	return ado.TaskAgentBridgeClient.UpdateAgentRequest(ctx, taskagent.UpdateAgentRequestArgs{
+		Request:         request,
+		PoolId:          &poolId,
+		RequestId:       request.RequestId,
+		LockToken:       new(uuid.UUID),
+		OrchestrationId: orchestrationId,
 	})
 }
 

@@ -52,7 +52,7 @@ type PipelineAgentJobRequest struct {
 	JobContainer         *task.TemplateToken                  `json:"jobContainer,omitempty"`
 	JobServiceContainers *task.TemplateToken                  `json:"jobServiceContainers,omitempty"`
 	JobOutputs           *task.TemplateToken                  `json:"jobOutputs,omitempty"`
-	RequestId            *int64                               `json:"requestId,omitempty"`
+	RequestId            *uint64                              `json:"requestId,omitempty"`
 	LockedUntil          *azuredevops.Time                    `json:"lockedUntil,omitempty"`
 	Resources            *JobResources                        `json:"resources,omitempty"`
 	ContextData          *map[string]PipelineContextData      `json:"contextData,omitempty"`

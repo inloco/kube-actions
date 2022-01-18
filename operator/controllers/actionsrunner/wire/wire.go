@@ -21,12 +21,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
-
+	"github.com/form3tech-oss/jwt-go"
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/facades"
 	"github.com/inloco/kube-actions/operator/metrics"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
 	"k8s.io/utils/strings"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -237,7 +238,9 @@ func (w *Wire) Listen() {
 				panic(err)
 			}
 
-			logger.Info("Message received", "id", message.Id, "type", message.Type)
+			messageLogger := logger.WithValues("id", message.Id, "type", message.Type)
+
+			messageLogger.Info("Message received")
 			metrics.IncGitHubActionsEventCounter(w.actionsRunner.GetNamespace(), w.GetRunnerName(), string(message.Type))
 
 			if message.Type == MessageTypePipelineAgentJobRequest {
@@ -252,31 +255,31 @@ func (w *Wire) Listen() {
 				}
 
 				if violatedRule == nil {
-					logger.Info("PipelineAgentJobRequest validated, notifying reconciler and disabling listener")
+					messageLogger.Info("PipelineAgentJobRequest validated, notifying reconciler and disabling listener")
 					w.jobRequests <- struct{}{}
 					w.operatorNotifier <- genericEvent
 					break
 				}
 
-				logger.Info("PipelineAgentJobRequest aborted, job request violated rule: %s", violatedRule)
+				messageLogger.Info("PipelineAgentJobRequest aborted, job request violated rule", "violatedRule", violatedRule)
 				if err := w.onPolicyViolation(ctx, pajr, violatedRule); err != nil {
-					panic(err)
+					messageLogger.Error(err, "onPolicyViolation failed")
 				}
 			}
 
 			// send ack unless it's a job request (ack will be sent by actual runner)
-			logger.Info("Deleting message", "id", message.Id, "type", message.Type)
+			messageLogger.Info("Deleting message")
 			if err := w.adoFacade.DeleteMessage(ctx, uint64(message.Id)); err != nil {
 				panic(err)
 			}
-			logger.Info("Message deleted", "id", message.Id, "type", message.Type)
+			messageLogger.Info("Message deleted")
 
 			if message.Type == MessageTypeAgentRefresh {
-				logger.Info("AgentRefresh, deleting agent", "id", message.Id, "type", message.Type)
+				messageLogger.Info("AgentRefresh, deleting agent")
 				if err := w.adoFacade.DeleteAgent(ctx); err != nil {
 					panic(err)
 				}
-				logger.Info("Agent deleted", "id", message.Id, "type", message.Type)
+				messageLogger.Info("Agent deleted")
 			}
 		}
 
@@ -310,6 +313,28 @@ func (w *Wire) onPolicyViolation(ctx context.Context, pajr *PipelineAgentJobRequ
 	}
 
 	if err := w.adoFacade.InitAzureDevOpsTaskClient(pajr.Plan, *pajr.Resources.Endpoints); err != nil {
+		return err
+	}
+
+	var claims jwt.MapClaims
+	if _, _, err := new(jwt.Parser).ParseUnverified(w.adoFacade.JobConnection.AuthorizationString[len("Bearer "):], &claims); err != nil {
+		return err
+	}
+
+	orchid, ok := claims["orchid"]
+	if !ok {
+		return errors.New(`claims["orchid"] == nil`)
+	}
+
+	orchestrationId, ok := orchid.(string)
+	if !ok {
+		return errors.New(`orchid.(string) == nil`)
+	}
+
+	request := taskagent.TaskAgentJobRequest{
+		RequestId: pajr.RequestId,
+	}
+	if _, err := w.adoFacade.UpdateAgentRequest(ctx, &request, &orchestrationId); err != nil {
 		return err
 	}
 

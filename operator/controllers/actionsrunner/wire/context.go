@@ -2,12 +2,9 @@ package wire
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
-
-type Flattener interface {
-	Flatten() (interface{}, error)
-}
 
 type PipelineContextDataType int32
 
@@ -20,174 +17,112 @@ const (
 	PipelineContextDataTypeCaseSensitiveDictionary PipelineContextDataType = 5
 )
 
-type PipelineContextData struct {
-	Type PipelineContextDataType `json:"t"`
-	JSON json.RawMessage
-}
-
-func (pcd *PipelineContextData) Flatten() (interface{}, error) {
-	switch t := pcd.Type; t {
-	case PipelineContextDataTypeString:
-		scd, err := pcd.ToStringContextData()
-		if err != nil {
-			return nil, err
-		}
-
-		return scd.Flatten()
-
-	case PipelineContextDataTypeArray:
-		acd, err := pcd.ToArrayContextData()
-		if err != nil {
-			return nil, err
-		}
-
-		return acd.Flatten()
-
-	case PipelineContextDataTypeDictionary, PipelineContextDataTypeCaseSensitiveDictionary:
-		dcd, err := pcd.ToDictionaryContextData()
-		if err != nil {
-			return nil, err
-		}
-
-		return dcd.Flatten()
-
-	case PipelineContextDataTypeBoolean:
-		bcd, err := pcd.ToBooleanContextData()
-		if err != nil {
-			return nil, err
-		}
-
-		return bcd.Flatten()
-
-	case PipelineContextDataTypeNumber:
-		ncd, err := pcd.ToNumberContextData()
-		if err != nil {
-			return nil, err
-		}
-
-		return ncd.Flatten()
-
-	default:
-		return nil, fmt.Errorf("unknown pipeline context data type: %d", t)
-	}
-}
-
-func (pcd *PipelineContextData) ToStringContextData() (*StringContextData, error) {
-	var scd StringContextData
-	if err := json.Unmarshal(pcd.JSON, &scd); err != nil {
-		return nil, err
-	}
-
-	return &scd, nil
-}
-
-func (pcd *PipelineContextData) ToArrayContextData() (*ArrayContextData, error) {
-	var acd ArrayContextData
-	if err := json.Unmarshal(pcd.JSON, &acd); err != nil {
-		return nil, err
-	}
-
-	return &acd, nil
-}
-
-func (pcd *PipelineContextData) ToDictionaryContextData() (*DictionaryContextData, error) {
-	var dcd DictionaryContextData
-	if err := json.Unmarshal(pcd.JSON, &dcd); err != nil {
-		return nil, err
-	}
-
-	return &dcd, nil
-}
-
-func (pcd *PipelineContextData) ToBooleanContextData() (*BooleanContextData, error) {
-	var bcd BooleanContextData
-	if err := json.Unmarshal(pcd.JSON, &bcd); err != nil {
-		return nil, err
-	}
-
-	return &bcd, nil
-}
-
-func (pcd *PipelineContextData) ToNumberContextData() (*NumberContextData, error) {
-	var ncd NumberContextData
-	if err := json.Unmarshal(pcd.JSON, &ncd); err != nil {
-		return nil, err
-	}
-
-	return &ncd, nil
-}
-
-type StringContextData struct {
-	String bool `json:"s"`
-}
-
-var _ Flattener = (*StringContextData)(nil)
-
-func (scd *StringContextData) Flatten() (interface{}, error) {
-	return scd.String, nil
-}
-
-type ArrayContextData struct {
-	Array []PipelineContextData `json:"a"`
-}
-
-var _ Flattener = (*ArrayContextData)(nil)
-
-func (acd *ArrayContextData) Flatten() (interface{}, error) {
-	is := make([]interface{}, len(acd.Array))
-	for i, data := range acd.Array {
-		d, err := data.Flatten()
-		if err != nil {
-			return nil, err
-		}
-
-		is[i] = d
-	}
-
-	return is, nil
-}
-
 type DictionaryContextDataPair struct {
 	Key string              `json:"k"`
 	Val PipelineContextData `json:"v"`
 }
 
-type DictionaryContextData struct {
-	Dictionary []DictionaryContextDataPair `json:"d"`
-}
+var _ json.Unmarshaler = (*DictionaryContextDataPair)(nil)
 
-var _ Flattener = (*DictionaryContextData)(nil)
-
-func (dcd *DictionaryContextData) Flatten() (interface{}, error) {
-	msi := make(map[string]interface{}, len(dcd.Dictionary))
-	for _, pair := range dcd.Dictionary {
-		v, err := pair.Val.Flatten()
-		if err != nil {
-			return nil, err
-		}
-
-		msi[pair.Key] = v
+func (dcdp *DictionaryContextDataPair) UnmarshalJSON(data []byte) error {
+	var m map[string]interface{}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
 	}
 
-	return msi, nil
+	ki, ok := m["k"]
+	if !ok {
+		return errors.New(`m["k"] == nil`)
+	}
+
+	ks, ok := ki.(string)
+	if !ok {
+		return errors.New(`ki.(string) == nil`)
+	}
+
+	vi, ok := m["v"]
+	if !ok {
+		return errors.New(`m["v"] == nil`)
+	}
+
+	var pcd PipelineContextData
+	switch vi.(type) {
+	case string:
+		pcd.Type = PipelineContextDataTypeString
+		pcd.String = vi.(string)
+
+	case bool:
+		pcd.Type = PipelineContextDataTypeBoolean
+		pcd.Boolean = vi.(bool)
+
+	case float64:
+		pcd.Type = PipelineContextDataTypeNumber
+		pcd.Number = vi.(float64)
+
+	default:
+		i, err := json.Marshal(vi)
+		if err != nil {
+			return err
+		}
+
+		if err := json.Unmarshal(i, &pcd); err != nil {
+			return err
+		}
+	}
+
+	dcdp.Key = ks
+	dcdp.Val = pcd
+
+	return nil
 }
 
-type BooleanContextData struct {
-	Boolean bool `json:"b"`
+type PipelineContextData struct {
+	Type       PipelineContextDataType     `json:"t"`
+	String     string                      `json:"s"`
+	Array      []PipelineContextData       `json:"a"`
+	Dictionary []DictionaryContextDataPair `json:"d"`
+	Boolean    bool                        `json:"b"`
+	Number     float64                     `json:"n"`
 }
 
-var _ Flattener = (*BooleanContextData)(nil)
+func (pcd *PipelineContextData) Flatten() (interface{}, error) {
+	switch t := pcd.Type; t {
+	case PipelineContextDataTypeString:
+		return pcd.String, nil
 
-func (bcd *BooleanContextData) Flatten() (interface{}, error) {
-	return bcd.Boolean, nil
-}
+	case PipelineContextDataTypeArray:
+		is := make([]interface{}, len(pcd.Array))
+		for i, data := range pcd.Array {
+			d, err := data.Flatten()
+			if err != nil {
+				return nil, err
+			}
 
-type NumberContextData struct {
-	Number float64 `json:"n"`
-}
+			is[i] = d
+		}
 
-var _ Flattener = (*NumberContextData)(nil)
+		return is, nil
 
-func (ncd *NumberContextData) Flatten() (interface{}, error) {
-	return ncd.Number, nil
+	case PipelineContextDataTypeDictionary, PipelineContextDataTypeCaseSensitiveDictionary:
+		msi := make(map[string]interface{}, len(pcd.Dictionary))
+		for _, pair := range pcd.Dictionary {
+			v, err := pair.Val.Flatten()
+			if err != nil {
+				return nil, err
+			}
+
+			msi[pair.Key] = v
+		}
+
+		return msi, nil
+
+	case PipelineContextDataTypeBoolean:
+		return pcd.Boolean, nil
+
+	case PipelineContextDataTypeNumber:
+		return pcd.Number, nil
+
+	default:
+		return nil, fmt.Errorf("unknown pipeline context data type: %d", t)
+	}
 }

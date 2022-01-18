@@ -29,18 +29,13 @@ spec:
         args:
         - --max-concurrent-reconciles=1000
         - --metrics-bind-address=:9102
-        image: inloco/kube-actions:to-be-replaced
+        image: localhost:5000/inloco/kube-actions:0.0.1
         name: manager
         envFrom:
         - configMapRef:
             name: controller-manager
         - secretRef:
             name: controller-manager
-        env:
-        - name: KUBEACTIONS_RUNNER_IMAGE_NAME
-          value: 779099367007.dkr.ecr.us-east-1.amazonaws.com/incognia/kube-actions
-        - name: KUBEACTIONS_DIND_IMAGE_NAME
-          value: 779099367007.dkr.ecr.us-east-1.amazonaws.com/incognia/kube-actions
         securityContext:
           allowPrivilegeEscalation: false
         resources:
