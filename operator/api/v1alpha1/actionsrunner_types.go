@@ -30,8 +30,8 @@ type ActionsRunnerRepository struct {
 type ActionsRunnerPolicyRule string
 
 type ActionsRunnerPolicy struct {
-	Must    []ActionsRunnerPolicyRule `json:"must"`
-	MustNot []ActionsRunnerPolicyRule `json:"mustNot"`
+	Must    []ActionsRunnerPolicyRule `json:"must,omitempty"`
+	MustNot []ActionsRunnerPolicyRule `json:"mustNot,omitempty"`
 }
 
 type ActionsRunnerCapability string
@@ -44,7 +44,7 @@ const (
 // ActionsRunnerSpec defines the desired state of ActionsRunner
 type ActionsRunnerSpec struct {
 	Repository   ActionsRunnerRepository   `json:"repository"`
-	Policy       ActionsRunnerPolicy       `json:"policy"`
+	Policy       ActionsRunnerPolicy       `json:"policy,omitempty"`
 	Capabilities []ActionsRunnerCapability `json:"capabilities,omitempty"`
 	Annotations  map[string]string         `json:"annotations,omitempty"`
 	Labels       []string                  `json:"labels,omitempty"`
