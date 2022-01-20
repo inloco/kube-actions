@@ -21,16 +21,17 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/form3tech-oss/jwt-go"
-	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/facades"
-	"github.com/inloco/kube-actions/operator/metrics"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
 	"k8s.io/utils/strings"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/facades"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
+	"github.com/inloco/kube-actions/operator/metrics"
 )
 
 type Wire struct {
@@ -312,23 +313,14 @@ func (w *Wire) onPolicyViolation(ctx context.Context, pajr *PipelineAgentJobRequ
 		return errors.New("pajr.Resources.Endpoints == nil")
 	}
 
-	if err := w.adoFacade.InitAzureDevOpsTaskClient(pajr.Plan, *pajr.Resources.Endpoints); err != nil {
+	timelineRecords, err := w.timelineRecordsForViolatedRule(pajr, violatedRule)
+	if err != nil {
 		return err
 	}
 
-	var claims jwt.MapClaims
-	if _, _, err := new(jwt.Parser).ParseUnverified(w.adoFacade.JobConnection.AuthorizationString[len("Bearer "):], &claims); err != nil {
+	orchestrationId, err := util.GetOrchestrationId(*pajr.Resources.Endpoints)
+	if err != nil {
 		return err
-	}
-
-	orchid, ok := claims["orchid"]
-	if !ok {
-		return errors.New(`claims["orchid"] == nil`)
-	}
-
-	orchestrationId, ok := orchid.(string)
-	if !ok {
-		return errors.New(`orchid.(string) == nil`)
 	}
 
 	request := taskagent.TaskAgentJobRequest{
@@ -338,12 +330,82 @@ func (w *Wire) onPolicyViolation(ctx context.Context, pajr *PipelineAgentJobRequ
 		return err
 	}
 
+	if err := w.adoFacade.InitAzureDevOpsTaskClient(pajr.Plan, pajr.Timeline, *pajr.Resources.Endpoints); err != nil {
+		return err
+	}
+
+	if _, err := w.adoFacade.UpdateRecord(ctx, timelineRecords); err != nil {
+		return err
+	}
+
 	return w.adoFacade.RaisePlanEvent(ctx, &task.JobEvent{
 		Name:      JobCompleted.StringReference(),
 		JobId:     pajr.JobId,
 		RequestId: pajr.RequestId,
 		Result:    &task.TaskResultValues.Failed,
 	})
+}
+
+func (w *Wire) timelineRecordsForViolatedRule(pajr *PipelineAgentJobRequest, violatedRule *inlocov1alpha1.ActionsRunnerPolicyRule) ([]task.TimelineRecord, error) {
+	if pajr == nil {
+		return nil, errors.New("pajr == nil")
+	}
+
+	issues, err := w.issuesForViolatedRule(violatedRule)
+	if err != nil {
+		return nil, err
+	}
+
+	var errorCount int
+	var warningCount int
+	for _, issue := range issues {
+		switch t := issue.Type; t {
+		case &task.IssueTypeValues.Error:
+			errorCount++
+
+		case &task.IssueTypeValues.Warning:
+			warningCount++
+
+		default:
+			return nil, fmt.Errorf("unknown issue type: %v", t)
+		}
+	}
+
+	workerName := w.GetRunnerName()
+	timelineRecord := task.TimelineRecord{
+		Type:         JobTimelineRecordType.StringReference(),
+		Id:           pajr.JobId,
+		RefName:      pajr.JobName,
+		Name:         pajr.JobDisplayName,
+		State:        &task.TimelineRecordStateValues.Completed,
+		Result:       &task.TaskResultValues.Failed,
+		WorkerName:   &workerName,
+		Issues:       &issues,
+		ErrorCount:   &errorCount,
+		WarningCount: &warningCount,
+	}
+
+	timelineRecords := []task.TimelineRecord{
+		timelineRecord,
+	}
+	return timelineRecords, nil
+}
+
+func (w *Wire) issuesForViolatedRule(violatedRule *inlocov1alpha1.ActionsRunnerPolicyRule) ([]task.Issue, error) {
+	if violatedRule == nil {
+		return nil, errors.New("violatedRule == nil")
+	}
+
+	message := fmt.Sprintf("This job was not allowed to run because it violated a runner policy:\n%s", *violatedRule)
+	issue := &task.Issue{
+		Type:    &task.IssueTypeValues.Error,
+		Message: &message,
+	}
+
+	issues := []task.Issue{
+		*issue,
+	}
+	return issues, nil
 }
 
 func (w *Wire) Close() error {

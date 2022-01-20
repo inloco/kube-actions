@@ -3,7 +3,6 @@ module github.com/inloco/kube-actions/operator
 go 1.16
 
 require (
-	github.com/form3tech-oss/jwt-go v3.2.2+incompatible
 	github.com/go-jose/go-jose/v3 v3.0.0
 	github.com/go-logr/logr v0.4.0
 	github.com/google/go-github/v32 v32.1.0
