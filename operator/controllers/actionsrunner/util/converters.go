@@ -340,19 +340,19 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 							return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
 						}),
 						corev1.EnvVar{
-							Name:  "ACTIONS_RUNNER_NAME",
+							Name:  "KUBEACTIONS_ACTIONSRUNNER_NAME",
 							Value: actionsRunner.GetName(),
 						},
 						corev1.EnvVar{
-							Name:  "ACTIONS_RUNNER_REPOSITORY_OWNER",
+							Name:  "KUBEACTIONS_ACTIONSRUNNER_REPOSITORY_OWNER",
 							Value: actionsRunner.Spec.Repository.Owner,
 						},
 						corev1.EnvVar{
-							Name:  "ACTIONS_RUNNER_REPOSITORY_NAME",
+							Name:  "KUBEACTIONS_ACTIONSRUNNER_REPOSITORY_NAME",
 							Value: actionsRunner.Spec.Repository.Name,
 						},
 						corev1.EnvVar{
-							Name:  "ACTIONS_RUNNER_JOB_NAME",
+							Name:  "KUBEACTIONS_ACTIONSRUNNERJOB_NAME",
 							Value: actionsRunnerJob.GetName(),
 						},
 					),
