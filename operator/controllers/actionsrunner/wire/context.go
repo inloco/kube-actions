@@ -85,7 +85,7 @@ type PipelineContextData struct {
 	Number     float64                     `json:"n"`
 }
 
-func (pcd *PipelineContextData) Flatten() (interface{}, error) {
+func (pcd *PipelineContextData) Flattened() (interface{}, error) {
 	switch t := pcd.Type; t {
 	case PipelineContextDataTypeString:
 		return pcd.String, nil
@@ -93,7 +93,7 @@ func (pcd *PipelineContextData) Flatten() (interface{}, error) {
 	case PipelineContextDataTypeArray:
 		is := make([]interface{}, len(pcd.Array))
 		for i, data := range pcd.Array {
-			d, err := data.Flatten()
+			d, err := data.Flattened()
 			if err != nil {
 				return nil, err
 			}
@@ -106,7 +106,7 @@ func (pcd *PipelineContextData) Flatten() (interface{}, error) {
 	case PipelineContextDataTypeDictionary, PipelineContextDataTypeCaseSensitiveDictionary:
 		msi := make(map[string]interface{}, len(pcd.Dictionary))
 		for _, pair := range pcd.Dictionary {
-			v, err := pair.Val.Flatten()
+			v, err := pair.Val.Flattened()
 			if err != nil {
 				return nil, err
 			}

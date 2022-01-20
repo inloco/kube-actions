@@ -23,7 +23,7 @@ func (pv *PolicyValidator) Validate(ctx context.Context, policy *inlocov1alpha1.
 
 	cd := make(map[string]interface{}, len(contextData))
 	for k, v := range contextData {
-		flattened, err := v.Flatten()
+		flattened, err := v.Flattened()
 		if err != nil {
 			return nil, err
 		}
