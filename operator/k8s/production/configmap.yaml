@@ -7,3 +7,5 @@ data:
   KUBEACTIONS_GITHUB_INSTL_ID: "18974040"
   KUBEACTIONS_GITHUB_OWNERS: inloco
   KUBEACTIONS_GITHUB_VISIBILITIES: private
+  KUBEACTIONS_RUNNER_IMAGE_NAME: 779099367007.dkr.ecr.us-east-1.amazonaws.com/incognia/kube-actions
+  KUBEACTIONS_DIND_IMAGE_NAME: 779099367007.dkr.ecr.us-east-1.amazonaws.com/incognia/kube-actions
