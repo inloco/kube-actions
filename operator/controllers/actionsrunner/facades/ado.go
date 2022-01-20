@@ -32,15 +32,17 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/inloco/kube-actions/operator/constants"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/build"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/location"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
 	"golang.org/x/text/encoding/unicode"
+
+	"github.com/inloco/kube-actions/operator/constants"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 )
 
 var (
@@ -57,12 +59,6 @@ var (
 	poolId = 1
 )
 
-type WellKnownServiceEndpointName string
-
-const (
-	WellKnownServiceEndpointNameSystemVssConnection WellKnownServiceEndpointName = "SystemVssConnection"
-)
-
 type AzureDevOps struct {
 	RSAPrivateKey *rsa.PrivateKey
 
@@ -76,6 +72,7 @@ type AzureDevOps struct {
 	TaskAgentSession      *taskagent.TaskAgentSession
 
 	Plan          *task.TaskOrchestrationPlanReference
+	Timeline      *build.TimelineReference
 	JobConnection *azuredevops.Connection
 	TaskClient    task.Client
 }
@@ -539,47 +536,33 @@ func (ado *AzureDevOps) initAzureDevOpsPlan(plan *task.TaskOrchestrationPlanRefe
 	return nil
 }
 
+func (ado *AzureDevOps) initAzureDevOpsTimeline(timeline *build.TimelineReference) error {
+	if timeline == nil {
+		return errors.New("timeline == nil")
+	}
+
+	if timeline.Id == nil {
+		return errors.New("timeline.Id == nil")
+	}
+
+	ado.Timeline = timeline
+	return nil
+}
+
 func (ado *AzureDevOps) initAzureDevOpsJobConnection(serviceEndpoints []serviceendpoint.ServiceEndpoint) error {
-	var serviceEndpoint *serviceendpoint.ServiceEndpoint
-	for _, se := range serviceEndpoints {
-		if name := se.Name; name == nil || *name != string(WellKnownServiceEndpointNameSystemVssConnection) {
-			continue
-		}
-
-		serviceEndpoint = &se
-		break
-	}
-	if serviceEndpoint == nil {
-		return errors.New("serviceEndpoint == nil")
+	serviceEndpoint, err := util.GetSystemVssConnectionEndpoint(serviceEndpoints)
+	if err != nil {
+		return err
 	}
 
-	if serviceEndpoint.Url == nil {
-		return errors.New("url == nil")
-	}
-	url := *serviceEndpoint.Url
-
-	if serviceEndpoint.Authorization == nil {
-		return errors.New("authorization == nil")
-	}
-	authorization := *serviceEndpoint.Authorization
-
-	if authorization.Scheme == nil {
-		return errors.New("scheme == nil")
-	}
-	scheme := *authorization.Scheme
-
-	if scheme != "OAuth" {
-		return errors.New(`scheme != "OAuth"`)
+	accessToken, err := util.GetServiceEndpointAccessToken(serviceEndpoint)
+	if err != nil {
+		return err
 	}
 
-	if authorization.Parameters == nil {
-		return errors.New("parameters == nil")
-	}
-	parameters := *authorization.Parameters
-
-	accessToken, ok := parameters["AccessToken"]
-	if !ok {
-		return errors.New(`parameters["AccessToken"] == nil`)
+	url, err := util.GetServiceEndpointURL(serviceEndpoint)
+	if err != nil {
+		return err
 	}
 
 	ado.JobConnection = &azuredevops.Connection{
@@ -589,8 +572,12 @@ func (ado *AzureDevOps) initAzureDevOpsJobConnection(serviceEndpoints []servicee
 	return nil
 }
 
-func (ado *AzureDevOps) InitAzureDevOpsTaskClient(plan *task.TaskOrchestrationPlanReference, endpoints []serviceendpoint.ServiceEndpoint) error {
+func (ado *AzureDevOps) InitAzureDevOpsTaskClient(plan *task.TaskOrchestrationPlanReference, timeline *build.TimelineReference, endpoints []serviceendpoint.ServiceEndpoint) error {
 	if err := ado.initAzureDevOpsPlan(plan); err != nil {
+		return err
+	}
+
+	if err := ado.initAzureDevOpsTimeline(timeline); err != nil {
 		return err
 	}
 
@@ -600,6 +587,47 @@ func (ado *AzureDevOps) InitAzureDevOpsTaskClient(plan *task.TaskOrchestrationPl
 
 	ado.TaskClient = task.NewClient(context.TODO(), ado.JobConnection)
 	return nil
+}
+
+func (ado *AzureDevOps) UpdateRecord(ctx context.Context, timelineRecords []task.TimelineRecord) ([]task.TimelineRecord, error) {
+	if ado.Plan == nil {
+		return nil, errors.New(".Plan == nil")
+	}
+
+	if ado.Timeline == nil {
+		return nil, errors.New(".Timeline == nil")
+	}
+
+	if ado.TaskClient == nil {
+		return nil, errors.New(".TaskClient == nil")
+	}
+
+	count := len(timelineRecords)
+
+	value := make([]interface{}, count)
+	for i := range timelineRecords {
+		value[i] = timelineRecords[i]
+	}
+
+	records := azuredevops.VssJsonCollectionWrapper{
+		Count: &count,
+		Value: &value,
+	}
+
+	res, err := ado.TaskClient.UpdateRecords(ctx, task.UpdateRecordsArgs{
+		Records:         &records,
+		ScopeIdentifier: ado.Plan.ScopeIdentifier,
+		HubName:         ado.Plan.PlanType,
+		PlanId:          ado.Plan.PlanId,
+		TimelineId:      ado.Timeline.Id,
+	})
+
+	var ret []task.TimelineRecord
+	if res != nil {
+		ret = *res
+	}
+
+	return ret, err
 }
 
 func (ado *AzureDevOps) RaisePlanEvent(ctx context.Context, eventData *task.JobEvent) error {
