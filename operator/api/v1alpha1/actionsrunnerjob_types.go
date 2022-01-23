@@ -17,24 +17,16 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ActionsRunnerJobSpec defines the desired state of ActionsRunnerJob
 type ActionsRunnerJobSpec struct{}
 
-type ActionsRunnerJobState string
-
-const (
-	ActionsRunnerJobStatePending   ActionsRunnerJobState = "Pending"
-	ActionsRunnerJobStateRunning   ActionsRunnerJobState = "Running"
-	ActionsRunnerJobStateCompleted ActionsRunnerJobState = "Completed"
-)
-
-const ActionsRunnerJobFinalizer = "actionsrunnerjobs.inloco.com.br/finalizer"
-
 // ActionsRunnerJobStatus defines the observed state of ActionsRunnerJob
 type ActionsRunnerJobStatus struct {
+	Phase corev1.PodPhase `json:"phase,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -47,7 +39,6 @@ type ActionsRunnerJob struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   ActionsRunnerJobSpec   `json:"spec,omitempty"`
-	State  ActionsRunnerJobState  `json:"state,omitempty"`
 	Status ActionsRunnerJobStatus `json:"status,omitempty"`
 }
 

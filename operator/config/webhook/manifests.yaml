@@ -26,3 +26,23 @@ webhooks:
     resources:
     - actionsrunners
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-inloco-com-br-v1alpha1-actionsrunnerreplicaset
+  failurePolicy: Fail
+  name: vactionsrunnerreplicaset.kb.io
+  rules:
+  - apiGroups:
+    - inloco.com.br
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - actionsrunnerreplicasets
+  sideEffects: None
