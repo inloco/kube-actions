@@ -2577,14 +2577,9 @@ spec:
             required:
             - repository
             type: object
-          state:
-            description: 'TODO: remove internal state from resource definition'
-            type: string
           status:
             description: ActionsRunnerStatus defines the observed state of ActionsRunner
             type: object
-        required:
-        - state
         type: object
     served: true
     storage: true

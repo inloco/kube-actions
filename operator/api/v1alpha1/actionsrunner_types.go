@@ -65,14 +65,6 @@ type ActionsRunnerSpec struct {
 type ActionsRunnerStatus struct {
 }
 
-type ActionsRunnerState string
-
-const (
-	ActionsRunnerStatePending ActionsRunnerState = "Pending"
-	ActionsRunnerStateIdle    ActionsRunnerState = "Idle"
-	ActionsRunnerStateActive  ActionsRunnerState = "Active"
-)
-
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:categories=actions,shortName=ar
 // +kubebuilder:subresource:status
@@ -84,9 +76,6 @@ type ActionsRunner struct {
 
 	Spec   ActionsRunnerSpec   `json:"spec,omitempty"`
 	Status ActionsRunnerStatus `json:"status,omitempty"`
-
-	// TODO: remove internal state from resource definition
-	State ActionsRunnerState `json:"state"`
 }
 
 // +kubebuilder:object:root=true

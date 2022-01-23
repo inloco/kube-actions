@@ -40,10 +40,13 @@ spec:
           spec:
             description: ActionsRunnerJobSpec defines the desired state of ActionsRunnerJob
             type: object
-          state:
-            type: string
           status:
             description: ActionsRunnerJobStatus defines the observed state of ActionsRunnerJob
+            properties:
+              phase:
+                description: PodPhase is a label for the condition of a pod at the
+                  current time.
+                type: string
             type: object
         type: object
     served: true
