@@ -123,16 +123,18 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var persistentVolumeClaim corev1.PersistentVolumeClaim
 	switch err := r.Get(ctx, req.NamespacedName, &persistentVolumeClaim); {
 	case apierrors.IsNotFound(err):
-		logger.Info("PersistentVolumeClaim needs to be created")
-
 		desiredPersistentVolumeClaim, err := util.ToPersistentVolumeClaim(&actionsRunner, &actionsRunnerJob, r.Scheme)
 		if err != nil {
 			logger.Info("Failed to build desired PersistentVolumeClaim")
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, desiredPersistentVolumeClaim, createOpts...); err != nil {
-			logger.Error(err, "Failed to create PersistentVolumeClaim")
-			return ctrl.Result{}, err
+		if desiredPersistentVolumeClaim != nil {
+			logger.Info("PersistentVolumeClaim needs to be created")
+
+			if err := r.Create(ctx, desiredPersistentVolumeClaim, createOpts...); err != nil {
+				logger.Error(err, "Failed to create PersistentVolumeClaim")
+				return ctrl.Result{}, err
+			}
 		}
 
 	case err != nil:

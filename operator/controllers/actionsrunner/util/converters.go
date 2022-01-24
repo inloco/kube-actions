@@ -262,6 +262,10 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 		return nil, errors.New("scheme == nil")
 	}
 
+	if !hasRequestedStorage(actionsRunner) {
+		return nil, nil
+	}
+
 	persistentVolumeClaim := corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),
@@ -420,13 +424,15 @@ func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
 		},
 	}
 
-	volumeByName["persistent-volume-claim"] = &corev1.Volume{
-		Name: "persistent-volume-claim",
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: actionsRunner.GetName(),
+	if hasRequestedStorage(actionsRunner) {
+		volumeByName["persistent-volume-claim"] = &corev1.Volume{
+			Name: "persistent-volume-claim",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: actionsRunner.GetName(),
+				},
 			},
-		},
+		}
 	}
 
 	volumes := make([]corev1.Volume, 0, len(volumeByName))
@@ -459,20 +465,23 @@ func withVolumeMounts(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volu
 		Name:      "secret",
 		SubPath:   ".credentials_rsaparams",
 	}
-	volumeMountByPath["/opt/actions-runner/_work"] = &corev1.VolumeMount{
-		MountPath: "/opt/actions-runner/_work",
-		Name:      "persistent-volume-claim",
-		SubPath:   "runner",
-	}
-	volumeMountByPath["/root"] = &corev1.VolumeMount{
-		MountPath: "/root",
-		Name:      "persistent-volume-claim",
-		SubPath:   "root",
-	}
-	volumeMountByPath["/home/user"] = &corev1.VolumeMount{
-		MountPath: "/home/user",
-		Name:      "persistent-volume-claim",
-		SubPath:   "user",
+
+	if hasRequestedStorage(actionsRunner) {
+		volumeMountByPath["/opt/actions-runner/_work"] = &corev1.VolumeMount{
+			MountPath: "/opt/actions-runner/_work",
+			Name:      "persistent-volume-claim",
+			SubPath:   "runner",
+		}
+		volumeMountByPath["/root"] = &corev1.VolumeMount{
+			MountPath: "/root",
+			Name:      "persistent-volume-claim",
+			SubPath:   "root",
+		}
+		volumeMountByPath["/home/user"] = &corev1.VolumeMount{
+			MountPath: "/home/user",
+			Name:      "persistent-volume-claim",
+			SubPath:   "user",
+		}
 	}
 
 	volumeMounts := make([]corev1.VolumeMount, 0, len(volumeMountByPath))
@@ -554,16 +563,10 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 		return errors.New("missing resources for dind container")
 	}
 
-	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
-		Name:  dindContainerName,
-		Image: fmt.Sprintf("%s:%s%s", dindImageName, dindImageVersion, dindImageVariant),
-		Env: []corev1.EnvVar{
-			corev1.EnvVar{
-				Name:  "DOCKER_TLS_CERTDIR",
-				Value: "",
-			},
-		},
-		VolumeMounts: []corev1.VolumeMount{
+	var volumeMounts []corev1.VolumeMount
+	if hasRequestedStorage(actionsRunner) {
+		volumeMounts = append(
+			volumeMounts,
 			corev1.VolumeMount{
 				Name:      "persistent-volume-claim",
 				MountPath: "/home/rootless",
@@ -579,7 +582,19 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 				MountPath: "/opt/actions-runner/_work",
 				SubPath:   "runner",
 			},
+		)
+	}
+
+	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
+		Name:  dindContainerName,
+		Image: fmt.Sprintf("%s:%s%s", dindImageName, dindImageVersion, dindImageVariant),
+		Env: []corev1.EnvVar{
+			corev1.EnvVar{
+				Name:  "DOCKER_TLS_CERTDIR",
+				Value: "",
+			},
 		},
+		VolumeMounts: volumeMounts,
 		LivenessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				Exec: &corev1.ExecAction{
@@ -605,4 +620,27 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 	})
 
 	return nil
+}
+
+func hasRequestedStorage(actionsRunner *inlocov1alpha1.ActionsRunner) bool {
+	if actionsRunner == nil {
+		return false
+	}
+
+	res, ok := actionsRunner.Spec.Resources[runnerResourcesKey]
+	if !ok {
+		return false
+	}
+
+	req := res.Requests
+	if req == nil {
+		return false
+	}
+
+	s := req.Storage()
+	if s == nil {
+		return false
+	}
+
+	return !s.IsZero()
 }
