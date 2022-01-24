@@ -35,13 +35,13 @@ import (
 )
 
 var (
-	runnerImageName    = EnvVar("KUBEACTIONS_RUNNER_IMAGE_NAME", "inloco/kube-actions")
-	runnerImageVersion = EnvVar("KUBEACTIONS_RUNNER_IMAGE_VERSION", constants.Ver())
-	runnerImageVariant = EnvVar("KUBEACTIONS_RUNNER_IMAGE_VARIANT", "-runner")
+	runnerImageName    = getEnv("KUBEACTIONS_RUNNER_IMAGE_NAME", "inloco/kube-actions")
+	runnerImageVersion = getEnv("KUBEACTIONS_RUNNER_IMAGE_VERSION", constants.Ver())
+	runnerImageVariant = getEnv("KUBEACTIONS_RUNNER_IMAGE_VARIANT", "-runner")
 
-	dindImageName    = EnvVar("KUBEACTIONS_DIND_IMAGE_NAME", "inloco/kube-actions")
-	dindImageVersion = EnvVar("KUBEACTIONS_DIND_IMAGE_VERSION", constants.Ver())
-	dindImageVariant = EnvVar("KUBEACTIONS_DIND_IMAGE_VARIANT", "-dind")
+	dindImageName    = getEnv("KUBEACTIONS_DIND_IMAGE_NAME", "inloco/kube-actions")
+	dindImageVersion = getEnv("KUBEACTIONS_DIND_IMAGE_VERSION", constants.Ver())
+	dindImageVariant = getEnv("KUBEACTIONS_DIND_IMAGE_VARIANT", "-dind")
 
 	runnerContainerName = "runner"
 	runnerResourcesKey  = "runner"
@@ -239,7 +239,7 @@ func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *run
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: actionsRunner.GetName() + "-",
 			Namespace:    actionsRunner.GetNamespace(),
-			Labels:       map[string]string{
+			Labels: map[string]string{
 				LabelRunner: actionsRunner.GetName(),
 			},
 		},
@@ -281,7 +281,10 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
-			Resources: FilterResources(actionsRunner.Spec.Resources[runnerResourcesKey], corev1.ResourceStorage),
+			Resources: filteredResourceRequirements(
+				actionsRunner.Spec.Resources[runnerResourcesKey],
+				corev1.ResourceStorage,
+			),
 		},
 	}
 
@@ -317,14 +320,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        actionsRunnerJob.GetName(),
 			Namespace:   actionsRunner.GetNamespace(),
-			Annotations: ConcatAnnotations(
-				map[string]string {
-					"prometheus.io/path": "/metrics",
-					"prometheus.io/port": "9102",
-					"prometheus.io/scrape": "true",
-				},
-				actionsRunner.Spec.Annotations,
-			),
+			Annotations: actionsRunner.Spec.Annotations,
 			Labels: map[string]string{
 				LabelRunner: actionsRunner.GetName(),
 			},
@@ -336,31 +332,36 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 				{
 					Name:  runnerContainerName,
 					Image: fmt.Sprintf("%s:%s%s", runnerImageName, runnerImageVersion, runnerImageVariant),
-					EnvFrom: FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
+					EnvFrom: filteredEnvFromSources(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
 						return envFromSource.SecretRef == nil
 					}),
-					Env: ConcatEnvVars(
-						[]corev1.EnvVar{
-							{
-								Name: "RUNNER_REPOSITORY",
-								Value: actionsRunner.Spec.Repository.Name,
-							},
-							{
-								Name: "RUNNER_JOB",
-								Value: actionsRunnerJob.GetName(),
-							},
-						},
-						FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
+					Env: append(
+						filteredEnvVars(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
 							return envVar.ValueFrom == nil || envVar.ValueFrom.SecretKeyRef == nil
 						}),
-					),
-					Ports: []corev1.ContainerPort{
-						{
-							Name: "prometheus",
-							ContainerPort: 9102,
+						corev1.EnvVar{
+							Name:  "KUBEACTIONS_ACTIONSRUNNER_NAME",
+							Value: actionsRunner.GetName(),
 						},
-					},
-					Resources:    FilterResources(actionsRunner.Spec.Resources[runnerResourcesKey], corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
+						corev1.EnvVar{
+							Name:  "KUBEACTIONS_ACTIONSRUNNER_REPOSITORY_OWNER",
+							Value: actionsRunner.Spec.Repository.Owner,
+						},
+						corev1.EnvVar{
+							Name:  "KUBEACTIONS_ACTIONSRUNNER_REPOSITORY_NAME",
+							Value: actionsRunner.Spec.Repository.Name,
+						},
+						corev1.EnvVar{
+							Name:  "KUBEACTIONS_ACTIONSRUNNERJOB_NAME",
+							Value: actionsRunnerJob.GetName(),
+						},
+					),
+					Resources: filteredResourceRequirements(
+						actionsRunner.Spec.Resources[runnerResourcesKey],
+						corev1.ResourceCPU,
+						corev1.ResourceMemory,
+						corev1.ResourceEphemeralStorage,
+					),
 					VolumeMounts: withVolumeMounts(actionsRunner),
 				},
 			},
@@ -534,12 +535,12 @@ func withRuntimeAffinity(affinity *corev1.Affinity) *corev1.Affinity {
 func addSecretCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsRunner) {
 	runnerContainer := &pod.Spec.Containers[0]
 
-	envFrom := FilterEnvFrom(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
+	envFrom := filteredEnvFromSources(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
 		return envFromSource.SecretRef != nil
 	})
 	runnerContainer.EnvFrom = append(runnerContainer.EnvFrom, envFrom...)
 
-	env := FilterEnv(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
+	env := filteredEnvVars(actionsRunner.Spec.Env, func(envVar corev1.EnvVar) bool {
 		return envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil
 	})
 	runnerContainer.Env = append(runnerContainer.Env, env...)
@@ -563,23 +564,23 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 		Name:  dindContainerName,
 		Image: fmt.Sprintf("%s:%s%s", dindImageName, dindImageVersion, dindImageVariant),
 		Env: []corev1.EnvVar{
-			{
+			corev1.EnvVar{
 				Name:  "DOCKER_TLS_CERTDIR",
 				Value: "",
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
-			{
+			corev1.VolumeMount{
 				Name:      "persistent-volume-claim",
 				MountPath: "/home/rootless",
 				SubPath:   "dind",
 			},
-			{
+			corev1.VolumeMount{
 				Name:      "persistent-volume-claim",
 				MountPath: "/home/rootless/.local/share/docker",
 				SubPath:   "dind/.local/share/docker",
 			},
-			{
+			corev1.VolumeMount{
 				Name:      "persistent-volume-claim",
 				MountPath: "/opt/actions-runner/_work",
 				SubPath:   "runner",
@@ -588,12 +589,22 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 		LivenessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				Exec: &corev1.ExecAction{
-					Command: []string{"nc", "-z", "127.0.0.1", "2375"},
+					Command: []string{
+						"nc",
+						"-z",
+						"127.0.0.1",
+						"2375",
+					},
 				},
 			},
 			InitialDelaySeconds: 3,
 		},
-		Resources: FilterResources(actionsRunner.Spec.Resources[dindResourcesKey], corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage),
+		Resources: filteredResourceRequirements(
+			actionsRunner.Spec.Resources[dindResourcesKey],
+			corev1.ResourceCPU,
+			corev1.ResourceMemory,
+			corev1.ResourceEphemeralStorage,
+		),
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: pointer.BoolPtr(true),
 		},

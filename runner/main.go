@@ -48,8 +48,11 @@ var (
 	gitHubActionsRunnerPath = "/opt/actions-runner/run.sh"
 	gitHubActionsRunnerArgs = []string{"--once"}
 
-	runnerRepository = os.Getenv("RUNNER_REPOSITORY")
-	runnerJob        = os.Getenv("RUNNER_JOB")
+	arRepositoryOwner = os.Getenv("KUBEACTIONS_ACTIONSRUNNER_REPOSITORY_OWNER")
+	arRepositoryName  = os.Getenv("KUBEACTIONS_ACTIONSRUNNER_REPOSITORY_NAME")
+	arRepository      = arRepositoryOwner + "/" + arRepositoryName
+
+	arjName = os.Getenv("KUBEACTIONS_ACTIONSRUNNERJOB_NAME")
 
 	_, hasDockerCapability = os.LookupEnv(dockerHostEnv)
 
@@ -122,15 +125,15 @@ func main() {
 		}
 	}()
 
-	runnerRunningGauge.WithLabelValues(runnerRepository, runnerJob).Set(1)
-	runnerStartedTimestampGauge.WithLabelValues(runnerRepository, runnerJob).SetToCurrentTime()
+	runnerRunningGauge.WithLabelValues(arRepository, arjName).Set(1)
+	runnerStartedTimestampGauge.WithLabelValues(arRepository, arjName).SetToCurrentTime()
 	if err := pushMetrics(); err != nil {
 		panic(err)
 	}
 
 	defer func() {
-		runnerRunningGauge.WithLabelValues(runnerRepository, runnerJob).Set(0)
-		runnerFinishedTimestampGauge.WithLabelValues(runnerRepository, runnerJob).SetToCurrentTime()
+		runnerRunningGauge.WithLabelValues(arRepository, arjName).Set(0)
+		runnerFinishedTimestampGauge.WithLabelValues(arRepository, arjName).SetToCurrentTime()
 		if err := pushMetrics(); err != nil {
 			logger.Println(err)
 		}

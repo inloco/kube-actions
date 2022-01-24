@@ -29,14 +29,20 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/microsoft/azure-devops-go-api/azuredevops"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/build"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/location"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/serviceendpoint"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
+	"golang.org/x/text/encoding/unicode"
+
 	"github.com/inloco/kube-actions/operator/constants"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
-	"github.com/microsoft/azure-devops-go-api/azuredevops"
-	"github.com/microsoft/azure-devops-go-api/azuredevops/location"
-	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
 )
 
 var (
@@ -64,6 +70,11 @@ type AzureDevOps struct {
 	BridgeConnection      *azuredevops.Connection
 	TaskAgentBridgeClient taskagent.Client
 	TaskAgentSession      *taskagent.TaskAgentSession
+
+	Plan          *task.TaskOrchestrationPlanReference
+	Timeline      *build.TimelineReference
+	JobConnection *azuredevops.Connection
+	TaskClient    task.Client
 }
 
 func (ado *AzureDevOps) InitForCRUD(ctx context.Context, dotFiles *dot.Files, labels []string, token string, url string) error {
@@ -449,10 +460,18 @@ func (ado *AzureDevOps) GetMessage(ctx context.Context, lastMessageId *uint64) (
 	}
 
 	cipher.NewCBCDecrypter(block, *message.Iv).CryptBlocks(bytes, bytes)
-	message.Iv = nil
 
-	body := string(bytes)
+	body, err := unicode.UTF8BOM.NewDecoder().String(string(bytes))
+	if err != nil {
+		return nil, err
+	}
+	body = strings.TrimRightFunc(body, func(r rune) bool {
+		i := int(r)
+		return i > 0 && i <= block.BlockSize()
+	})
+
 	message.Body = &body
+	message.Iv = nil
 
 	return message, nil
 }
@@ -470,5 +489,164 @@ func (ado *AzureDevOps) DeleteMessage(ctx context.Context, messageId uint64) err
 		PoolId:    &poolId,
 		MessageId: &messageId,
 		SessionId: ado.TaskAgentSession.SessionId,
+	})
+}
+
+func (ado *AzureDevOps) UpdateAgentRequest(ctx context.Context, request *taskagent.TaskAgentJobRequest, orchestrationId *string) (*taskagent.TaskAgentJobRequest, error) {
+	// TODO
+	//if rc.runnerSettings == nil {
+	//	return errors.New(".runnerSettings == nil")
+	//}
+
+	if ado.TaskAgentBridgeClient == nil {
+		return nil, errors.New(".TaskAgentBridgeClient == nil")
+	}
+
+	if request == nil {
+		return nil, errors.New("request == nil")
+	}
+
+	return ado.TaskAgentBridgeClient.UpdateAgentRequest(ctx, taskagent.UpdateAgentRequestArgs{
+		Request:         request,
+		PoolId:          &poolId,
+		RequestId:       request.RequestId,
+		LockToken:       new(uuid.UUID),
+		OrchestrationId: orchestrationId,
+	})
+}
+
+func (ado *AzureDevOps) initAzureDevOpsPlan(plan *task.TaskOrchestrationPlanReference) error {
+	if plan == nil {
+		return errors.New("plan == nil")
+	}
+
+	if plan.ScopeIdentifier == nil {
+		return errors.New("plan.ScopeIdentifier == nil")
+	}
+
+	if plan.PlanType == nil {
+		return errors.New("plan.PlanType == nil")
+	}
+
+	if plan.PlanId == nil {
+		return errors.New("plan.PlanId == nil")
+	}
+
+	ado.Plan = plan
+	return nil
+}
+
+func (ado *AzureDevOps) initAzureDevOpsTimeline(timeline *build.TimelineReference) error {
+	if timeline == nil {
+		return errors.New("timeline == nil")
+	}
+
+	if timeline.Id == nil {
+		return errors.New("timeline.Id == nil")
+	}
+
+	ado.Timeline = timeline
+	return nil
+}
+
+func (ado *AzureDevOps) initAzureDevOpsJobConnection(serviceEndpoints []serviceendpoint.ServiceEndpoint) error {
+	serviceEndpoint, err := util.GetSystemVssConnectionEndpoint(serviceEndpoints)
+	if err != nil {
+		return err
+	}
+
+	accessToken, err := util.GetServiceEndpointAccessToken(serviceEndpoint)
+	if err != nil {
+		return err
+	}
+
+	url, err := util.GetServiceEndpointURL(serviceEndpoint)
+	if err != nil {
+		return err
+	}
+
+	ado.JobConnection = &azuredevops.Connection{
+		AuthorizationString: fmt.Sprintf("Bearer %s", accessToken),
+		BaseUrl:             url,
+	}
+	return nil
+}
+
+func (ado *AzureDevOps) InitAzureDevOpsTaskClient(plan *task.TaskOrchestrationPlanReference, timeline *build.TimelineReference, endpoints []serviceendpoint.ServiceEndpoint) error {
+	if err := ado.initAzureDevOpsPlan(plan); err != nil {
+		return err
+	}
+
+	if err := ado.initAzureDevOpsTimeline(timeline); err != nil {
+		return err
+	}
+
+	if err := ado.initAzureDevOpsJobConnection(endpoints); err != nil {
+		return err
+	}
+
+	ado.TaskClient = task.NewClient(context.TODO(), ado.JobConnection)
+	return nil
+}
+
+func (ado *AzureDevOps) UpdateRecord(ctx context.Context, timelineRecords []task.TimelineRecord) ([]task.TimelineRecord, error) {
+	if ado.Plan == nil {
+		return nil, errors.New(".Plan == nil")
+	}
+
+	if ado.Timeline == nil {
+		return nil, errors.New(".Timeline == nil")
+	}
+
+	if ado.TaskClient == nil {
+		return nil, errors.New(".TaskClient == nil")
+	}
+
+	count := len(timelineRecords)
+
+	value := make([]interface{}, count)
+	for i := range timelineRecords {
+		value[i] = timelineRecords[i]
+	}
+
+	records := azuredevops.VssJsonCollectionWrapper{
+		Count: &count,
+		Value: &value,
+	}
+
+	res, err := ado.TaskClient.UpdateRecords(ctx, task.UpdateRecordsArgs{
+		Records:         &records,
+		ScopeIdentifier: ado.Plan.ScopeIdentifier,
+		HubName:         ado.Plan.PlanType,
+		PlanId:          ado.Plan.PlanId,
+		TimelineId:      ado.Timeline.Id,
+	})
+
+	var ret []task.TimelineRecord
+	if res != nil {
+		ret = *res
+	}
+
+	return ret, err
+}
+
+func (ado *AzureDevOps) RaisePlanEvent(ctx context.Context, eventData *task.JobEvent) error {
+	if ado.Plan == nil {
+		return errors.New(".Plan == nil")
+	}
+
+	if ado.TaskClient == nil {
+		return errors.New(".TaskClient == nil")
+	}
+
+	if eventData == nil {
+		return errors.New("eventData == nil")
+	}
+
+	return ado.TaskClient.RaisePlanEvent(ctx, task.RaisePlanEventArgs{
+		EventData:       eventData,
+		ScopeIdentifier: ado.Plan.ScopeIdentifier,
+		HubName:         ado.Plan.PlanType,
+		PlanId:          ado.Plan.PlanId,
 	})
 }
