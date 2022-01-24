@@ -18,11 +18,7 @@ package actionsrunnerjob
 
 import (
 	"context"
-	"fmt"
 
-	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
-	controllersutil "github.com/inloco/kube-actions/operator/controllers/util"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +26,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"github.com/inloco/kube-actions/operator/controllers"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 )
 
 var (
@@ -68,124 +69,109 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&inlocov1alpha1.ActionsRunnerJob{}).
 		Owns(&corev1.Pod{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
-		WithEventFilter(controllersutil.PredicateOfFunction(eventFilter)).
+		WithEventFilter(controllers.EventPredicate(eventFilter)).
 		Complete(r)
 }
 
-func eventFilter(object client.Object, event controllersutil.PredicateEvent) bool {
-	// ignore events for Pod, except Delete and completion Update
-	if pod, isPod := object.(*corev1.Pod); isPod {
-		isDelete := event == controllersutil.PredicateEventDelete
-		isUpdate := event == controllersutil.PredicateEventUpdate
-		if isDelete || (isUpdate && (pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded)) {
+func eventFilter(e controllers.Event) bool {
+	switch o := controllers.EventObject(e); o.(type) {
+	case *inlocov1alpha1.ActionsRunnerJob:
+		switch e.(type) {
+		case event.CreateEvent:
 			return true
 		}
-		return false
+
+	case *corev1.Pod, *corev1.PersistentVolumeClaim:
+		switch e.(type) {
+		case event.UpdateEvent, event.DeleteEvent:
+			return true
+		}
+
+	default:
+		return true
 	}
 
-	// ignore events for ActionsRunnerJob, except Create
-	_, isActionsRunnerJob := object.(*inlocov1alpha1.ActionsRunnerJob)
-	if isActionsRunnerJob && event != controllersutil.PredicateEventCreate {
-		return false
-	}
-
-	return true
+	return false
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx, "namespacedName", req.NamespacedName.String())
 
-	// if ARJ was deleted, ignore it
+	// TODO: add finalizer to ARJ
 	var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
 	case apierrors.IsNotFound(err):
-		logger.Info("ActionsRunnerJob not found, ignore")
+		logger.Info("ActionsRunnerJob not found")
 		return ctrl.Result{}, nil
 	case err != nil:
-		logger.Error(err, "Error retrieving ActionsRunnerJob")
+		logger.Error(err, "Failed to get ActionsRunnerJob")
 		return ctrl.Result{}, err
 	}
+	actionsRunnerJob.SetManagedFields(nil)
 
-	// if AR was deleted, ignore it
-	actionsRunnerNamespacedName := req.NamespacedName
-	actionsRunnerNamespacedName.Name = actionsRunnerJob.Labels[util.LabelRunner]
 	var actionsRunner inlocov1alpha1.ActionsRunner
-	switch err := r.Get(ctx, actionsRunnerNamespacedName, &actionsRunner); {
+	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
 	case apierrors.IsNotFound(err):
-		logger.Info("ActionsRunner not found, ignore")
+		logger.Info("ActionsRunner not found")
 		return ctrl.Result{}, nil
 	case err != nil:
-		logger.Error(err, "Error retrieving ActionsRunner")
+		logger.Error(err, "Failed to get ActionsRunner")
 		return ctrl.Result{}, err
 	}
 
-	// if ARJ is still pending, create pod
-	if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStatePending {
-		logger.Info("ActionsRunnerJob pending, creating Pod")
+	var persistentVolumeClaim corev1.PersistentVolumeClaim
+	switch err := r.Get(ctx, req.NamespacedName, &persistentVolumeClaim); {
+	case apierrors.IsNotFound(err):
+		logger.Info("PersistentVolumeClaim needs to be created")
 
 		desiredPersistentVolumeClaim, err := util.ToPersistentVolumeClaim(&actionsRunner, &actionsRunnerJob, r.Scheme)
 		if err != nil {
-			logger.Error(err, "Error generating PVC definition")
+			logger.Info("Failed to build desired PersistentVolumeClaim")
 			return ctrl.Result{}, err
 		}
-		if err := r.Patch(ctx, desiredPersistentVolumeClaim, client.Apply, patchOpts...); err != nil {
-			logger.Error(err, "Error creating PVC")
+		if err := r.Create(ctx, desiredPersistentVolumeClaim, createOpts...); err != nil {
+			logger.Error(err, "Failed to create PersistentVolumeClaim")
 			return ctrl.Result{}, err
 		}
+
+	case err != nil:
+		logger.Error(err, "Failed to get PersistentVolumeClaim")
+		return ctrl.Result{}, err
+	}
+
+	var pod corev1.Pod
+	switch err := r.Get(ctx, req.NamespacedName, &pod); {
+	case err == nil:
+		if actionsRunnerJob.Status.Phase == pod.Status.Phase {
+			break
+		}
+		logger.Info("ActionsRunnerJobStatus needs to be patched")
+
+		actionsRunnerJob.Status.Phase = pod.Status.Phase
+		if err := r.Status().Patch(ctx, &actionsRunnerJob, client.Apply, patchOpts...); err != nil {
+			logger.Error(err, "Failed to patch ActionsRunnerJobStatus")
+			return ctrl.Result{}, err
+		}
+
+	case apierrors.IsNotFound(err):
+		logger.Info("Pod needs to be created")
 
 		desiredPod, err := util.ToPod(&actionsRunner, &actionsRunnerJob, r.Scheme)
 		if err != nil {
-			logger.Error(err, "Error generating Pod definition")
+			logger.Info("Failed to build desired Pod")
 			return ctrl.Result{}, err
 		}
 		if err := r.Create(ctx, desiredPod, createOpts...); err != nil {
-			logger.Error(err, "Error creating Pod")
+			logger.Error(err, "Failed to create Pod")
 			return ctrl.Result{}, err
 		}
 
-		logger.Info("Set ActionsRunnerJob.State to running")
-		actionsRunnerJob.State = inlocov1alpha1.ActionsRunnerJobStateRunning
-		if err := r.Update(ctx, &actionsRunnerJob, updateOpts...); err != nil {
-			logger.Error(err, "Error updating ActionsRunnerJob.State to running")
-		}
-
-		return ctrl.Result{}, nil
+	default:
+		logger.Error(err, "Failed to get Pod")
+		return ctrl.Result{}, err
 	}
 
-	// if ARJ is running, check if pod is already finished
-	if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStateRunning {
-		logger.Info("ActionsRunnerJob running")
-
-		var pod corev1.Pod
-		err := r.Get(ctx, req.NamespacedName, &pod)
-
-		if client.IgnoreNotFound(err) != nil {
-			return ctrl.Result{}, err
-		}
-
-		if err == nil {
-			if pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed {
-				logger.Info("Pod still running, wait")
-				return ctrl.Result{}, nil
-			}
-		}
-
-		// if pod is no longer present, set ARJ to completed
-		logger.Info("Pod no longer active, set ActionsRunnerJob.State to completed")
-		actionsRunnerJob.State = inlocov1alpha1.ActionsRunnerJobStateCompleted
-		if err := r.Update(ctx, &actionsRunnerJob, updateOpts...); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, nil
-	}
-
-	// if ARJ is completed, ignore event, ARJ will be deleted
-	if actionsRunnerJob.State == inlocov1alpha1.ActionsRunnerJobStateCompleted {
-		logger.Info("ActionsRunnerJob completed, waiting to be deleted")
-		return ctrl.Result{}, nil
-	}
-
-	return ctrl.Result{}, fmt.Errorf("ActionsRunnerJob %s in invalid state", req.NamespacedName.String())
+	return ctrl.Result{}, nil
 }

@@ -22,13 +22,14 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 )
 
 var (
@@ -75,8 +76,7 @@ func desiredActionsRunner(actionsRunnerReplicaSet *inlocov1alpha1.ActionsRunnerR
 				"kube-actions.inloco.com.br/actions-runner-replica-set": actionsRunnerReplicaSet.GetName(),
 			},
 		},
-		Spec:  actionsRunnerReplicaSet.Spec.Template,
-		State: inlocov1alpha1.ActionsRunnerStatePending,
+		Spec: actionsRunnerReplicaSet.Spec.Template,
 	}
 
 	if err := ctrl.SetControllerReference(actionsRunnerReplicaSet, &actionsRunner, scheme); err != nil {
@@ -97,7 +97,6 @@ type Reconciler struct {
 
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunnerreplicasets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunnerreplicasets/status,verbs=get;update;patch
-
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunner,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=inloco.com.br,resources=actionsrunner/status,verbs=get;update;patch
 
@@ -116,12 +115,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err := r.Get(ctx, req.NamespacedName, &actionsRunnerReplicaSet); err != nil {
 		return ctrl.Result{}, err
 	}
-	expected := int(actionsRunnerReplicaSet.Spec.Replicas)
+	actionsRunnerReplicaSet.SetManagedFields(nil)
 
 	var actionsRunnerList inlocov1alpha1.ActionsRunnerList
 	if err := r.List(ctx, &actionsRunnerList, listOpts(actionsRunnerReplicaSet)...); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	expected := int(actionsRunnerReplicaSet.Spec.Replicas)
 	items := actionsRunnerList.Items
 
 	if len(items) < expected {
@@ -135,6 +136,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if len(items) > expected {
+		// TODO: prioritize deletion of idle ARs
 		actionsRunner := &items[0]
 		logger.Info("More replicas than expected, deleting ActionsRunner " + actionsRunner.GetName())
 

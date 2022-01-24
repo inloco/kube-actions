@@ -21,17 +21,17 @@ import (
 	"errors"
 	"fmt"
 
-	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/constants"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"github.com/inloco/kube-actions/operator/constants"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 )
 
 var (
@@ -47,8 +47,6 @@ var (
 	runnerResourcesKey  = "runner"
 	dindContainerName   = "dind"
 	dindResourcesKey    = "docker"
-
-	LabelRunner = "runner"
 )
 
 func ToDotFiles(configMap *corev1.ConfigMap, secret *corev1.Secret) *dot.Files {
@@ -180,14 +178,11 @@ func ToSecret(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, 
 	if err := ctrl.SetControllerReference(actionsRunner, &secret, scheme); err != nil {
 		return nil, err
 	}
+
 	return &secret, nil
 }
 
-func ToPodDisruptionBudget(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) (*policyv1beta.PodDisruptionBudget, error) {
-	if dotFiles == nil {
-		return nil, errors.New("dotFiles == nil")
-	}
-
+func ToPodDisruptionBudget(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *runtime.Scheme) (*policyv1.PodDisruptionBudget, error) {
 	if actionsRunner == nil {
 		return nil, errors.New("actionsRunner == nil")
 	}
@@ -196,20 +191,22 @@ func ToPodDisruptionBudget(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.Ac
 		return nil, errors.New("scheme == nil")
 	}
 
-	podDisruptionBudget := policyv1beta.PodDisruptionBudget{
+	podDisruptionBudget := policyv1.PodDisruptionBudget{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyv1beta.SchemeGroupVersion.String(),
+			APIVersion: policyv1.SchemeGroupVersion.String(),
 			Kind:       "PodDisruptionBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      actionsRunner.GetName(),
 			Namespace: actionsRunner.GetNamespace(),
 		},
-		Spec: policyv1beta.PodDisruptionBudgetSpec{
-			MaxUnavailable: &intstr.IntOrString{IntVal: 0},
+		Spec: policyv1.PodDisruptionBudgetSpec{
+			MaxUnavailable: &intstr.IntOrString{
+				IntVal: 0,
+			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					LabelRunner: actionsRunner.GetName(),
+					"kube-actions.inloco.com.br/actions-runner": actionsRunner.GetName(),
 				},
 			},
 		},
@@ -237,16 +234,13 @@ func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *run
 			Kind:       "ActionsRunnerJob",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: actionsRunner.GetName() + "-",
-			Namespace:    actionsRunner.GetNamespace(),
+			Name:      actionsRunner.GetName(),
+			Namespace: actionsRunner.GetNamespace(),
 			Labels: map[string]string{
-				LabelRunner: actionsRunner.GetName(),
+				"kube-actions.inloco.com.br/actions-runner": actionsRunner.GetName(),
 			},
 		},
-		State: inlocov1alpha1.ActionsRunnerJobStatePending,
 	}
-
-	controllerutil.AddFinalizer(&actionsRunnerJob, inlocov1alpha1.ActionsRunnerJobFinalizer)
 
 	if err := ctrl.SetControllerReference(actionsRunner, &actionsRunnerJob, scheme); err != nil {
 		return nil, err
@@ -268,6 +262,14 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 		return nil, errors.New("scheme == nil")
 	}
 
+	resources, ok := actionsRunner.Spec.Resources[runnerResourcesKey]
+	if ok {
+		resources = filteredResourceRequirements(
+			resources,
+			corev1.ResourceStorage,
+		)
+	}
+
 	persistentVolumeClaim := corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),
@@ -281,10 +283,7 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
-			Resources: filteredResourceRequirements(
-				actionsRunner.Spec.Resources[runnerResourcesKey],
-				corev1.ResourceStorage,
-			),
+			Resources: resources,
 		},
 	}
 
@@ -308,8 +307,14 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		return nil, errors.New("scheme == nil")
 	}
 
-	if _, ok := actionsRunner.Spec.Resources[runnerResourcesKey]; !ok {
-		return nil, errors.New("missing resources for runner container")
+	resources, ok := actionsRunner.Spec.Resources[runnerResourcesKey]
+	if ok {
+		resources = filteredResourceRequirements(
+			resources,
+			corev1.ResourceCPU,
+			corev1.ResourceMemory,
+			corev1.ResourceEphemeralStorage,
+		)
 	}
 
 	pod := corev1.Pod{
@@ -322,7 +327,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 			Namespace:   actionsRunner.GetNamespace(),
 			Annotations: actionsRunner.Spec.Annotations,
 			Labels: map[string]string{
-				LabelRunner: actionsRunner.GetName(),
+				"kube-actions.inloco.com.br/actions-runner": actionsRunner.GetName(),
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -356,12 +361,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 							Value: actionsRunnerJob.GetName(),
 						},
 					),
-					Resources: filteredResourceRequirements(
-						actionsRunner.Spec.Resources[runnerResourcesKey],
-						corev1.ResourceCPU,
-						corev1.ResourceMemory,
-						corev1.ResourceEphemeralStorage,
-					),
+					Resources:    resources,
 					VolumeMounts: withVolumeMounts(actionsRunner),
 				},
 			},
@@ -556,8 +556,14 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 		Value: "tcp://localhost:2375",
 	})
 
-	if _, ok := actionsRunner.Spec.Resources[dindResourcesKey]; !ok {
-		return errors.New("missing resources for dind container")
+	resources, ok := actionsRunner.Spec.Resources[dindResourcesKey]
+	if ok {
+		resources = filteredResourceRequirements(
+			resources,
+			corev1.ResourceCPU,
+			corev1.ResourceMemory,
+			corev1.ResourceEphemeralStorage,
+		)
 	}
 
 	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
@@ -599,12 +605,7 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 			},
 			InitialDelaySeconds: 3,
 		},
-		Resources: filteredResourceRequirements(
-			actionsRunner.Spec.Resources[dindResourcesKey],
-			corev1.ResourceCPU,
-			corev1.ResourceMemory,
-			corev1.ResourceEphemeralStorage,
-		),
+		Resources: resources,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: pointer.BoolPtr(true),
 		},
