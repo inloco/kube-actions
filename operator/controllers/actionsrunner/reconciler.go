@@ -159,30 +159,30 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	desiredConfigMap, err := util.ToConfigMap(w.DotFiles, &actionsRunner, r.Scheme)
-	if err != nil {
-		logger.Info("Failed to build desired ConfigMap")
-		return ctrl.Result{}, err
-	}
-	if !reflect.DeepEqual(&configMap, desiredConfigMap) {
-		logger.Info("ConfigMap needs to be patched")
+	if reflect.ValueOf(configMap).IsZero() {
+		logger.Info("ConfigMap needs to be created")
 
-		if err := r.Patch(ctx, desiredConfigMap, client.Apply, patchOpts...); err != nil {
-			logger.Error(err, "Failed to patch ConfigMap")
+		desiredConfigMap, err := util.ToConfigMap(w.DotFiles, &actionsRunner, r.Scheme)
+		if err != nil {
+			logger.Info("Failed to build desired ConfigMap")
+			return ctrl.Result{}, err
+		}
+		if err := r.Create(ctx, desiredConfigMap, createOpts...); err != nil {
+			logger.Error(err, "Failed to create ConfigMap")
 			return ctrl.Result{}, err
 		}
 	}
 
-	desiredSecret, err := util.ToSecret(w.DotFiles, &actionsRunner, r.Scheme)
-	if err != nil {
-		logger.Info("Failed to build desired Secret")
-		return ctrl.Result{}, err
-	}
-	if !reflect.DeepEqual(&secret, desiredSecret) {
-		logger.Info("Secret needs to be patched")
+	if reflect.ValueOf(configMap).IsZero() {
+		logger.Info("Secret needs to be created")
 
-		if err := r.Patch(ctx, desiredSecret, client.Apply, patchOpts...); err != nil {
-			logger.Error(err, "Failed to patch Secret")
+		desiredSecret, err := util.ToSecret(w.DotFiles, &actionsRunner, r.Scheme)
+		if err != nil {
+			logger.Info("Failed to build desired Secret")
+			return ctrl.Result{}, err
+		}
+		if err := r.Create(ctx, desiredSecret, createOpts...); err != nil {
+			logger.Error(err, "Failed to create Secret")
 			return ctrl.Result{}, err
 		}
 	}
@@ -199,7 +199,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Error(err, "Failed to build desired PodDisruptionBudget")
 		return ctrl.Result{}, err
 	}
-	if !reflect.DeepEqual(&podDisruptionBudget, desiredPodDisruptionBudget) {
+	if !reflect.DeepEqual(podDisruptionBudget.Spec, desiredPodDisruptionBudget.Spec) {
 		logger.Info("PodDisruptionBudget needs to be patched")
 
 		if err := r.Patch(ctx, desiredPodDisruptionBudget, client.Apply, patchOpts...); err != nil {

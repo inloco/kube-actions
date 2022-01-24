@@ -130,6 +130,7 @@ func ToConfigMap(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunne
 			Name:      actionsRunner.GetName(),
 			Namespace: actionsRunner.GetNamespace(),
 		},
+		Immutable: pointer.Bool(true),
 		BinaryData: map[string][]byte{
 			".runner":      runner,
 			".credentials": credentials,
@@ -170,6 +171,7 @@ func ToSecret(dotFiles *dot.Files, actionsRunner *inlocov1alpha1.ActionsRunner, 
 			Name:      actionsRunner.GetName(),
 			Namespace: actionsRunner.GetNamespace(),
 		},
+		Immutable: pointer.Bool(true),
 		Data: map[string][]byte{
 			".credentials_rsaparams": rsaparams,
 		},
