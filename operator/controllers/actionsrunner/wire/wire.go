@@ -18,15 +18,20 @@ package wire
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
+	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
+	"k8s.io/utils/strings"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/facades"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/inloco/kube-actions/operator/metrics"
-	"k8s.io/utils/strings"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Wire struct {
@@ -43,6 +48,8 @@ type Wire struct {
 
 	invalid   bool
 	listening bool
+
+	validator *PolicyValidator
 }
 
 func (w *Wire) initGH(ctx context.Context) error {
@@ -85,6 +92,10 @@ func (w *Wire) init(ctx context.Context) error {
 
 	if w.jobRequests == nil {
 		w.jobRequests = make(chan struct{}, 1)
+	}
+
+	if w.validator == nil {
+		w.validator = NewPolicyValidator()
 	}
 
 	return nil
@@ -228,34 +239,173 @@ func (w *Wire) Listen() {
 				panic(err)
 			}
 
-			logger.Info("Message received", "id", message.Id, "type", message.Type)
+			messageLogger := logger.WithValues("id", message.Id, "type", message.Type)
+
+			messageLogger.Info("Message received")
 			metrics.IncGitHubActionsEventCounter(w.actionsRunner.GetNamespace(), w.GetRunnerName(), string(message.Type))
 
 			if message.Type == MessageTypePipelineAgentJobRequest {
-				logger.Info("PipelineAgentJobRequest, notifying reconciler, disabling listener")
-				w.jobRequests <- struct{}{}
-				w.operatorNotifier <- genericEvent
-				break
+				pajr, err := toPipelineAgentJobRequest(message)
+				if err != nil {
+					panic(err)
+				}
+
+				violatedRule, err := w.validator.Validate(ctx, &w.actionsRunner.Spec.Policy, pajr)
+				if err != nil {
+					panic(err)
+				}
+
+				if violatedRule == nil {
+					messageLogger.Info("PipelineAgentJobRequest validated, notifying reconciler and disabling listener")
+					w.jobRequests <- struct{}{}
+					w.operatorNotifier <- genericEvent
+					break
+				}
+
+				messageLogger.Info("PipelineAgentJobRequest aborted, job request violated rule", "violatedRule", violatedRule)
+				if err := w.onPolicyViolation(ctx, pajr, violatedRule); err != nil {
+					messageLogger.Error(err, "onPolicyViolation failed")
+				}
 			}
 
 			// send ack unless it's a job request (ack will be sent by actual runner)
-			logger.Info("Deleting message", "id", message.Id, "type", message.Type)
+			messageLogger.Info("Deleting message")
 			if err := w.adoFacade.DeleteMessage(ctx, uint64(message.Id)); err != nil {
 				panic(err)
 			}
-			logger.Info("Message deleted", "id", message.Id, "type", message.Type)
+			messageLogger.Info("Message deleted")
 
 			if message.Type == MessageTypeAgentRefresh {
-				logger.Info("AgentRefresh, deleting agent", "id", message.Id, "type", message.Type)
+				messageLogger.Info("AgentRefresh, deleting agent")
 				if err := w.adoFacade.DeleteAgent(ctx); err != nil {
 					panic(err)
 				}
-				logger.Info("Agent deleted", "id", message.Id, "type", message.Type)
+				messageLogger.Info("Agent deleted")
 			}
 		}
 
 		logger.Info("Stop listening")
 	}()
+}
+
+func (w *Wire) onPolicyViolation(ctx context.Context, pajr *PipelineAgentJobRequest, violatedRule *inlocov1alpha1.ActionsRunnerPolicyRule) error {
+	if violatedRule == nil {
+		return errors.New("violatedRule == nil")
+	}
+
+	if pajr == nil {
+		return errors.New("pajr == nil")
+	}
+
+	if pajr.JobId == nil {
+		return errors.New("pajr.JobId == nil")
+	}
+
+	if pajr.RequestId == nil {
+		return errors.New("pajr.RequestId == nil")
+	}
+
+	if pajr.Resources == nil {
+		return errors.New("pajr.Resources == nil")
+	}
+
+	if pajr.Resources.Endpoints == nil {
+		return errors.New("pajr.Resources.Endpoints == nil")
+	}
+
+	timelineRecords, err := w.timelineRecordsForViolatedRule(pajr, violatedRule)
+	if err != nil {
+		return err
+	}
+
+	orchestrationId, err := util.GetOrchestrationId(*pajr.Resources.Endpoints)
+	if err != nil {
+		return err
+	}
+
+	request := taskagent.TaskAgentJobRequest{
+		RequestId: pajr.RequestId,
+	}
+	if _, err := w.adoFacade.UpdateAgentRequest(ctx, &request, &orchestrationId); err != nil {
+		return err
+	}
+
+	if err := w.adoFacade.InitAzureDevOpsTaskClient(pajr.Plan, pajr.Timeline, *pajr.Resources.Endpoints); err != nil {
+		return err
+	}
+
+	if _, err := w.adoFacade.UpdateRecord(ctx, timelineRecords); err != nil {
+		return err
+	}
+
+	return w.adoFacade.RaisePlanEvent(ctx, &task.JobEvent{
+		Name:      JobCompleted.StringReference(),
+		JobId:     pajr.JobId,
+		RequestId: pajr.RequestId,
+		Result:    &task.TaskResultValues.Failed,
+	})
+}
+
+func (w *Wire) timelineRecordsForViolatedRule(pajr *PipelineAgentJobRequest, violatedRule *inlocov1alpha1.ActionsRunnerPolicyRule) ([]task.TimelineRecord, error) {
+	if pajr == nil {
+		return nil, errors.New("pajr == nil")
+	}
+
+	issues, err := w.issuesForViolatedRule(violatedRule)
+	if err != nil {
+		return nil, err
+	}
+
+	var errorCount int
+	var warningCount int
+	for _, issue := range issues {
+		switch t := issue.Type; t {
+		case &task.IssueTypeValues.Error:
+			errorCount++
+
+		case &task.IssueTypeValues.Warning:
+			warningCount++
+
+		default:
+			return nil, fmt.Errorf("unknown issue type: %v", t)
+		}
+	}
+
+	workerName := w.GetRunnerName()
+	timelineRecord := task.TimelineRecord{
+		Type:         JobTimelineRecordType.StringReference(),
+		Id:           pajr.JobId,
+		RefName:      pajr.JobName,
+		Name:         pajr.JobDisplayName,
+		State:        &task.TimelineRecordStateValues.Completed,
+		Result:       &task.TaskResultValues.Failed,
+		WorkerName:   &workerName,
+		Issues:       &issues,
+		ErrorCount:   &errorCount,
+		WarningCount: &warningCount,
+	}
+
+	timelineRecords := []task.TimelineRecord{
+		timelineRecord,
+	}
+	return timelineRecords, nil
+}
+
+func (w *Wire) issuesForViolatedRule(violatedRule *inlocov1alpha1.ActionsRunnerPolicyRule) ([]task.Issue, error) {
+	if violatedRule == nil {
+		return nil, errors.New("violatedRule == nil")
+	}
+
+	message := fmt.Sprintf("This job was not allowed to run because it violated a runner policy:\n%s", *violatedRule)
+	issue := &task.Issue{
+		Type:    &task.IssueTypeValues.Error,
+		Message: &message,
+	}
+
+	issues := []task.Issue{
+		*issue,
+	}
+	return issues, nil
 }
 
 func (w *Wire) Close() error {

@@ -27,6 +27,13 @@ type ActionsRunnerRepository struct {
 	APIEndpoint string `json:"apiEndpoint,omitempty"`
 }
 
+type ActionsRunnerPolicyRule string
+
+type ActionsRunnerPolicy struct {
+	Must    []ActionsRunnerPolicyRule `json:"must,omitempty"`
+	MustNot []ActionsRunnerPolicyRule `json:"mustNot,omitempty"`
+}
+
 type ActionsRunnerCapability string
 
 const (
@@ -34,17 +41,10 @@ const (
 	ActionsRunnerCapabilityDocker ActionsRunnerCapability = "docker"
 )
 
-type ActionsRunnerState string
-
-const (
-	ActionsRunnerStatePending ActionsRunnerState = "Pending"
-	ActionsRunnerStateIdle    ActionsRunnerState = "Idle"
-	ActionsRunnerStateActive  ActionsRunnerState = "Active"
-)
-
 // ActionsRunnerSpec defines the desired state of ActionsRunner
 type ActionsRunnerSpec struct {
 	Repository   ActionsRunnerRepository   `json:"repository"`
+	Policy       ActionsRunnerPolicy       `json:"policy,omitempty"`
 	Capabilities []ActionsRunnerCapability `json:"capabilities,omitempty"`
 	Annotations  map[string]string         `json:"annotations,omitempty"`
 	Labels       []string                  `json:"labels,omitempty"`
@@ -65,8 +65,16 @@ type ActionsRunnerSpec struct {
 type ActionsRunnerStatus struct {
 }
 
+type ActionsRunnerState string
+
+const (
+	ActionsRunnerStatePending ActionsRunnerState = "Pending"
+	ActionsRunnerStateIdle    ActionsRunnerState = "Idle"
+	ActionsRunnerStateActive  ActionsRunnerState = "Active"
+)
+
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName="ar"
+// +kubebuilder:resource:categories=actions,shortName=ar
 // +kubebuilder:subresource:status
 
 // ActionsRunner is the Schema for the actionsrunners API
@@ -75,8 +83,10 @@ type ActionsRunner struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   ActionsRunnerSpec   `json:"spec,omitempty"`
-	State  ActionsRunnerState  `json:"state"`
 	Status ActionsRunnerStatus `json:"status,omitempty"`
+
+	// TODO: remove internal state from resource definition
+	State ActionsRunnerState `json:"state"`
 }
 
 // +kubebuilder:object:root=true

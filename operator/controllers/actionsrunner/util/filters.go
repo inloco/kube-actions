@@ -20,46 +20,46 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func FilterEnvFrom(oldEnvFrom []corev1.EnvFromSource, predicate func(corev1.EnvFromSource) bool) []corev1.EnvFromSource {
-	var newEnvFrom []corev1.EnvFromSource
-	for _, envFromSource := range oldEnvFrom {
+func filteredEnvFromSources(in []corev1.EnvFromSource, predicate func(corev1.EnvFromSource) bool) []corev1.EnvFromSource {
+	var out []corev1.EnvFromSource
+	for _, envFromSource := range in {
 		if !predicate(envFromSource) {
 			continue
 		}
 
-		newEnvFrom = append(newEnvFrom, envFromSource)
+		out = append(out, envFromSource)
 	}
 
-	return newEnvFrom
+	return out
 }
 
-func FilterEnv(oldEnv []corev1.EnvVar, predicate func(corev1.EnvVar) bool) []corev1.EnvVar {
-	var newEnv []corev1.EnvVar
-	for _, envVar := range oldEnv {
+func filteredEnvVars(in []corev1.EnvVar, predicate func(corev1.EnvVar) bool) []corev1.EnvVar {
+	var out []corev1.EnvVar
+	for _, envVar := range in {
 		if !predicate(envVar) {
 			continue
 		}
 
-		newEnv = append(newEnv, envVar)
+		out = append(out, envVar)
 	}
 
-	return newEnv
+	return out
 }
 
-func FilterResources(source corev1.ResourceRequirements, resourceNames ...corev1.ResourceName) corev1.ResourceRequirements {
-	resourceRequirements := corev1.ResourceRequirements{
+func filteredResourceRequirements(in corev1.ResourceRequirements, resourceNames ...corev1.ResourceName) corev1.ResourceRequirements {
+	out := corev1.ResourceRequirements{
 		Limits:   corev1.ResourceList{},
 		Requests: corev1.ResourceList{},
 	}
 
 	for _, resourceName := range resourceNames {
-		if val, ok := source.Limits[resourceName]; ok {
-			resourceRequirements.Limits[resourceName] = val
+		if val, ok := in.Limits[resourceName]; ok {
+			out.Limits[resourceName] = val
 		}
-		if val, ok := source.Requests[resourceName]; ok {
-			resourceRequirements.Requests[resourceName] = val
+		if val, ok := in.Requests[resourceName]; ok {
+			out.Requests[resourceName] = val
 		}
 	}
 
-	return resourceRequirements
+	return out
 }
