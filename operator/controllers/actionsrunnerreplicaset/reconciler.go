@@ -22,6 +22,7 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -112,7 +113,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	logger := log.FromContext(ctx)
 
 	var actionsRunnerReplicaSet inlocov1alpha1.ActionsRunnerReplicaSet
-	if err := r.Get(ctx, req.NamespacedName, &actionsRunnerReplicaSet); err != nil {
+	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerReplicaSet); {
+	case apierrors.IsNotFound(err):
+		logger.Info("ActionsRunnerReplicaSet not found")
+		return ctrl.Result{}, nil
+	case err != nil:
+		logger.Error(err, "Failed to get ActionsRunnerReplicaSet")
 		return ctrl.Result{}, err
 	}
 	expected := int(actionsRunnerReplicaSet.Spec.Replicas)
