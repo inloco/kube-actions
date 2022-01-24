@@ -109,6 +109,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Error(err, "Failed to get ActionsRunnerJob")
 		return ctrl.Result{}, err
 	}
+	actionsRunnerJob.SetManagedFields(nil)
 
 	var actionsRunner inlocov1alpha1.ActionsRunner
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
