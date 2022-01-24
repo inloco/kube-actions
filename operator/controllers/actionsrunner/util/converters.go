@@ -234,8 +234,8 @@ func ToActionsRunnerJob(actionsRunner *inlocov1alpha1.ActionsRunner, scheme *run
 			Kind:       "ActionsRunnerJob",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: actionsRunner.GetName() + "-",
-			Namespace:    actionsRunner.GetNamespace(),
+			Name:      actionsRunner.GetName(),
+			Namespace: actionsRunner.GetNamespace(),
 			Labels: map[string]string{
 				"kube-actions.inloco.com.br/actions-runner": actionsRunner.GetName(),
 			},
@@ -262,6 +262,14 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 		return nil, errors.New("scheme == nil")
 	}
 
+	resources, ok := actionsRunner.Spec.Resources[runnerResourcesKey]
+	if ok {
+		resources = filteredResourceRequirements(
+			resources,
+			corev1.ResourceStorage,
+		)
+	}
+
 	persistentVolumeClaim := corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),
@@ -275,10 +283,7 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
-			Resources: filteredResourceRequirements(
-				actionsRunner.Spec.Resources[runnerResourcesKey],
-				corev1.ResourceStorage,
-			),
+			Resources: resources,
 		},
 	}
 
@@ -302,8 +307,14 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		return nil, errors.New("scheme == nil")
 	}
 
-	if _, ok := actionsRunner.Spec.Resources[runnerResourcesKey]; !ok {
-		return nil, errors.New("missing resources for runner container")
+	resources, ok := actionsRunner.Spec.Resources[runnerResourcesKey]
+	if ok {
+		resources = filteredResourceRequirements(
+			resources,
+			corev1.ResourceCPU,
+			corev1.ResourceMemory,
+			corev1.ResourceEphemeralStorage,
+		)
 	}
 
 	pod := corev1.Pod{
@@ -350,12 +361,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 							Value: actionsRunnerJob.GetName(),
 						},
 					),
-					Resources: filteredResourceRequirements(
-						actionsRunner.Spec.Resources[runnerResourcesKey],
-						corev1.ResourceCPU,
-						corev1.ResourceMemory,
-						corev1.ResourceEphemeralStorage,
-					),
+					Resources:    resources,
 					VolumeMounts: withVolumeMounts(actionsRunner),
 				},
 			},
@@ -550,8 +556,14 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 		Value: "tcp://localhost:2375",
 	})
 
-	if _, ok := actionsRunner.Spec.Resources[dindResourcesKey]; !ok {
-		return errors.New("missing resources for dind container")
+	resources, ok := actionsRunner.Spec.Resources[dindResourcesKey]
+	if ok {
+		resources = filteredResourceRequirements(
+			resources,
+			corev1.ResourceCPU,
+			corev1.ResourceMemory,
+			corev1.ResourceEphemeralStorage,
+		)
 	}
 
 	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
@@ -593,12 +605,7 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 			},
 			InitialDelaySeconds: 3,
 		},
-		Resources: filteredResourceRequirements(
-			actionsRunner.Spec.Resources[dindResourcesKey],
-			corev1.ResourceCPU,
-			corev1.ResourceMemory,
-			corev1.ResourceEphemeralStorage,
-		),
+		Resources: resources,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: pointer.BoolPtr(true),
 		},
