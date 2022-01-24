@@ -18,8 +18,6 @@ package facades
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -29,8 +27,8 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"strings"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/google/uuid"
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/build"
@@ -449,28 +447,22 @@ func (ado *AzureDevOps) GetMessage(ctx context.Context, lastMessageId *uint64) (
 		return message, nil
 	}
 
-	bytes, err := base64.StdEncoding.DecodeString(*message.Body)
+	encBytes, err := base64.StdEncoding.DecodeString(*message.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	block, err := aes.NewCipher(*ado.TaskAgentSession.EncryptionKey.Value)
+	decBytes, err := util.DecryptPKCS7(encBytes, *message.Iv, *ado.TaskAgentSession.EncryptionKey.Value)
 	if err != nil {
 		return nil, err
 	}
 
-	cipher.NewCBCDecrypter(block, *message.Iv).CryptBlocks(bytes, bytes)
-
-	body, err := unicode.UTF8BOM.NewDecoder().String(string(bytes))
+	body, err := unicode.UTF8BOM.NewDecoder().String(string(decBytes))
 	if err != nil {
 		return nil, err
 	}
-	body = strings.TrimRightFunc(body, func(r rune) bool {
-		i := int(r)
-		return i > 0 && i <= block.BlockSize()
-	})
 
-	message.Body = &body
+	message.Body = github.String(body)
 	message.Iv = nil
 
 	return message, nil
