@@ -115,12 +115,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err := r.Get(ctx, req.NamespacedName, &actionsRunnerReplicaSet); err != nil {
 		return ctrl.Result{}, err
 	}
-	expected := int(actionsRunnerReplicaSet.Spec.Replicas)
+	actionsRunnerReplicaSet.SetManagedFields(nil)
 
 	var actionsRunnerList inlocov1alpha1.ActionsRunnerList
 	if err := r.List(ctx, &actionsRunnerList, listOpts(actionsRunnerReplicaSet)...); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	expected := int(actionsRunnerReplicaSet.Spec.Replicas)
 	items := actionsRunnerList.Items
 
 	if len(items) < expected {

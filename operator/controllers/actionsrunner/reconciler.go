@@ -139,6 +139,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Error(err, "Failed to get ActionsRunner")
 		return ctrl.Result{}, err
 	}
+	actionsRunner.SetManagedFields(nil)
 
 	var configMap corev1.ConfigMap
 	if err := r.Get(ctx, req.NamespacedName, &configMap); client.IgnoreNotFound(err) != nil {
@@ -195,7 +196,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// TODO: move PDB to ARJ
 	desiredPodDisruptionBudget, err := util.ToPodDisruptionBudget(&actionsRunner, r.Scheme)
 	if err != nil {
-		logger.Info("Failed to build desired PodDisruptionBudget")
+		logger.Error(err, "Failed to build desired PodDisruptionBudget")
 		return ctrl.Result{}, err
 	}
 	if !reflect.DeepEqual(&podDisruptionBudget, desiredPodDisruptionBudget) {
@@ -232,7 +233,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 			desiredActionsRunnerJob, err := util.ToActionsRunnerJob(&actionsRunner, r.Scheme)
 			if err != nil {
-				logger.Info("Failed to build desired ActionsRunnerJob")
+				logger.Error(err, "Failed to build desired ActionsRunnerJob")
 				return ctrl.Result{}, err
 			}
 			if err := r.Create(ctx, desiredActionsRunnerJob, createOpts...); err != nil {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/microsoft/azure-devops-go-api/azuredevops/task"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/taskagent"
@@ -46,8 +47,10 @@ type Wire struct {
 	jobRequests chan struct{}
 	loopClose   chan struct{}
 
-	invalid   bool
-	listening bool
+	invalid bool
+
+	listening     bool
+	listeningLock sync.RWMutex
 
 	validator *PolicyValidator
 }
@@ -178,10 +181,20 @@ func (w *Wire) Valid() bool {
 }
 
 func (w *Wire) Listening() bool {
+	w.listeningLock.RLock()
+	defer w.listeningLock.RUnlock()
+
 	return w.listening
 }
 
 func (w *Wire) Listen() {
+	w.listeningLock.Lock()
+	defer w.listeningLock.Unlock()
+
+	if w.listening {
+		return
+	}
+
 	ctx := context.Background()
 	logger := log.FromContext(ctx, "runner", w.GetRunnerName())
 
@@ -216,8 +229,6 @@ func (w *Wire) Listen() {
 			logger.Info("Wire gone")
 			panic(err)
 		}
-
-		w.listening = true
 
 		logger.Info("Getting message")
 
@@ -286,6 +297,8 @@ func (w *Wire) Listen() {
 
 		logger.Info("Stop listening")
 	}()
+
+	w.listening = true
 }
 
 func (w *Wire) onPolicyViolation(ctx context.Context, pajr *PipelineAgentJobRequest, violatedRule *inlocov1alpha1.ActionsRunnerPolicyRule) error {
