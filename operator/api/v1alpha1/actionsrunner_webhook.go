@@ -42,37 +42,48 @@ func (r *ActionsRunner) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &ActionsRunner{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ActionsRunner) ValidateCreate() error {
-	if r.State == "" {
-		return errors.New("missing Status.State for ActionsRunner")
-	}
-	return nil
-}
+func (ar *ActionsRunner) ValidateCreate() error {
+	actionsrunnerlog.Info("validate create", "name", ar.Name)
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ActionsRunner) ValidateUpdate(old runtime.Object) error {
-	actionsrunnerlog.Info("validate update", "name", r.Name)
-
-	oldRunner, ok := old.(*ActionsRunner)
-	if !ok {
-		return errors.New("could not read old object to validate update operation")
-	}
-
-	if !reflect.DeepEqual(r.Spec.Repository, oldRunner.Spec.Repository) {
-		return errors.New("ActionsRunner's repository field is immutable")
-	}
-
-	if !reflect.DeepEqual(r.Spec.Labels, oldRunner.Spec.Labels) {
-		return errors.New("ActionsRunner's labels field is immutable")
-	}
-
-	for _, policyRule := range r.Spec.Policy.Must {
+	for _, policyRule := range ar.Spec.Policy.Must {
 		if err := validatePolicyRule(policyRule); err != nil {
 			return err
 		}
 	}
 
-	for _, policyRule := range r.Spec.Policy.MustNot {
+	for _, policyRule := range ar.Spec.Policy.MustNot {
+		if err := validatePolicyRule(policyRule); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
+func (ar *ActionsRunner) ValidateUpdate(old runtime.Object) error {
+	actionsrunnerlog.Info("validate update", "name", ar.Name)
+
+	oldAR, ok := old.(*ActionsRunner)
+	if !ok {
+		return errors.New("old.(*ActionsRunner) == nil")
+	}
+
+	if !reflect.DeepEqual(ar.Spec.Repository, oldAR.Spec.Repository) {
+		return errors.New(".Spec.Repository is immutable")
+	}
+
+	if !reflect.DeepEqual(ar.Spec.Labels, oldAR.Spec.Labels) {
+		return errors.New(".Spec.Labels is immutable")
+	}
+
+	for _, policyRule := range ar.Spec.Policy.Must {
+		if err := validatePolicyRule(policyRule); err != nil {
+			return err
+		}
+	}
+
+	for _, policyRule := range ar.Spec.Policy.MustNot {
 		if err := validatePolicyRule(policyRule); err != nil {
 			return err
 		}
@@ -82,7 +93,9 @@ func (r *ActionsRunner) ValidateUpdate(old runtime.Object) error {
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ActionsRunner) ValidateDelete() error {
+func (ar *ActionsRunner) ValidateDelete() error {
+	actionsrunnerlog.Info("validate delete", "name", ar.Name)
+
 	return nil
 }
 
