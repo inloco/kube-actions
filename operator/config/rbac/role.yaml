@@ -138,7 +138,6 @@ rules:
   - policy
   resources:
   - poddisruptionbudgets
-  - poddisruptionbudgets/status
   verbs:
   - create
   - delete

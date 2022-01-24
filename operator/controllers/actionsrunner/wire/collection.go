@@ -21,12 +21,13 @@ import (
 	"errors"
 	"sync"
 
-	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 )
 
 type Collection struct {
@@ -74,12 +75,13 @@ func (c *Collection) GetWire(ctx context.Context, actionsRunner *inlocov1alpha1.
 
 	if i, ok := c.wireRegistry.Load(namespacedName); ok {
 		if wire, ok := i.(*Wire); ok {
+			// TODO: check if AR, CM, and Secret are still the same
 			if wire.Valid() {
 				return wire, nil
-			} else {
-				if err := c.Destroy(ctx, wire); err != nil {
-					logger.Error(err, "Error destroying invalid wire")
-				}
+			}
+
+			if err := c.Destroy(ctx, wire); err != nil {
+				logger.Error(err, "Error destroying invalid wire")
 			}
 		}
 	}
@@ -117,14 +119,16 @@ func (c *Collection) MakeWire(ctx context.Context, actionsRunner *inlocov1alpha1
 	return wire, nil
 }
 
-func (c *Collection) TryDestroy(ctx context.Context, namespacedName client.ObjectKey) error {
-	i, ok := c.wireRegistry.LoadAndDelete(namespacedName)
-	if !ok {
-		return nil
+func (c *Collection) WireFor(ctx context.Context, actionsRunner *inlocov1alpha1.ActionsRunner, dotFiles *dot.Files) (*Wire, error) {
+	w, err := c.GetWire(ctx, actionsRunner)
+	if err != nil {
+		return nil, err
+	}
+	if w != nil {
+		return w, nil
 	}
 
-	wire := i.(*Wire)
-	return c.Destroy(ctx, wire)
+	return c.MakeWire(ctx, actionsRunner, dotFiles)
 }
 
 func (c *Collection) Destroy(ctx context.Context, wire *Wire) error {
@@ -135,4 +139,14 @@ func (c *Collection) Destroy(ctx context.Context, wire *Wire) error {
 	}
 
 	return wire.Destroy()
+}
+
+func (c *Collection) TryDestroy(ctx context.Context, namespacedName client.ObjectKey) error {
+	i, ok := c.wireRegistry.LoadAndDelete(namespacedName)
+	if !ok {
+		return nil
+	}
+
+	wire := i.(*Wire)
+	return c.Destroy(ctx, wire)
 }
