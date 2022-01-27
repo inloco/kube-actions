@@ -17,6 +17,51 @@ const (
 	PipelineContextDataTypeCaseSensitiveDictionary PipelineContextDataType = 5
 )
 
+type ArrayContextData []PipelineContextData
+
+var _ json.Unmarshaler = (*ArrayContextData)(nil)
+
+func (acd *ArrayContextData) UnmarshalJSON(data []byte) error {
+	var s []interface{}
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	pcds := make([]PipelineContextData, len(s))
+	for idx, i := range s {
+		var pcd PipelineContextData
+		switch i.(type) {
+		case string:
+			pcd.Type = PipelineContextDataTypeString
+			pcd.String = i.(string)
+
+		case bool:
+			pcd.Type = PipelineContextDataTypeBoolean
+			pcd.Boolean = i.(bool)
+
+		case float64:
+			pcd.Type = PipelineContextDataTypeNumber
+			pcd.Number = i.(float64)
+
+		default:
+			j, err := json.Marshal(i)
+			if err != nil {
+				return err
+			}
+
+			if err := json.Unmarshal(j, &pcd); err != nil {
+				return err
+			}
+		}
+
+		pcds[idx] = pcd
+	}
+
+	*acd = pcds
+
+	return nil
+}
+
 type DictionaryContextDataPair struct {
 	Key string              `json:"k"`
 	Val PipelineContextData `json:"v"`
@@ -60,12 +105,12 @@ func (dcdp *DictionaryContextDataPair) UnmarshalJSON(data []byte) error {
 		pcd.Number = vi.(float64)
 
 	default:
-		i, err := json.Marshal(vi)
+		j, err := json.Marshal(vi)
 		if err != nil {
 			return err
 		}
 
-		if err := json.Unmarshal(i, &pcd); err != nil {
+		if err := json.Unmarshal(j, &pcd); err != nil {
 			return err
 		}
 	}
@@ -76,13 +121,15 @@ func (dcdp *DictionaryContextDataPair) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type DictionaryContextData []DictionaryContextDataPair
+
 type PipelineContextData struct {
-	Type       PipelineContextDataType     `json:"t"`
-	String     string                      `json:"s"`
-	Array      []PipelineContextData       `json:"a"`
-	Dictionary []DictionaryContextDataPair `json:"d"`
-	Boolean    bool                        `json:"b"`
-	Number     float64                     `json:"n"`
+	Type       PipelineContextDataType `json:"t"`
+	String     string                  `json:"s"`
+	Array      ArrayContextData        `json:"a"`
+	Dictionary DictionaryContextData   `json:"d"`
+	Boolean    bool                    `json:"b"`
+	Number     float64                 `json:"n"`
 }
 
 func (pcd *PipelineContextData) Flattened() (interface{}, error) {
