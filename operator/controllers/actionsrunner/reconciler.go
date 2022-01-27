@@ -257,13 +257,15 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			}
 
 			metrics.SetGitHubActionsJobAlive(actionsRunner.Spec.Repository.Name, desiredActionsRunnerJob.Name)
+			return ctrl.Result{}, nil
 
 		default:
 			logger.Info("Wire needs to start listening")
-
 			if !w.Listening() {
 				w.Listen()
 			}
+
+			return ctrl.Result{}, nil
 		}
 
 	default:
@@ -276,7 +278,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Error(err, "Failed to delete ActionsRunnerJob")
 		return ctrl.Result{}, err
 	}
-	metrics.SetGitHubActionsJobDone(actionsRunner.Spec.Repository.Name, actionsRunnerJob.Name)
 
+	metrics.SetGitHubActionsJobDone(actionsRunner.Spec.Repository.Name, actionsRunnerJob.Name)
 	return ctrl.Result{}, nil
 }
