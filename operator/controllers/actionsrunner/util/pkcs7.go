@@ -27,7 +27,7 @@ func DecryptPKCS7(data []byte, iv []byte, key []byte) ([]byte, error) {
 	ed, err := asn1.Marshal(EncryptedData{
 		Version: 0,
 		EncryptedContentInfo: EncryptedContentInfo{
-			ContentType: nil,
+			ContentType: pkcs7.OIDData,
 			ContentEncryptionAlgorithm: pkix.AlgorithmIdentifier{
 				Algorithm: pkcs7.OIDEncryptionAlgorithmAES128CBC,
 				Parameters: asn1.RawValue{
