@@ -244,7 +244,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			metrics.SetGitHubActionsJobAlive(actionsRunner.Spec.Repository.Name, desiredActionsRunnerJob.Name)
 
 		default:
-			logger.Info("ActionsRunnerJob needs to start listening")
+			logger.Info("Wire needs to start listening")
 
 			if !w.Listening() {
 				w.Listen()
