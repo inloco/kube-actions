@@ -18,8 +18,6 @@ package facades
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -29,8 +27,8 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"strings"
 
+	"github.com/google/go-github/v32/github"
 	"github.com/google/uuid"
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
 	"github.com/microsoft/azure-devops-go-api/azuredevops/build"
@@ -45,9 +43,11 @@ import (
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 )
 
-var (
-	agentNameTemplate = "KA %v %v"
+const (
+	poolId = 1
+)
 
+var (
 	agentVersion = constants.API()
 
 	agentLabelsBase = []string{
@@ -55,8 +55,6 @@ var (
 		runtime.GOOS,
 		runtime.GOARCH,
 	}
-
-	poolId = 1
 )
 
 type AzureDevOps struct {
@@ -163,7 +161,7 @@ func (ado *AzureDevOps) GetAgent(ctx context.Context) (*taskagent.TaskAgent, err
 	}
 
 	agent, err := ado.TaskAgentClient.GetAgent(ctx, taskagent.GetAgentArgs{
-		PoolId:  &poolId,
+		PoolId:  github.Int(poolId),
 		AgentId: ado.TaskAgent.Id,
 	})
 	if err == nil {
@@ -171,7 +169,7 @@ func (ado *AzureDevOps) GetAgent(ctx context.Context) (*taskagent.TaskAgent, err
 	}
 
 	agents, _ := ado.TaskAgentClient.GetAgents(ctx, taskagent.GetAgentsArgs{
-		PoolId:    &poolId,
+		PoolId:    github.Int(poolId),
 		AgentName: ado.TaskAgent.Name,
 	})
 	if agents != nil && len(*agents) == 1 {
@@ -187,7 +185,7 @@ func (ado *AzureDevOps) AddAgent(ctx context.Context) (*taskagent.TaskAgent, err
 	}
 
 	taskAgent, err := ado.TaskAgentClient.AddAgent(ctx, taskagent.AddAgentArgs{
-		PoolId: &poolId,
+		PoolId: github.Int(poolId),
 		Agent:  ado.TaskAgent,
 	})
 	if err != nil {
@@ -203,7 +201,7 @@ func (ado *AzureDevOps) ReplaceAgent(ctx context.Context) (*taskagent.TaskAgent,
 	}
 
 	taskAgent, err := ado.TaskAgentClient.ReplaceAgent(ctx, taskagent.ReplaceAgentArgs{
-		PoolId:  &poolId,
+		PoolId:  github.Int(poolId),
 		AgentId: ado.TaskAgent.Id,
 		Agent:   ado.TaskAgent,
 	})
@@ -225,7 +223,7 @@ func (ado *AzureDevOps) DeleteAgent(ctx context.Context) error {
 	}
 
 	return ado.TaskAgentClient.DeleteAgent(ctx, taskagent.DeleteAgentArgs{
-		PoolId:  &poolId,
+		PoolId:  github.Int(poolId),
 		AgentId: ado.TaskAgent.Id,
 	})
 }
@@ -356,7 +354,7 @@ func (ado *AzureDevOps) CreateAgentSession(ctx context.Context) (*taskagent.Task
 			OwnerName: &ownerName,
 			SessionId: &uuid.UUID{},
 		},
-		PoolId: &poolId,
+		PoolId: github.Int(poolId),
 	})
 }
 
@@ -405,7 +403,7 @@ func (ado *AzureDevOps) DeleteAgentSession(ctx context.Context) error {
 	}
 
 	return ado.TaskAgentBridgeClient.DeleteAgentSession(ctx, taskagent.DeleteAgentSessionArgs{
-		PoolId:    &poolId,
+		PoolId:    github.Int(poolId),
 		SessionId: ado.TaskAgentSession.SessionId,
 	})
 }
@@ -433,7 +431,7 @@ func (ado *AzureDevOps) GetMessage(ctx context.Context, lastMessageId *uint64) (
 	}
 
 	message, err := ado.TaskAgentBridgeClient.GetMessage(ctx, taskagent.GetMessageArgs{
-		PoolId:        &poolId,
+		PoolId:        github.Int(poolId),
 		SessionId:     ado.TaskAgentSession.SessionId,
 		LastMessageId: lastMessageId,
 	})
@@ -449,28 +447,22 @@ func (ado *AzureDevOps) GetMessage(ctx context.Context, lastMessageId *uint64) (
 		return message, nil
 	}
 
-	bytes, err := base64.StdEncoding.DecodeString(*message.Body)
+	encBytes, err := base64.StdEncoding.DecodeString(*message.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	block, err := aes.NewCipher(*ado.TaskAgentSession.EncryptionKey.Value)
+	decBytes, err := util.DecryptPKCS7(encBytes, *message.Iv, *ado.TaskAgentSession.EncryptionKey.Value)
 	if err != nil {
 		return nil, err
 	}
 
-	cipher.NewCBCDecrypter(block, *message.Iv).CryptBlocks(bytes, bytes)
-
-	body, err := unicode.UTF8BOM.NewDecoder().String(string(bytes))
+	body, err := unicode.UTF8BOM.NewDecoder().String(string(decBytes))
 	if err != nil {
 		return nil, err
 	}
-	body = strings.TrimRightFunc(body, func(r rune) bool {
-		i := int(r)
-		return i > 0 && i <= block.BlockSize()
-	})
 
-	message.Body = &body
+	message.Body = github.String(body)
 	message.Iv = nil
 
 	return message, nil
@@ -486,7 +478,7 @@ func (ado *AzureDevOps) DeleteMessage(ctx context.Context, messageId uint64) err
 	}
 
 	return ado.TaskAgentBridgeClient.DeleteMessage(ctx, taskagent.DeleteMessageArgs{
-		PoolId:    &poolId,
+		PoolId:    github.Int(poolId),
 		MessageId: &messageId,
 		SessionId: ado.TaskAgentSession.SessionId,
 	})
@@ -508,7 +500,7 @@ func (ado *AzureDevOps) UpdateAgentRequest(ctx context.Context, request *taskage
 
 	return ado.TaskAgentBridgeClient.UpdateAgentRequest(ctx, taskagent.UpdateAgentRequestArgs{
 		Request:         request,
-		PoolId:          &poolId,
+		PoolId:          github.Int(poolId),
 		RequestId:       request.RequestId,
 		LockToken:       new(uuid.UUID),
 		OrchestrationId: orchestrationId,

@@ -409,7 +409,7 @@ func (w *Wire) issuesForViolatedRule(violatedRule *inlocov1alpha1.ActionsRunnerP
 		return nil, errors.New("violatedRule == nil")
 	}
 
-	message := fmt.Sprintf("This job was not allowed to run because it violated a runner policy:\n%s", *violatedRule)
+	message := fmt.Sprintf("This job was not allowed to run because it violated a runner policy: %s", *violatedRule)
 	issue := &task.Issue{
 		Type:    &task.IssueTypeValues.Error,
 		Message: &message,
