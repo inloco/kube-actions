@@ -212,7 +212,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
 	case err == nil:
 		switch actionsRunnerJob.Status.Phase {
-		case corev1.PodSucceeded, corev1.PodFailed:
+		case string(corev1.ClaimLost), string(corev1.PodSucceeded), string(corev1.PodFailed), string(corev1.PodUnknown):
 			logger.Info("ActionsRunnerJob needs to be deleted")
 
 			if err := r.Delete(ctx, &actionsRunnerJob, deleteOpts...); err != nil {
