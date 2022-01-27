@@ -222,19 +222,23 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
 	case err == nil:
-		switch actionsRunnerJob.Status.Phase {
-		case string(corev1.ClaimLost), string(corev1.PodSucceeded), string(corev1.PodFailed), string(corev1.PodUnknown):
-			logger.Info("ActionsRunnerJob needs to be deleted")
+		persistentVolumeClaimPhase := actionsRunnerJob.Status.PersistentVolumeClaimPhase
+		podPhase := actionsRunnerJob.Status.PodPhase
+		logger = logger.WithValues("persistentVolumeClaimPhase", persistentVolumeClaimPhase, "podPhase", podPhase)
 
-			if err := r.Delete(ctx, &actionsRunnerJob, deleteOpts...); err != nil {
-				logger.Error(err, "Failed to delete ActionsRunnerJob")
-				return ctrl.Result{}, err
-			}
+		var completed bool
+		switch persistentVolumeClaimPhase {
+		case corev1.ClaimLost:
+			completed = true
+		}
+		switch podPhase {
+		case corev1.PodSucceeded, corev1.PodFailed, corev1.PodUnknown:
+			completed = true
+		}
 
-			metrics.SetGitHubActionsJobDone(actionsRunner.Spec.Repository.Name, actionsRunnerJob.Name)
-
-		default:
+		if !completed {
 			logger.Info("Waiting ActionsRunnerJob to complete")
+			return ctrl.Result{}, nil
 		}
 
 	case apierrors.IsNotFound(err):
@@ -266,6 +270,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Error(err, "Failed to get ActionsRunnerJob")
 		return ctrl.Result{}, err
 	}
+
+	logger.Info("ActionsRunnerJob needs to be deleted")
+	if err := r.Delete(ctx, &actionsRunnerJob, deleteOpts...); err != nil {
+		logger.Error(err, "Failed to delete ActionsRunnerJob")
+		return ctrl.Result{}, err
+	}
+	metrics.SetGitHubActionsJobDone(actionsRunner.Spec.Repository.Name, actionsRunnerJob.Name)
 
 	return ctrl.Result{}, nil
 }

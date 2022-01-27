@@ -80,7 +80,7 @@ func eventFilter(e controllers.Event) bool {
 	switch o := controllers.EventObject(e); o.(type) {
 	case *inlocov1alpha1.ActionsRunnerJob:
 		switch e.(type) {
-		case event.CreateEvent:
+		case event.CreateEvent, event.UpdateEvent:
 			return true
 		}
 
@@ -145,19 +145,21 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 
-		phase := string(persistentVolumeClaim.Status.Phase)
-		if actionsRunnerJob.Status.Phase != phase {
+		phase := persistentVolumeClaim.Status.Phase
+		if actionsRunnerJob.Status.PersistentVolumeClaimPhase != phase {
 			logger.Info("PersistentVolumeClaimPhase changed", "phase", phase)
-			logger.Info("ActionsRunnerJobStatus needs to be patched")
+			actionsRunnerJob.Status.PersistentVolumeClaimPhase = phase
 
-			actionsRunnerJob.Status.Phase = phase
+			logger.Info("ActionsRunnerJobStatus needs to be patched")
 			if err := r.Status().Patch(ctx, &actionsRunnerJob, client.Apply, patchOpts...); err != nil {
 				logger.Error(err, "Failed to patch ActionsRunnerJobStatus")
 				return ctrl.Result{}, err
 			}
+
+			return ctrl.Result{}, nil
 		}
 
-		switch corev1.PersistentVolumeClaimPhase(phase) {
+		switch phase {
 		case corev1.ClaimPending:
 			return ctrl.Result{}, nil
 		case corev1.ClaimLost:
@@ -168,19 +170,21 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var pod corev1.Pod
 	switch err := r.Get(ctx, req.NamespacedName, &pod); {
 	case err == nil:
-		phase := string(pod.Status.Phase)
-		if actionsRunnerJob.Status.Phase != phase {
+		phase := pod.Status.Phase
+		if actionsRunnerJob.Status.PodPhase != phase {
 			logger.Info("PodPhase changed", "phase", phase)
-			logger.Info("ActionsRunnerJobStatus needs to be patched")
+			actionsRunnerJob.Status.PodPhase = phase
 
-			actionsRunnerJob.Status.Phase = phase
+			logger.Info("ActionsRunnerJobStatus needs to be patched")
 			if err := r.Status().Patch(ctx, &actionsRunnerJob, client.Apply, patchOpts...); err != nil {
 				logger.Error(err, "Failed to patch ActionsRunnerJobStatus")
 				return ctrl.Result{}, err
 			}
+
+			return ctrl.Result{}, nil
 		}
 
-		switch corev1.PodPhase(phase) {
+		switch phase {
 		case corev1.PodPending:
 			return ctrl.Result{}, nil
 		case corev1.PodUnknown:
