@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,7 +26,8 @@ type ActionsRunnerJobSpec struct{}
 
 // ActionsRunnerJobStatus defines the observed state of ActionsRunnerJob
 type ActionsRunnerJobStatus struct {
-	Phase string `json:"phase,omitempty"`
+	PersistentVolumeClaimPhase corev1.PersistentVolumeClaimPhase `json:"persistentVolumeClaimPhase,omitempty"`
+	PodPhase                   corev1.PodPhase                   `json:"podPhase,omitempty"`
 }
 
 // +kubebuilder:object:root=true
