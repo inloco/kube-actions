@@ -31,6 +31,7 @@ import (
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/constants"
+	"github.com/inloco/kube-actions/operator/controllers"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
 )
 
@@ -264,7 +265,7 @@ func ToPersistentVolumeClaim(actionsRunner *inlocov1alpha1.ActionsRunner, action
 		return nil, errors.New("scheme == nil")
 	}
 
-	if !hasRequestedStorage(actionsRunner) {
+	if !controllers.HasActionsRunnerRequestedStorage(actionsRunner) {
 		return nil, nil
 	}
 
@@ -432,7 +433,7 @@ func withVolumes(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volume {
 		},
 	}
 
-	if hasRequestedStorage(actionsRunner) {
+	if controllers.HasActionsRunnerRequestedStorage(actionsRunner) {
 		volumeByName["persistent-volume-claim"] = &corev1.Volume{
 			Name: "persistent-volume-claim",
 			VolumeSource: corev1.VolumeSource{
@@ -474,7 +475,7 @@ func withVolumeMounts(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volu
 		SubPath:   ".credentials_rsaparams",
 	}
 
-	if hasRequestedStorage(actionsRunner) {
+	if controllers.HasActionsRunnerRequestedStorage(actionsRunner) {
 		volumeMountByPath["/opt/actions-runner/_work"] = &corev1.VolumeMount{
 			MountPath: "/opt/actions-runner/_work",
 			Name:      "persistent-volume-claim",
@@ -578,7 +579,7 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 	}
 
 	var volumeMounts []corev1.VolumeMount
-	if hasRequestedStorage(actionsRunner) {
+	if controllers.HasActionsRunnerRequestedStorage(actionsRunner) {
 		volumeMounts = append(
 			volumeMounts,
 			corev1.VolumeMount{
@@ -629,27 +630,4 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 	})
 
 	return nil
-}
-
-func hasRequestedStorage(actionsRunner *inlocov1alpha1.ActionsRunner) bool {
-	if actionsRunner == nil {
-		return false
-	}
-
-	res, ok := actionsRunner.Spec.Resources[runnerResourcesKey]
-	if !ok {
-		return false
-	}
-
-	req := res.Requests
-	if req == nil {
-		return false
-	}
-
-	s := req.Storage()
-	if s == nil {
-		return false
-	}
-
-	return !s.IsZero()
 }

@@ -1,10 +1,38 @@
 package controllers
 
 import (
+	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
+
+const (
+	runnerResourcesKey = "runner"
+)
+
+func HasActionsRunnerRequestedStorage(actionsRunner *inlocov1alpha1.ActionsRunner) bool {
+	if actionsRunner == nil {
+		return false
+	}
+
+	res, ok := actionsRunner.Spec.Resources[runnerResourcesKey]
+	if !ok {
+		return false
+	}
+
+	req := res.Requests
+	if req == nil {
+		return false
+	}
+
+	s := req.Storage()
+	if s == nil {
+		return false
+	}
+
+	return !s.IsZero()
+}
 
 type Event interface{}
 
