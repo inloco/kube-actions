@@ -75,6 +75,7 @@ func (w *Wire) initADO(ctx context.Context, runnerEvent facades.RunnerEvent) err
 }
 
 func (w *Wire) init(ctx context.Context) error {
+	// TODO: check if runner needs to be re-registered
 	if w.DotFiles == nil {
 		if err := w.initDotFiles(); err != nil {
 			return err
@@ -119,6 +120,7 @@ func (w *Wire) Destroy() error {
 		return err
 	}
 
+	// TODO: review agent deletion at this point
 	if err := w.adoFacade.DeleteAgent(ctx); err != nil {
 		return err
 	}

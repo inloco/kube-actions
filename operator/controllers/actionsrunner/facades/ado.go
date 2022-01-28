@@ -114,8 +114,10 @@ func (ado *AzureDevOps) InitForRun(ctx context.Context, dotFiles *dot.Files, lab
 
 	return nil
 }
-
 func (ado *AzureDevOps) RefreshForRun(ctx context.Context, dotFiles *dot.Files) error {
+	// TODO: improve refresh mechanism so it refreshes automatically and only when necessary
+	// TODO: refresh other tokens if needed
+
 	if err := ado.initAzureDevOpsBridgeConnection(ctx, dotFiles); err != nil {
 		return err
 	}
