@@ -92,6 +92,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 	actionsRunnerJob.SetManagedFields(nil)
 
+	if controllers.IsBeingDeleted(&actionsRunnerJob) {
+		logger.Info("ActionsRunnerJob is being deleted")
+		return ctrl.Result{}, nil
+	}
+
 	var actionsRunner inlocov1alpha1.ActionsRunner
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunner); {
 	case apierrors.IsNotFound(err):

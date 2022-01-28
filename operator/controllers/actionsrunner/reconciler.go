@@ -122,6 +122,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 	actionsRunner.SetManagedFields(nil)
 
+	if controllers.IsBeingDeleted(&actionsRunner) {
+		logger.Info("ActionsRunner is being deleted")
+		return ctrl.Result{}, nil
+	}
+
 	var configMap corev1.ConfigMap
 	if err := r.Get(ctx, req.NamespacedName, &configMap); client.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to get ConfigMap")

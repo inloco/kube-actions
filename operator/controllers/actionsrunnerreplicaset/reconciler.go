@@ -127,6 +127,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 	actionsRunnerReplicaSet.SetManagedFields(nil)
 
+	if controllers.IsBeingDeleted(&actionsRunnerReplicaSet) {
+		logger.Info("ActionsRunnerReplicaSet is being deleted")
+		return ctrl.Result{}, nil
+	}
+
 	selector, err := desiredSelector(&actionsRunnerReplicaSet)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -152,7 +157,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	actionsRunners := make([]inlocov1alpha1.ActionsRunner, 0, len(items))
 	for _, actionsRunner := range items {
-		if deletionTimestamp := actionsRunner.GetObjectMeta().GetDeletionTimestamp(); deletionTimestamp == nil || deletionTimestamp.IsZero() {
+		if !controllers.IsBeingDeleted(&actionsRunner) {
 			actionsRunners = append(actionsRunners, actionsRunner)
 		}
 	}
