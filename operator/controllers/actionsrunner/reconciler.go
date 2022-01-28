@@ -202,15 +202,15 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 
-	case controllers.ReconciliationActionPatch:
+	case controllers.ReconciliationActionUpdate:
 		if reflect.DeepEqual(podDisruptionBudget.Spec, desiredPodDisruptionBudget.Spec) {
 			break
 		}
 
-		logger.Info("PodDisruptionBudget needs to be patched")
+		logger.Info("PodDisruptionBudget needs to be updated")
 
-		if err := r.Patch(ctx, desiredPodDisruptionBudget, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
-			logger.Error(err, "Failed to patch PodDisruptionBudget")
+		if err := r.Update(ctx, desiredPodDisruptionBudget, controllers.UpdateOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to update PodDisruptionBudget")
 			return ctrl.Result{}, err
 		}
 

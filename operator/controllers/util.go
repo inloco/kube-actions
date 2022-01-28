@@ -101,7 +101,7 @@ type ReconciliationAction byte
 const (
 	ReconciliationActionNothing = iota
 	ReconciliationActionCreate
-	ReconciliationActionPatch
+	ReconciliationActionUpdate
 	ReconciliationActionDelete
 )
 
@@ -114,7 +114,7 @@ func CalculateReconciliationAction(actual client.Object, desired client.Object) 
 	}
 
 	if !actualIsZero && !desiredIsZero {
-		return ReconciliationActionPatch
+		return ReconciliationActionUpdate
 	}
 
 	if !actualIsZero && desiredIsZero {
