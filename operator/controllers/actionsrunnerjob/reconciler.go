@@ -129,9 +129,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Info("PersistentVolumeClaimPhase changed", "phase", pvcPhase)
 		actionsRunnerJob.Status.PersistentVolumeClaimPhase = pvcPhase
 
-		logger.Info("ActionsRunnerJobStatus needs to be patched")
-		if err := r.Status().Patch(ctx, &actionsRunnerJob, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
-			logger.Error(err, "Failed to patch ActionsRunnerJobStatus")
+		logger.Info("ActionsRunnerJobStatus needs to be updated")
+		if err := r.Status().Update(ctx, &actionsRunnerJob, controllers.UpdateOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to update ActionsRunnerJobStatus")
 			return ctrl.Result{}, err
 		}
 
@@ -172,9 +172,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Info("PodPhase changed", "phase", podPhase)
 		actionsRunnerJob.Status.PodPhase = podPhase
 
-		logger.Info("ActionsRunnerJobStatus needs to be patched")
-		if err := r.Status().Patch(ctx, &actionsRunnerJob, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
-			logger.Error(err, "Failed to patch ActionsRunnerJobStatus")
+		logger.Info("ActionsRunnerJobStatus needs to be updated")
+		if err := r.Status().Update(ctx, &actionsRunnerJob, controllers.UpdateOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to update ActionsRunnerJobStatus")
 			return ctrl.Result{}, err
 		}
 
