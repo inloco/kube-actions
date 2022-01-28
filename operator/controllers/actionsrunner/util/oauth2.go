@@ -46,10 +46,40 @@ const (
 	errInvalidScope         = "invalid_scope"
 )
 
+var (
+	ErrOAuth2InvalidRequest       = errors.New(errInvalidRequest)
+	ErrOAuth2InvalidClient        = errors.New(errInvalidClient)
+	ErrOAuth2InvalidGrant         = errors.New(errInvalidGrant)
+	ErrOAuth2UnauthorizedClient   = errors.New(errUnauthorizedClient)
+	ErrOAuth2UnsupportedGrantType = errors.New(errUnsupportedGrantType)
+	ErrOAuth2InvalidScope         = errors.New(errInvalidScope)
+)
+
 type errorResponse struct {
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`
 	ErrorURI         string `json:"error_uri"`
+}
+
+func (er errorResponse) error() error {
+	switch err := er.Error; err {
+	case "":
+		return nil
+	case errInvalidRequest:
+		return ErrOAuth2InvalidRequest
+	case errInvalidClient:
+		return ErrOAuth2InvalidClient
+	case errInvalidGrant:
+		return ErrOAuth2InvalidGrant
+	case errUnauthorizedClient:
+		return ErrOAuth2UnauthorizedClient
+	case errUnsupportedGrantType:
+		return ErrOAuth2UnsupportedGrantType
+	case errInvalidScope:
+		return ErrOAuth2InvalidScope
+	default:
+		return errors.New(err)
+	}
 }
 
 type successfulResponse struct {
@@ -95,16 +125,17 @@ func fetchResponse(req *http.Request) (*response, error) {
 	return &body, nil
 }
 
-func unwrapErr(res errorResponse) error {
-	if err := res.Error; err != "" {
-		if desc := res.ErrorDescription; desc != "" {
-			return fmt.Errorf("%v: %v", err, desc)
-		}
-
-		return errors.New(err)
+func wrapErr(res errorResponse) error {
+	err := res.error()
+	if err == nil {
+		return nil
 	}
 
-	return nil
+	if desc := res.ErrorDescription; desc != "" {
+		return fmt.Errorf("%s: %w", desc, err)
+	}
+
+	return err
 }
 
 func AccessToken(ctx context.Context, tokenEndpoint string, clientAssertion string) (string, error) {
@@ -118,7 +149,7 @@ func AccessToken(ctx context.Context, tokenEndpoint string, clientAssertion stri
 		return "", err
 	}
 
-	if err := unwrapErr(res.errorResponse); err != nil {
+	if err := wrapErr(res.errorResponse); err != nil {
 		return "", err
 	}
 
