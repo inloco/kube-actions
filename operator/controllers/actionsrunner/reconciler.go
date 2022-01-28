@@ -77,10 +77,10 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&inlocov1alpha1.ActionsRunner{}).
-		Owns(&inlocov1alpha1.ActionsRunnerJob{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
+		Owns(&inlocov1alpha1.ActionsRunnerJob{}).
 		Watches(r.wires.EventSource(), &handler.EnqueueRequestForObject{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		WithEventFilter(controllers.EventPredicate(eventFilter)).
@@ -89,7 +89,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func eventFilter(e controllers.Event) bool {
 	switch o := controllers.EventObject(e); o.(type) {
-	case *inlocov1alpha1.ActionsRunnerJob, *corev1.ConfigMap, *corev1.Secret, *policyv1.PodDisruptionBudget:
+	case *corev1.ConfigMap, *corev1.Secret, *policyv1.PodDisruptionBudget, *inlocov1alpha1.ActionsRunnerJob:
 		switch e.(type) {
 		case event.UpdateEvent, event.DeleteEvent:
 			return true
@@ -133,10 +133,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
+	if controllers.IsBeingDeleted(&configMap) {
+		logger.Info("ConfigMap is being deleted")
+		return ctrl.Result{}, nil
+	}
+
 	var secret corev1.Secret
 	if err := r.Get(ctx, req.NamespacedName, &secret); client.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to get Secret")
 		return ctrl.Result{}, err
+	}
+
+	if controllers.IsBeingDeleted(&secret) {
+		logger.Info("Secret is being deleted")
+		return ctrl.Result{}, nil
 	}
 
 	w, err := r.wires.WireFor(ctx, &actionsRunner, util.ToDotFiles(&configMap, &secret))
@@ -190,6 +200,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err := r.Get(ctx, req.NamespacedName, &podDisruptionBudget); client.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to get PodDisruptionBudget")
 		return ctrl.Result{}, err
+	}
+
+	if controllers.IsBeingDeleted(&podDisruptionBudget) {
+		logger.Info("PodDisruptionBudget is being deleted")
+		return ctrl.Result{}, nil
 	}
 
 	desiredPodDisruptionBudget, err := util.ToPodDisruptionBudget(&actionsRunner, r.Scheme)
@@ -260,6 +275,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	case err != nil:
 		logger.Error(err, "Failed to get ActionsRunnerJob")
 		return ctrl.Result{}, err
+	}
+
+	if controllers.IsBeingDeleted(&actionsRunnerJob) {
+		logger.Info("ActionsRunnerJob is being deleted")
+		return ctrl.Result{}, nil
 	}
 
 	persistentVolumeClaimPhase := actionsRunnerJob.Status.PersistentVolumeClaimPhase
