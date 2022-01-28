@@ -161,7 +161,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			logger.Info("Failed to build desired ConfigMap")
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, desiredConfigMap, controllers.CreateOpts...); err != nil {
+		if err := r.Create(ctx, desiredConfigMap, controllers.CreateOpts...); controllers.IgnoreAlreadyExists(err) != nil {
 			logger.Error(err, "Failed to create ConfigMap")
 			return ctrl.Result{}, err
 		}
@@ -175,7 +175,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			logger.Info("Failed to build desired Secret")
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, desiredSecret, controllers.CreateOpts...); err != nil {
+		if err := r.Create(ctx, desiredSecret, controllers.CreateOpts...); controllers.IgnoreAlreadyExists(err) != nil {
 			logger.Error(err, "Failed to create Secret")
 			return ctrl.Result{}, err
 		}
@@ -197,7 +197,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	case controllers.ReconciliationActionCreate:
 		logger.Info("PodDisruptionBudget needs to be created")
 
-		if err := r.Create(ctx, desiredPodDisruptionBudget, controllers.CreateOpts...); err != nil {
+		if err := r.Create(ctx, desiredPodDisruptionBudget, controllers.CreateOpts...); controllers.IgnoreAlreadyExists(err) != nil {
 			logger.Error(err, "Failed to create PodDisruptionBudget")
 			return ctrl.Result{}, err
 		}
@@ -235,7 +235,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				logger.Error(err, "Failed to build desired ActionsRunnerJob")
 				return ctrl.Result{}, err
 			}
-			if err := r.Create(ctx, desiredActionsRunnerJob, controllers.CreateOpts...); err != nil {
+			if err := r.Create(ctx, desiredActionsRunnerJob, controllers.CreateOpts...); controllers.IgnoreAlreadyExists(err) != nil {
 				logger.Error(err, "Failed to create ActionsRunnerJob")
 				return ctrl.Result{}, err
 			}
