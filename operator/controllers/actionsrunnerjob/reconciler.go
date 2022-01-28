@@ -113,7 +113,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if desiredPersistentVolumeClaim != nil {
 			logger.Info("PersistentVolumeClaim needs to be created")
 
-			if err := r.Create(ctx, desiredPersistentVolumeClaim, controllers.CreateOpts...); err != nil {
+			if err := r.Create(ctx, desiredPersistentVolumeClaim, controllers.CreateOpts...); controllers.IgnoreAlreadyExists(err) != nil {
 				logger.Error(err, "Failed to create PersistentVolumeClaim")
 				return ctrl.Result{}, err
 			}
@@ -156,7 +156,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if desiredPod != nil {
 			logger.Info("Pod needs to be created")
 
-			if err := r.Create(ctx, desiredPod, controllers.CreateOpts...); err != nil {
+			if err := r.Create(ctx, desiredPod, controllers.CreateOpts...); controllers.IgnoreAlreadyExists(err) != nil {
 				logger.Error(err, "Failed to create Pod")
 				return ctrl.Result{}, err
 			}
