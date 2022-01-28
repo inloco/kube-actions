@@ -27,12 +27,15 @@ type ActionsRunnerReplicaSetSpec struct {
 }
 
 // ActionsRunnerReplicaSetStatus defines the observed state of ActionsRunnerReplicaSet
-type ActionsRunnerReplicaSetStatus struct{}
+type ActionsRunnerReplicaSetStatus struct {
+	Replicas uint   `json:"replicas,omitempty"`
+	Selector string `json:"selector,omitempty"`
+}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:categories=actions,shortName=arrs
 // +kubebuilder:subresource:status
-// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.labelSelector
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
 
 // ActionsRunnerReplicaSet is the Schema for the actionsrunnerjobs API
 type ActionsRunnerReplicaSet struct {

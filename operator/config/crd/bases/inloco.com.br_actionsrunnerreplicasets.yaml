@@ -2695,13 +2695,18 @@ spec:
           status:
             description: ActionsRunnerReplicaSetStatus defines the observed state
               of ActionsRunnerReplicaSet
+            properties:
+              replicas:
+                type: integer
+              selector:
+                type: string
             type: object
         type: object
     served: true
     storage: true
     subresources:
       scale:
-        labelSelectorPath: .status.labelSelector
+        labelSelectorPath: .status.selector
         specReplicasPath: .spec.replicas
         statusReplicasPath: .status.replicas
       status: {}

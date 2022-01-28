@@ -1,14 +1,33 @@
 package controllers
 
 import (
-	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"reflect"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 )
 
-const (
-	runnerResourcesKey = "runner"
+var (
+	CreateOpts = []client.CreateOption{
+		client.FieldOwner("kube-actions"),
+	}
+
+	PatchOpts = []client.PatchOption{
+		client.ForceOwnership,
+		client.FieldOwner("kube-actions"),
+	}
+
+	UpdateOpts = []client.UpdateOption{
+		client.FieldOwner("kube-actions"),
+	}
+
+	DeleteOpts = []client.DeleteOption{
+		client.PropagationPolicy(metav1.DeletePropagationForeground),
+	}
 )
 
 func HasActionsRunnerRequestedStorage(actionsRunner *inlocov1alpha1.ActionsRunner) bool {
@@ -16,7 +35,7 @@ func HasActionsRunnerRequestedStorage(actionsRunner *inlocov1alpha1.ActionsRunne
 		return false
 	}
 
-	res, ok := actionsRunner.Spec.Resources[runnerResourcesKey]
+	res, ok := actionsRunner.Spec.Resources["runner"]
 	if !ok {
 		return false
 	}
@@ -74,4 +93,46 @@ func (ep EventPredicate) Delete(deleteEvent event.DeleteEvent) bool {
 
 func (ep EventPredicate) Generic(genericEvent event.GenericEvent) bool {
 	return ep(genericEvent)
+}
+
+type ReconciliationAction byte
+
+const (
+	ReconciliationActionNothing = iota
+	ReconciliationActionCreate
+	ReconciliationActionPatch
+	ReconciliationActionDelete
+)
+
+func CalculateReconciliationAction(actual client.Object, desired client.Object) ReconciliationAction {
+	actualIsZero := IsZero(actual)
+	desiredIsZero := IsZero(desired)
+
+	if actualIsZero && !desiredIsZero {
+		return ReconciliationActionCreate
+	}
+
+	if !actualIsZero && !desiredIsZero {
+		return ReconciliationActionPatch
+	}
+
+	if !actualIsZero && desiredIsZero {
+		return ReconciliationActionDelete
+	}
+
+	return ReconciliationActionNothing
+}
+
+func IsZero(i interface{}) bool {
+	v := reflect.ValueOf(i)
+	if v.Kind() == reflect.Invalid {
+		return true
+	}
+
+	v = reflect.Indirect(v)
+	if v.Kind() == reflect.Invalid {
+		return true
+	}
+
+	return v.IsZero()
 }
