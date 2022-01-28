@@ -145,3 +145,12 @@ func IgnoreAlreadyExists(err error) error {
 
 	return err
 }
+
+func IsBeingDeleted(o client.Object) bool {
+	if o == nil {
+		return true
+	}
+
+	deletionTimestamp := o.GetDeletionTimestamp()
+	return deletionTimestamp != nil && !deletionTimestamp.IsZero()
+}
