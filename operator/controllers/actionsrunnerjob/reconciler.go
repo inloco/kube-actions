@@ -64,7 +64,7 @@ func eventFilter(e controllers.Event) bool {
 			return true
 		}
 
-	case *corev1.Pod, *corev1.PersistentVolumeClaim:
+	case *corev1.PersistentVolumeClaim, *corev1.Pod:
 		switch e.(type) {
 		case event.UpdateEvent, event.DeleteEvent:
 			return true
@@ -107,6 +107,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
+	if controllers.IsBeingDeleted(&actionsRunner) {
+		logger.Info("ActionsRunner is being deleted")
+		return ctrl.Result{}, nil
+	}
+
 	var persistentVolumeClaim corev1.PersistentVolumeClaim
 	switch err := r.Get(ctx, req.NamespacedName, &persistentVolumeClaim); {
 	case apierrors.IsNotFound(err):
@@ -127,6 +132,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	case err != nil:
 		logger.Error(err, "Failed to get PersistentVolumeClaim")
 		return ctrl.Result{}, err
+	}
+
+	if controllers.IsBeingDeleted(&persistentVolumeClaim) {
+		logger.Info("PersistentVolumeClaim is being deleted")
+		return ctrl.Result{}, nil
 	}
 
 	pvcPhase := persistentVolumeClaim.Status.Phase
@@ -170,6 +180,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	case err != nil:
 		logger.Error(err, "Failed to get Pod")
 		return ctrl.Result{}, err
+	}
+
+	if controllers.IsBeingDeleted(&pod) {
+		logger.Info("Pod is being deleted")
+		return ctrl.Result{}, nil
 	}
 
 	podPhase := pod.Status.Phase

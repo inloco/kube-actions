@@ -174,7 +174,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger := logger.WithValues("actionsRunner", actionsRunner.GetName())
 		logger.Info("Less replicas than desired, creating ActionsRunner")
 
-		if err := r.Create(ctx, actionsRunner, controllers.CreateOpts...); controllers.IgnoreAlreadyExists(err) != nil {
+		if err := r.Create(ctx, actionsRunner, controllers.CreateOpts...); err != nil {
 			return ctrl.Result{}, err
 		}
 
