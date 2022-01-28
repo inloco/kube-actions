@@ -22,7 +22,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,25 +32,6 @@ import (
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/controllers"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
-)
-
-var (
-	createOpts = []client.CreateOption{
-		client.FieldOwner("kube-actions"),
-	}
-
-	patchOpts = []client.PatchOption{
-		client.ForceOwnership,
-		client.FieldOwner("kube-actions"),
-	}
-
-	updateOpts = []client.UpdateOption{
-		client.FieldOwner("kube-actions"),
-	}
-
-	deleteOpts = []client.DeleteOption{
-		client.PropagationPolicy(metav1.DeletePropagationForeground),
-	}
 )
 
 // Reconciler reconciles an ActionsRunnerJob object
@@ -122,91 +102,90 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	if controllers.HasActionsRunnerRequestedStorage(&actionsRunner) {
-		var persistentVolumeClaim corev1.PersistentVolumeClaim
-		switch err := r.Get(ctx, req.NamespacedName, &persistentVolumeClaim); {
-		case apierrors.IsNotFound(err):
-			desiredPersistentVolumeClaim, err := util.ToPersistentVolumeClaim(&actionsRunner, &actionsRunnerJob, r.Scheme)
-			if err != nil {
-				logger.Info("Failed to build desired PersistentVolumeClaim")
+	var persistentVolumeClaim corev1.PersistentVolumeClaim
+	switch err := r.Get(ctx, req.NamespacedName, &persistentVolumeClaim); {
+	case apierrors.IsNotFound(err):
+		desiredPersistentVolumeClaim, err := util.ToPersistentVolumeClaim(&actionsRunner, &actionsRunnerJob, r.Scheme)
+		if err != nil {
+			logger.Info("Failed to build desired PersistentVolumeClaim")
+			return ctrl.Result{}, err
+		}
+		if desiredPersistentVolumeClaim != nil {
+			logger.Info("PersistentVolumeClaim needs to be created")
+
+			if err := r.Create(ctx, desiredPersistentVolumeClaim, controllers.CreateOpts...); err != nil {
+				logger.Error(err, "Failed to create PersistentVolumeClaim")
 				return ctrl.Result{}, err
 			}
-			if desiredPersistentVolumeClaim != nil {
-				logger.Info("PersistentVolumeClaim needs to be created")
+		}
 
-				if err := r.Create(ctx, desiredPersistentVolumeClaim, createOpts...); err != nil {
-					logger.Error(err, "Failed to create PersistentVolumeClaim")
-					return ctrl.Result{}, err
-				}
-			}
+	case err != nil:
+		logger.Error(err, "Failed to get PersistentVolumeClaim")
+		return ctrl.Result{}, err
+	}
 
-		case err != nil:
-			logger.Error(err, "Failed to get PersistentVolumeClaim")
+	pvcPhase := persistentVolumeClaim.Status.Phase
+	if actionsRunnerJob.Status.PersistentVolumeClaimPhase != pvcPhase {
+		logger.Info("PersistentVolumeClaimPhase changed", "phase", pvcPhase)
+		actionsRunnerJob.Status.PersistentVolumeClaimPhase = pvcPhase
+
+		logger.Info("ActionsRunnerJobStatus needs to be patched")
+		if err := r.Status().Patch(ctx, &actionsRunnerJob, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to patch ActionsRunnerJobStatus")
 			return ctrl.Result{}, err
 		}
 
-		phase := persistentVolumeClaim.Status.Phase
-		if actionsRunnerJob.Status.PersistentVolumeClaimPhase != phase {
-			logger.Info("PersistentVolumeClaimPhase changed", "phase", phase)
-			actionsRunnerJob.Status.PersistentVolumeClaimPhase = phase
+		return ctrl.Result{}, nil
+	}
 
-			logger.Info("ActionsRunnerJobStatus needs to be patched")
-			if err := r.Status().Patch(ctx, &actionsRunnerJob, client.Apply, patchOpts...); err != nil {
-				logger.Error(err, "Failed to patch ActionsRunnerJobStatus")
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{}, nil
-		}
-
-		switch phase {
-		case corev1.ClaimPending:
-			return ctrl.Result{}, nil
-		case corev1.ClaimLost:
-			return ctrl.Result{}, fmt.Errorf("corev1.Claim%s", phase)
-		}
+	switch pvcPhase {
+	case corev1.ClaimPending:
+		return ctrl.Result{}, nil
+	case corev1.ClaimLost:
+		return ctrl.Result{}, fmt.Errorf("corev1.Claim%s", pvcPhase)
 	}
 
 	var pod corev1.Pod
 	switch err := r.Get(ctx, req.NamespacedName, &pod); {
-	case err == nil:
-		phase := pod.Status.Phase
-		if actionsRunnerJob.Status.PodPhase != phase {
-			logger.Info("PodPhase changed", "phase", phase)
-			actionsRunnerJob.Status.PodPhase = phase
-
-			logger.Info("ActionsRunnerJobStatus needs to be patched")
-			if err := r.Status().Patch(ctx, &actionsRunnerJob, client.Apply, patchOpts...); err != nil {
-				logger.Error(err, "Failed to patch ActionsRunnerJobStatus")
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{}, nil
-		}
-
-		switch phase {
-		case corev1.PodPending:
-			return ctrl.Result{}, nil
-		case corev1.PodUnknown:
-			return ctrl.Result{}, fmt.Errorf("corev1.Pod%s", phase)
-		}
-
 	case apierrors.IsNotFound(err):
-		logger.Info("Pod needs to be created")
-
 		desiredPod, err := util.ToPod(&actionsRunner, &actionsRunnerJob, r.Scheme)
 		if err != nil {
 			logger.Info("Failed to build desired Pod")
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, desiredPod, createOpts...); err != nil {
-			logger.Error(err, "Failed to create Pod")
+		if desiredPod != nil {
+			logger.Info("Pod needs to be created")
+
+			if err := r.Create(ctx, desiredPod, controllers.CreateOpts...); err != nil {
+				logger.Error(err, "Failed to create Pod")
+				return ctrl.Result{}, err
+			}
+		}
+
+	case err != nil:
+		logger.Error(err, "Failed to get Pod")
+		return ctrl.Result{}, err
+	}
+
+	podPhase := pod.Status.Phase
+	if actionsRunnerJob.Status.PodPhase != podPhase {
+		logger.Info("PodPhase changed", "phase", podPhase)
+		actionsRunnerJob.Status.PodPhase = podPhase
+
+		logger.Info("ActionsRunnerJobStatus needs to be patched")
+		if err := r.Status().Patch(ctx, &actionsRunnerJob, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to patch ActionsRunnerJobStatus")
 			return ctrl.Result{}, err
 		}
 
-	default:
-		logger.Error(err, "Failed to get Pod")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
+	}
+
+	switch podPhase {
+	case corev1.PodPending:
+		return ctrl.Result{}, nil
+	case corev1.PodUnknown:
+		return ctrl.Result{}, fmt.Errorf("corev1.Pod%s", podPhase)
 	}
 
 	return ctrl.Result{}, nil

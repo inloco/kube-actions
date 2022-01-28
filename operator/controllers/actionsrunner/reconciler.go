@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,25 +40,6 @@ import (
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
 	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/wire"
 	"github.com/inloco/kube-actions/operator/metrics"
-)
-
-var (
-	createOpts = []client.CreateOption{
-		client.FieldOwner("kube-actions"),
-	}
-
-	patchOpts = []client.PatchOption{
-		client.ForceOwnership,
-		client.FieldOwner("kube-actions"),
-	}
-
-	updateOpts = []client.UpdateOption{
-		client.FieldOwner("kube-actions"),
-	}
-
-	deleteOpts = []client.DeleteOption{
-		client.PropagationPolicy(metav1.DeletePropagationForeground),
-	}
 )
 
 // Reconciler reconciles an actionsRunner object
@@ -158,19 +138,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Error(err, "Failed to get Wire")
 
 		logger.Info("ConfigMap needs to be deleted")
-		if err := r.Delete(ctx, &configMap, deleteOpts...); client.IgnoreNotFound(err) != nil {
+		if err := r.Delete(ctx, &configMap, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "Failed to delete ConfigMap")
 		}
 
 		logger.Info("Secret needs to be deleted")
-		if err := r.Delete(ctx, &secret, deleteOpts...); client.IgnoreNotFound(err) != nil {
+		if err := r.Delete(ctx, &secret, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "Failed to delete Secret")
 		}
 
 		return ctrl.Result{}, err
 	}
 
-	if reflect.ValueOf(configMap).IsZero() {
+	if controllers.IsZero(configMap) {
 		logger.Info("ConfigMap needs to be created")
 
 		desiredConfigMap, err := util.ToConfigMap(w.DotFiles, &actionsRunner, r.Scheme)
@@ -178,13 +158,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			logger.Info("Failed to build desired ConfigMap")
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, desiredConfigMap, createOpts...); err != nil {
+		if err := r.Create(ctx, desiredConfigMap, controllers.CreateOpts...); err != nil {
 			logger.Error(err, "Failed to create ConfigMap")
 			return ctrl.Result{}, err
 		}
 	}
 
-	if reflect.ValueOf(configMap).IsZero() {
+	if controllers.IsZero(secret) {
 		logger.Info("Secret needs to be created")
 
 		desiredSecret, err := util.ToSecret(w.DotFiles, &actionsRunner, r.Scheme)
@@ -192,7 +172,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			logger.Info("Failed to build desired Secret")
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, desiredSecret, createOpts...); err != nil {
+		if err := r.Create(ctx, desiredSecret, controllers.CreateOpts...); err != nil {
 			logger.Error(err, "Failed to create Secret")
 			return ctrl.Result{}, err
 		}
@@ -204,43 +184,44 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	// TODO: move PDB to ARJ
 	desiredPodDisruptionBudget, err := util.ToPodDisruptionBudget(&actionsRunner, r.Scheme)
 	if err != nil {
-		logger.Error(err, "Failed to build desired PodDisruptionBudget")
+		logger.Info("Failed to build desired PodDisruptionBudget")
 		return ctrl.Result{}, err
 	}
-	if !reflect.DeepEqual(podDisruptionBudget.Spec, desiredPodDisruptionBudget.Spec) {
+
+	switch controllers.CalculateReconciliationAction(&podDisruptionBudget, desiredPodDisruptionBudget) {
+	case controllers.ReconciliationActionCreate:
+		logger.Info("PodDisruptionBudget needs to be created")
+
+		if err := r.Create(ctx, desiredPodDisruptionBudget, controllers.CreateOpts...); err != nil {
+			logger.Error(err, "Failed to create PodDisruptionBudget")
+			return ctrl.Result{}, err
+		}
+
+	case controllers.ReconciliationActionPatch:
+		if reflect.DeepEqual(podDisruptionBudget.Spec, desiredPodDisruptionBudget.Spec) {
+			break
+		}
+
 		logger.Info("PodDisruptionBudget needs to be patched")
 
-		if err := r.Patch(ctx, desiredPodDisruptionBudget, client.Apply, patchOpts...); err != nil {
+		if err := r.Patch(ctx, desiredPodDisruptionBudget, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "Failed to patch PodDisruptionBudget")
+			return ctrl.Result{}, err
+		}
+
+	case controllers.ReconciliationActionDelete:
+		logger.Info("PodDisruptionBudget needs to be deleted")
+
+		if err := r.Delete(ctx, desiredPodDisruptionBudget, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to create PodDisruptionBudget")
 			return ctrl.Result{}, err
 		}
 	}
 
 	var actionsRunnerJob inlocov1alpha1.ActionsRunnerJob
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerJob); {
-	case err == nil:
-		persistentVolumeClaimPhase := actionsRunnerJob.Status.PersistentVolumeClaimPhase
-		podPhase := actionsRunnerJob.Status.PodPhase
-		logger = logger.WithValues("persistentVolumeClaimPhase", persistentVolumeClaimPhase, "podPhase", podPhase)
-
-		var completed bool
-		switch persistentVolumeClaimPhase {
-		case corev1.ClaimLost:
-			completed = true
-		}
-		switch podPhase {
-		case corev1.PodSucceeded, corev1.PodFailed, corev1.PodUnknown:
-			completed = true
-		}
-
-		if !completed {
-			logger.Info("Waiting ActionsRunnerJob to complete")
-			return ctrl.Result{}, nil
-		}
-
 	case apierrors.IsNotFound(err):
 		select {
 		case <-w.JobRequests():
@@ -251,7 +232,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				logger.Error(err, "Failed to build desired ActionsRunnerJob")
 				return ctrl.Result{}, err
 			}
-			if err := r.Create(ctx, desiredActionsRunnerJob, createOpts...); err != nil {
+			if err := r.Create(ctx, desiredActionsRunnerJob, controllers.CreateOpts...); err != nil {
 				logger.Error(err, "Failed to create ActionsRunnerJob")
 				return ctrl.Result{}, err
 			}
@@ -268,13 +249,32 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, nil
 		}
 
-	default:
+	case err != nil:
 		logger.Error(err, "Failed to get ActionsRunnerJob")
 		return ctrl.Result{}, err
 	}
 
+	persistentVolumeClaimPhase := actionsRunnerJob.Status.PersistentVolumeClaimPhase
+	podPhase := actionsRunnerJob.Status.PodPhase
+	logger = logger.WithValues("persistentVolumeClaimPhase", persistentVolumeClaimPhase, "podPhase", podPhase)
+
+	var completed bool
+	switch persistentVolumeClaimPhase {
+	case corev1.ClaimLost:
+		completed = true
+	}
+	switch podPhase {
+	case corev1.PodSucceeded, corev1.PodFailed, corev1.PodUnknown:
+		completed = true
+	}
+
+	if !completed {
+		logger.Info("Waiting ActionsRunnerJob to complete")
+		return ctrl.Result{}, nil
+	}
+
 	logger.Info("ActionsRunnerJob needs to be deleted")
-	if err := r.Delete(ctx, &actionsRunnerJob, deleteOpts...); err != nil {
+	if err := r.Delete(ctx, &actionsRunnerJob, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to delete ActionsRunnerJob")
 		return ctrl.Result{}, err
 	}

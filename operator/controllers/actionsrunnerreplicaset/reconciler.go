@@ -31,28 +31,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
+	"github.com/inloco/kube-actions/operator/controllers"
 )
 
-var (
-	createOpts = []client.CreateOption{
-		client.FieldOwner("kube-actions"),
+func matchingLabels(actionsRunnerReplicaSet inlocov1alpha1.ActionsRunnerReplicaSet) client.MatchingLabels {
+	return client.MatchingLabels{
+		"kube-actions.inloco.com.br/actions-runner-replica-set": actionsRunnerReplicaSet.GetName(),
 	}
-
-	updateOpts = []client.UpdateOption{
-		client.FieldOwner("kube-actions"),
-	}
-
-	deleteOpts = []client.DeleteOption{
-		client.PropagationPolicy(metav1.DeletePropagationForeground),
-	}
-)
+}
 
 func listOpts(actionsRunnerReplicaSet inlocov1alpha1.ActionsRunnerReplicaSet) []client.ListOption {
 	return []client.ListOption{
 		client.InNamespace(actionsRunnerReplicaSet.GetNamespace()),
-		client.MatchingLabels{
-			"kube-actions.inloco.com.br/actions-runner-replica-set": actionsRunnerReplicaSet.GetName(),
-		},
+		matchingLabels(actionsRunnerReplicaSet),
 	}
 }
 
@@ -73,9 +64,7 @@ func desiredActionsRunner(actionsRunnerReplicaSet *inlocov1alpha1.ActionsRunnerR
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: actionsRunnerReplicaSet.GetName() + "-",
 			Namespace:    actionsRunnerReplicaSet.GetNamespace(),
-			Labels: map[string]string{
-				"kube-actions.inloco.com.br/actions-runner-replica-set": actionsRunnerReplicaSet.GetName(),
-			},
+			Labels:       matchingLabels(*actionsRunnerReplicaSet),
 		},
 		Spec: actionsRunnerReplicaSet.Spec.Template,
 	}
@@ -85,6 +74,21 @@ func desiredActionsRunner(actionsRunnerReplicaSet *inlocov1alpha1.ActionsRunnerR
 	}
 
 	return &actionsRunner, nil
+}
+
+func desiredSelector(actionsRunnerReplicaSet *inlocov1alpha1.ActionsRunnerReplicaSet) (string, error) {
+	if actionsRunnerReplicaSet == nil {
+		return "", errors.New("actionsRunnerReplicaSet == nil")
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: matchingLabels(*actionsRunnerReplicaSet),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return selector.String(), nil
 }
 
 // Reconciler reconciles an ActionsRunnerReplicaSet object
@@ -110,7 +114,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx, "namespacedName", req.NamespacedName.String())
 
 	var actionsRunnerReplicaSet inlocov1alpha1.ActionsRunnerReplicaSet
 	switch err := r.Get(ctx, req.NamespacedName, &actionsRunnerReplicaSet); {
@@ -123,39 +127,99 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 	actionsRunnerReplicaSet.SetManagedFields(nil)
 
+	selector, err := desiredSelector(&actionsRunnerReplicaSet)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if actionsRunnerReplicaSet.Status.Selector != selector {
+		logger.Info("ActionsRunnerReplicaSetStatus needs to be patched")
+		actionsRunnerReplicaSet.Status.Selector = selector
+
+		if err := r.Status().Patch(ctx, &actionsRunnerReplicaSet, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to patch ActionsRunnerReplicaSetStatus")
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
+	}
+
 	var actionsRunnerList inlocov1alpha1.ActionsRunnerList
 	if err := r.List(ctx, &actionsRunnerList, listOpts(actionsRunnerReplicaSet)...); err != nil {
 		return ctrl.Result{}, err
 	}
-
-	expected := int(actionsRunnerReplicaSet.Spec.Replicas)
 	items := actionsRunnerList.Items
 
-	if len(items) < expected {
+	actionsRunners := make([]inlocov1alpha1.ActionsRunner, 0, len(items))
+	for _, actionsRunner := range items {
+		if deletionTimestamp := actionsRunner.GetObjectMeta().GetDeletionTimestamp(); deletionTimestamp == nil || deletionTimestamp.IsZero() {
+			actionsRunners = append(actionsRunners, actionsRunner)
+		}
+	}
+
+	actual := len(actionsRunners)
+	desired := int(actionsRunnerReplicaSet.Spec.Replicas)
+
+	if actual < desired {
 		actionsRunner, err := desiredActionsRunner(&actionsRunnerReplicaSet, r.Scheme)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		logger.Info("Less replicas than expected, creating ActionsRunner " + actionsRunner.GetGenerateName())
 
-		return ctrl.Result{}, r.Create(ctx, actionsRunner, createOpts...)
+		logger := logger.WithValues("actionsRunner", actionsRunner.GetName())
+		logger.Info("Less replicas than desired, creating ActionsRunner")
+
+		if err := r.Create(ctx, actionsRunner, controllers.CreateOpts...); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		logger.Info("ActionsRunnerReplicaSetStatus needs to be patched")
+		actionsRunnerReplicaSet.Status.Replicas = uint(actual + 1)
+
+		if err := r.Status().Patch(ctx, &actionsRunnerReplicaSet, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to patch ActionsRunnerReplicaSetStatus")
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
 	}
 
-	if len(items) > expected {
+	if actual > desired {
 		// TODO: prioritize deletion of idle ARs
 		actionsRunner := &items[0]
-		logger.Info("More replicas than expected, deleting ActionsRunner " + actionsRunner.GetName())
 
-		return ctrl.Result{}, r.Delete(ctx, actionsRunner, deleteOpts...)
+		logger := logger.WithValues("actionsRunner", actionsRunner.GetName())
+		logger.Info("More replicas than desired, deleting ActionsRunner")
+
+		if err := r.Delete(ctx, actionsRunner, controllers.DeleteOpts...); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		logger.Info("ActionsRunnerReplicaSetStatus needs to be patched")
+		actionsRunnerReplicaSet.Status.Replicas = uint(actual - 1)
+
+		if err := r.Status().Patch(ctx, &actionsRunnerReplicaSet, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to patch ActionsRunnerReplicaSetStatus")
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
 	}
 
-	for _, item := range items {
-		if !reflect.DeepEqual(item.Spec, actionsRunnerReplicaSet.Spec.Template) {
-			actionsRunner := item
+	for _, actionsRunner := range actionsRunners {
+		if reflect.DeepEqual(actionsRunner.Spec, actionsRunnerReplicaSet.Spec.Template) {
+			continue
+		}
 
-			logger.Info("Undesired replica, patching ActionsRunner " + actionsRunner.GetName())
-			actionsRunner.Spec = actionsRunnerReplicaSet.Spec.Template
-			return ctrl.Result{}, r.Update(ctx, &actionsRunner, updateOpts...)
+		logger := logger.WithValues("actionsRunner", actionsRunner.GetName())
+		actionsRunner.SetManagedFields(nil)
+
+		logger.Info("Undesired spec, patching ActionsRunner")
+		actionsRunner.Spec = actionsRunnerReplicaSet.Spec.Template
+
+		if err := r.Patch(ctx, &actionsRunner, client.Apply, controllers.PatchOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to patch ActionsRunner")
+			return ctrl.Result{}, err
 		}
 	}
 
