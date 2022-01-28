@@ -224,17 +224,26 @@ func (w *Wire) Listen() {
 			}
 		}()
 
+		if err := w.adoFacade.RefreshForRun(ctx, w.DotFiles); err != nil {
+			w.invalid = true
+			logger.Info("Wire gone")
+			panic(err)
+		}
+
 		if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
 			w.invalid = true
 			logger.Info("Wire gone")
 			panic(err)
 		}
 
-		logger.Info("Getting message")
-
 		var lastMessageId *uint64
-
 		for !w.isClosed() {
+			if err := w.adoFacade.RefreshForRun(ctx, w.DotFiles); err != nil {
+				panic(err)
+			}
+
+			logger.Info("Getting message")
+
 			taMessage, err := w.adoFacade.GetMessage(ctx, lastMessageId)
 			if err != nil {
 				panic(err)

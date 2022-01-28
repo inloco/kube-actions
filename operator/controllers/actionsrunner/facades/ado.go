@@ -115,6 +115,18 @@ func (ado *AzureDevOps) InitForRun(ctx context.Context, dotFiles *dot.Files, lab
 	return nil
 }
 
+func (ado *AzureDevOps) RefreshForRun(ctx context.Context, dotFiles *dot.Files) error {
+	if err := ado.initAzureDevOpsBridgeConnection(ctx, dotFiles); err != nil {
+		return err
+	}
+
+	if err := ado.initAzureDevOpsBridgeTaskAgentClient(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (ado *AzureDevOps) initRSAPrivateKey(dotFiles *dot.Files) error {
 	rsaPrivateKey, err := dotFiles.RSAParameters.ToRSAPrivateKey()
 	if err != nil {
