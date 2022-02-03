@@ -18,7 +18,6 @@ package actionsrunnerjob
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -134,11 +133,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	if controllers.IsBeingDeleted(&persistentVolumeClaim) {
-		logger.Info("PersistentVolumeClaim is being deleted")
-		return ctrl.Result{}, nil
-	}
-
 	pvcPhase := persistentVolumeClaim.Status.Phase
 	if actionsRunnerJob.Status.PersistentVolumeClaimPhase != pvcPhase {
 		logger.Info("PersistentVolumeClaimPhase changed", "phase", pvcPhase)
@@ -153,11 +147,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	switch pvcPhase {
-	case corev1.ClaimPending:
+	if controllers.IsBeingDeleted(&persistentVolumeClaim) {
+		logger.Info("PersistentVolumeClaim is being deleted")
 		return ctrl.Result{}, nil
-	case corev1.ClaimLost:
-		return ctrl.Result{}, fmt.Errorf("corev1.Claim%s", pvcPhase)
+	}
+
+	if pvcPhase == corev1.ClaimLost {
+		logger.Info("PersistentVolumeClaim needs to be deleted")
+		if err := r.Delete(ctx, &persistentVolumeClaim, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to delete PersistentVolumeClaim")
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
 	}
 
 	var pod corev1.Pod
@@ -182,11 +184,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	if controllers.IsBeingDeleted(&pod) {
-		logger.Info("Pod is being deleted")
-		return ctrl.Result{}, nil
-	}
-
 	podPhase := pod.Status.Phase
 	if actionsRunnerJob.Status.PodPhase != podPhase {
 		logger.Info("PodPhase changed", "phase", podPhase)
@@ -201,11 +198,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	switch podPhase {
-	case corev1.PodPending:
+	if controllers.IsBeingDeleted(&pod) {
+		logger.Info("Pod is being deleted")
 		return ctrl.Result{}, nil
-	case corev1.PodUnknown:
-		return ctrl.Result{}, fmt.Errorf("corev1.Pod%s", podPhase)
+	}
+
+	if podPhase == corev1.PodUnknown {
+		logger.Info("Pod needs to be deleted")
+		if err := r.Delete(ctx, &pod, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to delete Pod")
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
 	}
 
 	return ctrl.Result{}, nil
