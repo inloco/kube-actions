@@ -24,3 +24,7 @@ updates:
     directory: /operator
     schedule:
       interval: daily
+  - package-ecosystem: gomod
+    directory: /runner
+    schedule:
+      interval: daily
