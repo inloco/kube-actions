@@ -44,7 +44,8 @@ import (
 )
 
 const (
-	poolId = 1
+	ownerName = "Kube Actions"
+	poolId    = 1
 )
 
 var (
@@ -356,7 +357,6 @@ func (ado *AzureDevOps) CreateAgentSession(ctx context.Context) (*taskagent.Task
 		return nil, errors.New(".TaskAgentBridgeClient == nil")
 	}
 
-	ownerName := "Kube Actions"
 	return ado.TaskAgentBridgeClient.CreateAgentSession(ctx, taskagent.CreateAgentSessionArgs{
 		Session: &taskagent.TaskAgentSession{
 			Agent: &taskagent.TaskAgentReference{
@@ -370,7 +370,7 @@ func (ado *AzureDevOps) CreateAgentSession(ctx context.Context) (*taskagent.Task
 				Status:            ado.TaskAgent.Status,
 				Version:           ado.TaskAgent.Version,
 			},
-			OwnerName: &ownerName,
+			OwnerName: github.String(ownerName),
 			SessionId: &uuid.UUID{},
 		},
 		PoolId: github.Int(poolId),
@@ -621,7 +621,7 @@ func (ado *AzureDevOps) UpdateRecord(ctx context.Context, timelineRecords []task
 	}
 
 	records := azuredevops.VssJsonCollectionWrapper{
-		Count: &count,
+		Count: github.Int(count),
 		Value: &value,
 	}
 
