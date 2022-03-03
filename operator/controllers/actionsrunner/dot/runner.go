@@ -22,6 +22,8 @@ type Runner struct {
 	SkipSessionRecover   bool   `json:"skipSessionRecover,omitempty"`
 	PoolId               int    `json:"poolId,omitempty"`
 	PoolName             string `json:"poolName,omitempty"`
+	DisableUpdate        bool   `json:"disableUpdate,omitempty"`
+	Ephemeral            bool   `json:"ephemeral,omitempty"`
 	ServerUrl            string `json:"serverUrl,omitempty"`
 	GitHubUrl            string `json:"gitHubUrl,omitempty"`
 	WorkFolder           string `json:"workFolder,omitempty"`
