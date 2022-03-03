@@ -248,17 +248,22 @@ func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, dotFiles *
 	//	return errors.New(".rsaParameters == nil")
 	//}
 
+	publicKey := taskagent.TaskAgentPublicKey{
+		Exponent: &dotFiles.RSAParameters.Exponent,
+		Modulus:  &dotFiles.RSAParameters.Modulus,
+	}
+
+	authorization := taskagent.TaskAgentAuthorization{
+		PublicKey: &publicKey,
+	}
+
 	ado.TaskAgent = &taskagent.TaskAgent{
-		Id:      &dotFiles.Runner.AgentId,
-		Name:    &dotFiles.Runner.AgentName,
-		Version: &agentVersion,
-		Labels:  &labels,
-		Authorization: &taskagent.TaskAgentAuthorization{
-			PublicKey: &taskagent.TaskAgentPublicKey{
-				Exponent: &dotFiles.RSAParameters.Exponent,
-				Modulus:  &dotFiles.RSAParameters.Modulus,
-			},
-		},
+		DisableUpdate: github.Bool(true),
+		Id:            github.Int(dotFiles.Runner.AgentId),
+		Name:          github.String(dotFiles.Runner.AgentName),
+		Version:       github.String(agentVersion),
+		Authorization: &authorization,
+		Labels:        &labels,
 	}
 
 	if ado.TaskAgentClient == nil {
