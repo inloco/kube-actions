@@ -161,10 +161,11 @@ func (w *Wire) initDotFiles() error {
 
 	w.DotFiles = &dot.Files{
 		Runner: dot.Runner{
-			AgentName:  strings.ShortenString(fmt.Sprintf("KA %s %s", w.actionsRunner.GetNamespace(), w.actionsRunner.GetName()), 64),
-			PoolId:     1,
-			PoolName:   "Default",
-			WorkFolder: "_work",
+			AgentName:     strings.ShortenString(fmt.Sprintf("KA %s %s", w.actionsRunner.GetNamespace(), w.actionsRunner.GetName()), 64),
+			PoolId:        1,
+			PoolName:      "Default",
+			DisableUpdate: true,
+			WorkFolder:    "_work",
 		},
 		Credentials: dot.Credentials{
 			Scheme: "OAuth",

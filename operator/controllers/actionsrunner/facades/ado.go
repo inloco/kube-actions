@@ -44,7 +44,8 @@ import (
 )
 
 const (
-	poolId = 1
+	ownerName = "Kube Actions"
+	poolId    = 1
 )
 
 var (
@@ -248,17 +249,22 @@ func (ado *AzureDevOps) initAzureDevOpsTaskAgent(ctx context.Context, dotFiles *
 	//	return errors.New(".rsaParameters == nil")
 	//}
 
+	publicKey := taskagent.TaskAgentPublicKey{
+		Exponent: &dotFiles.RSAParameters.Exponent,
+		Modulus:  &dotFiles.RSAParameters.Modulus,
+	}
+
+	authorization := taskagent.TaskAgentAuthorization{
+		PublicKey: &publicKey,
+	}
+
 	ado.TaskAgent = &taskagent.TaskAgent{
-		Id:      &dotFiles.Runner.AgentId,
-		Name:    &dotFiles.Runner.AgentName,
-		Version: &agentVersion,
-		Labels:  &labels,
-		Authorization: &taskagent.TaskAgentAuthorization{
-			PublicKey: &taskagent.TaskAgentPublicKey{
-				Exponent: &dotFiles.RSAParameters.Exponent,
-				Modulus:  &dotFiles.RSAParameters.Modulus,
-			},
-		},
+		DisableUpdate: github.Bool(true),
+		Id:            github.Int(dotFiles.Runner.AgentId),
+		Name:          github.String(dotFiles.Runner.AgentName),
+		Version:       github.String(agentVersion),
+		Authorization: &authorization,
+		Labels:        &labels,
 	}
 
 	if ado.TaskAgentClient == nil {
@@ -351,7 +357,6 @@ func (ado *AzureDevOps) CreateAgentSession(ctx context.Context) (*taskagent.Task
 		return nil, errors.New(".TaskAgentBridgeClient == nil")
 	}
 
-	ownerName := "Kube Actions"
 	return ado.TaskAgentBridgeClient.CreateAgentSession(ctx, taskagent.CreateAgentSessionArgs{
 		Session: &taskagent.TaskAgentSession{
 			Agent: &taskagent.TaskAgentReference{
@@ -365,7 +370,7 @@ func (ado *AzureDevOps) CreateAgentSession(ctx context.Context) (*taskagent.Task
 				Status:            ado.TaskAgent.Status,
 				Version:           ado.TaskAgent.Version,
 			},
-			OwnerName: &ownerName,
+			OwnerName: github.String(ownerName),
 			SessionId: &uuid.UUID{},
 		},
 		PoolId: github.Int(poolId),
@@ -616,7 +621,7 @@ func (ado *AzureDevOps) UpdateRecord(ctx context.Context, timelineRecords []task
 	}
 
 	records := azuredevops.VssJsonCollectionWrapper{
-		Count: &count,
+		Count: github.Int(count),
 		Value: &value,
 	}
 
