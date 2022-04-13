@@ -173,7 +173,9 @@ func assureAwsEnv(ctx context.Context) error {
 	awsRegion, ok := os.LookupEnv(awsRegionEnv)
 	if !ok {
 		logger.Println("AWS_REGION not present, calling metadata server")
-		imdsClient := imds.New(imds.Options{})
+		imdsClient := imds.New(imds.Options{
+			ClientEnableState: imds.ClientEnabled,
+		})
 		output, err := imdsClient.GetRegion(ctx, nil)
 		if err != nil {
 			logger.Printf("Error creating aws imds client: %v\n", err)
