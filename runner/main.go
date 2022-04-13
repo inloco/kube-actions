@@ -156,11 +156,11 @@ func updateCaCertificates() error {
 }
 
 func setupGitCredentials() error {
-	if err := <-run("git", "config", "--system", "user.name", "github-actions[bot]"); err != nil {
+	if err := <-run("sudo", "git", "config", "--system", "user.name", "github-actions[bot]"); err != nil {
 		return errors.Wrap(err, "Error setting system username for git")
 	}
 
-	if err := <-run("git", "config", "--system", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"); err != nil {
+	if err := <-run("sudo", "git", "config", "--system", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"); err != nil {
 		return errors.Wrap(err, "Error setting system email for git")
 	}
 
@@ -173,9 +173,7 @@ func assureAwsEnv(ctx context.Context) error {
 	awsRegion, ok := os.LookupEnv(awsRegionEnv)
 	if !ok {
 		logger.Println("AWS_REGION not present, calling metadata server")
-		imdsClient := imds.New(imds.Options{
-			ClientEnableState: imds.ClientEnabled,
-		})
+		imdsClient := imds.New(imds.Options{})
 		output, err := imdsClient.GetRegion(ctx, nil)
 		if err != nil {
 			logger.Printf("Error creating aws imds client: %v\n", err)
