@@ -156,12 +156,12 @@ func updateCaCertificates() error {
 }
 
 func setupGitCredentials() error {
-	if err := <-run("git", "config", "--global", "user.name", "github-actions[bot]"); err != nil {
-		return errors.Wrap(err, "Error setting global username for git")
+	if err := <-run("git", "config", "--system", "user.name", "github-actions[bot]"); err != nil {
+		return errors.Wrap(err, "Error setting system username for git")
 	}
 
-	if err := <-run("git", "config", "--global", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"); err != nil {
-		return errors.Wrap(err, "Error setting global email for git")
+	if err := <-run("git", "config", "--system", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"); err != nil {
+		return errors.Wrap(err, "Error setting system email for git")
 	}
 
 	return nil
