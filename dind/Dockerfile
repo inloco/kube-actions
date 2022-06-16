@@ -7,7 +7,8 @@ RUN go mod download
 COPY ./*.go ./
 RUN CGO_ENABLED=0 go install -a -gcflags 'all=-N -l' -ldflags '-d -extldflags "-fno-PIC -static"' -tags 'netgo osusergo static_build' -trimpath -v ./...
 
-FROM docker:${DOCKER_VERSION}-dind-rootless
+# this is the last version whose base is alpine:3.15, which has iptables version that is not picky with our setuid binary
+FROM docker:20.10.15-dind-rootless
 USER root
 RUN apk add --no-cache jq socat fuse3 && \
     export CRUN_URL=$(wget -qO- https://api.github.com/repos/containers/crun/releases | jq -r '.[0].assets[] | select(.name | match("linux-amd64$")) | .browser_download_url') && \
