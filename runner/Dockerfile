@@ -16,13 +16,23 @@ RUN set -x && \
     export $(cat /etc/os-release | sed 's/"//g') && \
     unset IFS && \
     apt-get update && \
-    apt-get install -y apt-transport-https busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make parallel python3 python3-distutils software-properties-common ssh sudo zstd && \
+    apt-get install -y apt-transport-https apt-utils busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make parallel python3 python3-distutils software-properties-common ssh sudo zstd && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0 && \
     apt-add-repository https://cli.github.com/packages && \
     curl -sSLf https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
+    export DEBIAN_MIRROR=http://deb.debian.org/debian && \
+    export GGCI_PACKAGE=golang-github-containers-image && \
+    export GGCI_VERSION=5.10.3-1 && \
+    curl -sSLfo "/tmp/${GGCI_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCI_PACKAGE}/${GGCI_PACKAGE}_${GGCI_VERSION}_all.deb" && \
+    export GGCC_PACKAGE=golang-github-containers-common && \
+    export GGCC_VERSION=0.33.4+ds1-1+deb11u1 && \
+    curl -sSLfo "/tmp/${GGCC_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCC_PACKAGE}/${GGCC_PACKAGE}_${GGCC_VERSION}_all.deb" && \
+    export SKOPEO_PACKAGE=skopeo && \
+    export SKOPEO_VERSION=1.2.2+dfsg1-1+b6 && \
+    curl -sSLfo "/tmp/${SKOPEO_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/s/${SKOPEO_PACKAGE}/${SKOPEO_PACKAGE}_${SKOPEO_VERSION}_amd64.deb" && \
     apt-get update && \
-    apt-get install -y docker-ce-cli gh && \
+    apt-get install -y docker-ce-cli gh "/tmp/${GGCI_PACKAGE}.deb" "/tmp/${GGCC_PACKAGE}.deb" "/tmp/${SKOPEO_PACKAGE}.deb" && \
     busybox --install && \
     curl -sSLf https://bootstrap.pypa.io/get-pip.py | python3 - && \
     export HUB_URL=$(curl -sSLf https://api.github.com/repos/github/hub/releases/latest | jq -r '.assets[] | select(.name | match("linux-amd64")) | .browser_download_url') && \
