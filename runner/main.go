@@ -248,10 +248,6 @@ func waitForDocker() error {
 }
 
 func setupDockerConfig() error {
-	if !hasDockerCapability {
-		return nil
-	}
-
 	logger.Println("Preparing Docker config")
 
 	dockerConfigDir := dockerconfig.Dir()
