@@ -1,6 +1,6 @@
 ARG UBUNTU_VERSION
 
-FROM golang:1.16-alpine AS build
+FROM golang:1.19.0-alpine AS build
 WORKDIR /go/src/github.com/inloco/kube-actions/runner
 COPY ./go.mod ./go.sum ./
 RUN go mod download
