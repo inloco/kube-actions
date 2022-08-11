@@ -3,9 +3,9 @@ module github.com/inloco/kube-actions/runner
 go 1.16
 
 require (
-	github.com/aws/aws-sdk-go-v2/config v1.8.2
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.5.1
-	github.com/aws/aws-sdk-go-v2/service/sts v1.7.1
+	github.com/aws/aws-sdk-go-v2/config v1.16.0
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.11
+	github.com/aws/aws-sdk-go-v2/service/sts v1.16.12
 	github.com/containerd/containerd v1.5.6 // indirect
 	github.com/docker/cli v20.10.8+incompatible
 	github.com/docker/docker v20.10.8+incompatible
