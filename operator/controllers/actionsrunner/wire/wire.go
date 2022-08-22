@@ -94,6 +94,14 @@ func (w *Wire) init(ctx context.Context) error {
 		return err
 	}
 
+	if err := w.adoFacade.InitAzureDevOpsTaskAgentSession(ctx); err != nil {
+		return err
+	}
+
+	if err := w.adoFacade.DeinitAzureDevOpsTaskAgentSession(ctx); err != nil {
+		return err
+	}
+
 	if w.jobRequests == nil {
 		w.jobRequests = make(chan struct{}, 1)
 	}
