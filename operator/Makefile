@@ -3,7 +3,7 @@ IMAGE_NAME ?= incognia/kube-actions
 IMAGE_VERSION ?= $(shell git describe --always)
 IMAGE_VARIANT ?= -operator
 
-AGENT_VERSION ?= 2.296.0
+AGENT_VERSION ?= 2.296.1
 
 # Default rule
 all: manager
