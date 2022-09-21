@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Microsoft/go-winio v0.4.17 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.17.6
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.16
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.17
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.18
 	github.com/docker/cli v20.10.18+incompatible
 	github.com/docker/distribution v2.7.1+incompatible // indirect
