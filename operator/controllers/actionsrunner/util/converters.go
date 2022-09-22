@@ -598,19 +598,19 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 		volumeMounts = append(
 			volumeMounts,
 			corev1.VolumeMount{
-				Name:      "persistent-volume-claim",
 				MountPath: "/home/rootless",
-				SubPath:   "dind",
+				Name:      "persistent-volume-claim",
+				SubPath:   ":home:rootless",
 			},
 			corev1.VolumeMount{
-				Name:      "persistent-volume-claim",
 				MountPath: "/home/rootless/.local/share/docker",
-				SubPath:   "dind/.local/share/docker",
+				Name:      "persistent-volume-claim",
+				SubPath:   ":home:rootless:.local:share:docker",
 			},
 			corev1.VolumeMount{
-				Name:      "persistent-volume-claim",
 				MountPath: "/opt/actions-runner/_work",
-				SubPath:   "runner",
+				Name:      "persistent-volume-claim",
+				SubPath:   ":opt:actions-runner:_work",
 			},
 		)
 	}
