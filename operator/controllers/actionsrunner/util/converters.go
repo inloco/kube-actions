@@ -476,20 +476,35 @@ func withVolumeMounts(actionsRunner *inlocov1alpha1.ActionsRunner) []corev1.Volu
 	}
 
 	if controllers.HasActionsRunnerRequestedStorage(actionsRunner) {
-		volumeMountByPath["/opt/actions-runner/_work"] = corev1.VolumeMount{
-			MountPath: "/opt/actions-runner/_work",
+		volumeMountByPath["/home/linuxbrew"] = corev1.VolumeMount{
+			MountPath: "/home/linuxbrew",
 			Name:      "persistent-volume-claim",
-			SubPath:   "runner",
+			SubPath:   ":home:linuxbrew",
 		}
-		volumeMountByPath["/root"] = corev1.VolumeMount{
-			MountPath: "/root",
+		volumeMountByPath["/home/runner"] = corev1.VolumeMount{
+			MountPath: "/home/runner",
 			Name:      "persistent-volume-claim",
-			SubPath:   "root",
+			SubPath:   ":home:user",
 		}
 		volumeMountByPath["/home/user"] = corev1.VolumeMount{
 			MountPath: "/home/user",
 			Name:      "persistent-volume-claim",
-			SubPath:   "user",
+			SubPath:   ":home:user",
+		}
+		volumeMountByPath["/opt/actions-runner/_work"] = corev1.VolumeMount{
+			MountPath: "/opt/actions-runner/_work",
+			Name:      "persistent-volume-claim",
+			SubPath:   ":opt:actions-runner:_work",
+		}
+		volumeMountByPath["/opt/hostedtoolcache"] = corev1.VolumeMount{
+			MountPath: "/opt/hostedtoolcache",
+			Name:      "persistent-volume-claim",
+			SubPath:   ":opt:hostedtoolcache",
+		}
+		volumeMountByPath["/root"] = corev1.VolumeMount{
+			MountPath: "/root",
+			Name:      "persistent-volume-claim",
+			SubPath:   ":root",
 		}
 	}
 
