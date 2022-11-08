@@ -173,7 +173,7 @@ func ensureAwsEnv(ctx context.Context) error {
 	envVars := make(map[string]string)
 
 	logger.Println("Detecting AWS Region")
-	awsRegion := detectAwsRegion()
+	awsRegion := detectAwsRegion(ctx)
 	envVars[awsRegionEnv] = awsRegion
 
 	logger.Println("Loading AWS Configuration with Region")
