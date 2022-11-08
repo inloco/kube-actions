@@ -188,14 +188,16 @@ func ensureAwsEnv(ctx context.Context) error {
 	if err != nil {
 		logger.Println(errors.Wrap(err, "Error getting AWS Caller Identity"))
 	}
-	if account := stsOutput.Account; account != nil {
-		envVars[awsAccountEnv] = *account
-	}
-	if arn := stsOutput.Arn; arn != nil {
-		envVars[awsCallerArnEnv] = *arn
-	}
-	if userId := stsOutput.UserId; userId != nil {
-		envVars[awsCallerIdEnv] = *userId
+	if stsOutput != nil {
+		if account := stsOutput.Account; account != nil {
+			envVars[awsAccountEnv] = *account
+		}
+		if arn := stsOutput.Arn; arn != nil {
+			envVars[awsCallerArnEnv] = *arn
+		}
+		if userId := stsOutput.UserId; userId != nil {
+			envVars[awsCallerIdEnv] = *userId
+		}
 	}
 
 	for k, v := range envVars {
@@ -228,9 +230,9 @@ func detectAwsRegion(ctx context.Context) string {
 	if err != nil {
 		logger.Println(errors.Wrap(err, "AWS IMDS is unavailable"))
 	}
-	if region := imdsOutput.Region; region != nil {
+	if imdsOutput != nil {
 		logger.Println("Detected AWS Region from AWS IMDS")
-		return *region
+		return imdsOutput.Region
 	}
 
 	logger.Println("Detected AWS Region from Hardcoded Fallback")
