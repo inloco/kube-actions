@@ -18,7 +18,6 @@ package actionsrunner
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/signal"
 	"reflect"
@@ -153,16 +152,18 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		logger.Error(err, "Failed to get Wire")
 
-		if errors.Is(err, util.ErrOAuth2InvalidClient) {
-			logger.Info("ConfigMap needs to be deleted")
-			if err := r.Delete(ctx, &configMap, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
-				logger.Error(err, "Failed to delete ConfigMap")
-			}
+		if !wire.IsUnrecoverable(err) {
+			return ctrl.Result{}, err
+		}
 
-			logger.Info("Secret needs to be deleted")
-			if err := r.Delete(ctx, &secret, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
-				logger.Error(err, "Failed to delete Secret")
-			}
+		logger.Info("ConfigMap needs to be deleted")
+		if err := r.Delete(ctx, &configMap, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to delete ConfigMap")
+		}
+
+		logger.Info("Secret needs to be deleted")
+		if err := r.Delete(ctx, &secret, controllers.DeleteOpts...); client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to delete Secret")
 		}
 
 		return ctrl.Result{}, err
