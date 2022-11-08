@@ -24,10 +24,11 @@ import (
 )
 
 const (
-	awsRegionEnv    = "AWS_REGION"
-	awsAccountEnv   = "AWS_ACCOUNT"
-	awsCallerArnEnv = "AWS_CALLER_ARN"
-	awsCallerIdEnv  = "AWS_CALLER_ID"
+	awsAccountEnv       = "AWS_ACCOUNT"
+	awsCallerArnEnv     = "AWS_CALLER_ARN"
+	awsCallerIdEnv      = "AWS_CALLER_ID"
+	awsDefaultRegionEnv = "AWS_DEFAULT_REGION"
+	awsRegionEnv        = "AWS_REGION"
 
 	dockerHostEnv        = "DOCKER_HOST"
 	dockerAuthsEnv       = "DOCKER_AUTHS"
@@ -102,8 +103,8 @@ func main() {
 		return setupGitCredentials()
 	})
 
-	assureAwsAndDockerEnvC := async(func() error {
-		if err := assureAwsEnv(ctx); err != nil {
+	ensureAwsAndDockerEnvC := async(func() error {
+		if err := ensureAwsEnv(ctx); err != nil {
 			return err
 		}
 		return setupDockerConfig()
@@ -113,7 +114,7 @@ func main() {
 		return waitForDocker()
 	})
 
-	for _, c := range []chan error{updateCaCertificatesC, setupGitCredentialsC, assureAwsAndDockerEnvC, waitForDockerC} {
+	for _, c := range []chan error{updateCaCertificatesC, setupGitCredentialsC, ensureAwsAndDockerEnvC, waitForDockerC} {
 		if err := <-c; err != nil {
 			panic(err)
 		}
@@ -167,58 +168,73 @@ func setupGitCredentials() error {
 	return nil
 }
 
-func assureAwsEnv(ctx context.Context) error {
-	logger.Println("Assuring AWS environment")
+func ensureAwsEnv(ctx context.Context) error {
+	logger.Println("Ensuring AWS Environment")
+	envVars := make(map[string]string)
 
-	awsRegion, ok := os.LookupEnv(awsRegionEnv)
-	if !ok {
-		logger.Println("AWS_REGION not present, calling metadata server")
-		imdsClient := imds.New(imds.Options{
-			ClientEnableState: imds.ClientEnabled,
-		})
-		output, err := imdsClient.GetRegion(ctx, nil)
-		if err != nil {
-			logger.Printf("Error creating aws imds client: %v\n", err)
-			return nil
-		}
+	logger.Println("Detecting AWS Region")
+	awsRegion := detectAwsRegion()
+	envVars[awsRegionEnv] = awsRegion
 
-		logger.Printf("Detected aws region: %s\n", output.Region)
-		awsRegion = output.Region
-		if err := os.Setenv(awsRegionEnv, awsRegion); err != nil {
-			return errors.Wrapf(err, "Error setting %s env var", awsRegionEnv)
-		}
-	}
-
-	logger.Println("Loading aws configuration with credentials")
+	logger.Println("Loading AWS Configuration with Region")
 	config, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(awsRegion))
 	if err != nil {
-		return errors.Wrap(err, "Error loading aws config")
+		return errors.Wrap(err, "Error loading AWS Configuration with Region")
 	}
 
-	logger.Println("Retrieving aws caller identity")
+	logger.Println("Getting AWS Caller Identity")
 	stsClient := sts.NewFromConfig(config)
-	output, err := stsClient.GetCallerIdentity(ctx, nil)
+	stsOutput, err := stsClient.GetCallerIdentity(ctx, nil)
 	if err != nil {
-		logger.Printf("Error requesting STS caller identity: %v\n", err)
-		return nil
+		logger.Println(errors.Wrap(err, "Error getting AWS Caller Identity"))
+	}
+	if account := stsOutput.Account; account != nil {
+		envVars[awsAccountEnv] = *account
+	}
+	if arn := stsOutput.Arn; arn != nil {
+		envVars[awsCallerArnEnv] = *arn
+	}
+	if userId := stsOutput.UserId; userId != nil {
+		envVars[awsCallerIdEnv] = *userId
 	}
 
-	logger.Printf("Detected aws account: %s\n", *output.Account)
-	if err := os.Setenv(awsAccountEnv, *output.Account); err != nil {
-		return errors.Wrapf(err, "Error setting %s env var", awsAccountEnv)
-	}
-
-	logger.Printf("Detected aws arn: %s\n", *output.Arn)
-	if err := os.Setenv(awsCallerArnEnv, *output.Arn); err != nil {
-		return errors.Wrapf(err, "Error setting %s env var", awsCallerArnEnv)
-	}
-
-	logger.Printf("Detected aws caller id: %s\n", *output.UserId)
-	if err := os.Setenv(awsCallerIdEnv, *output.UserId); err != nil {
-		return errors.Wrapf(err, "Error setting %s env var", awsCallerIdEnv)
+	for k, v := range envVars {
+		logger.Printf("Setting %s to %s\n", k, v)
+		if err := os.Setenv(k, v); err != nil {
+			return errors.Wrapf(err, "Error setting %s to %s", k, v)
+		}
 	}
 
 	return nil
+}
+
+func detectAwsRegion(ctx context.Context) string {
+	if awsRegion, ok := os.LookupEnv(awsRegionEnv); ok {
+		logger.Println("Detected AWS Region from AWS_REGION")
+		return awsRegion
+	}
+	logger.Println("AWS_REGION is not defined")
+
+	if awsDefaultRegion, ok := os.LookupEnv(awsDefaultRegionEnv); ok {
+		logger.Println("Detected AWS Region from AWS_DEFAULT_REGION")
+		return awsDefaultRegion
+	}
+	logger.Println("AWS_DEFAULT_REGION is not defined")
+
+	imdsClient := imds.New(imds.Options{
+		ClientEnableState: imds.ClientEnabled,
+	})
+	imdsOutput, err := imdsClient.GetRegion(ctx, nil)
+	if err != nil {
+		logger.Println(errors.Wrap(err, "AWS IMDS is unavailable"))
+	}
+	if region := imdsOutput.Region; region != nil {
+		logger.Println("Detected AWS Region from AWS IMDS")
+		return *region
+	}
+
+	logger.Println("Detected AWS Region from Hardcoded Fallback")
+	return "us-east-1"
 }
 
 func waitForDocker() error {
