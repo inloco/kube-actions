@@ -1,9 +1,6 @@
 SHELL = /bin/bash
 .SHELLFLAGS = -o pipefail -ec
 
-dind/% operator/% runner/%:
-	$(MAKE) -C $(@D) $(@F)
-
 .ONESHELL:
 continuous-upgrade:
 	@
