@@ -1,6 +1,7 @@
 ARG DOCKER_VERSION
 
-FROM golang:1.15-alpine AS build
+FROM golang:1.17-alpine AS build
+RUN CGO_ENABLED=0 go install -v github.com/go-delve/delve/cmd/dlv@latest
 WORKDIR /go/src/github.com/inloco/kube-actions/dind
 COPY ./go.mod ./go.sum ./
 RUN go mod download
@@ -25,6 +26,7 @@ RUN apk add --no-cache jq socat fuse3 && \
     wget https://github.com/containers/fuse-overlayfs/releases/download/v1.7.1/fuse-overlayfs-x86_64 -O fuse-overlayfs && \
     chmod +x fuse-overlayfs && \
     cp fuse-overlayfs /usr/local/bin/fuse-overlayfs
+COPY --from=build /go/bin/dlv /usr/local/bin/dlv
 COPY --from=build /go/bin/dind /sbin/init
 RUN chmod +s /sbin/init
 USER rootless
