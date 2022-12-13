@@ -19,25 +19,17 @@ docker: docker-build docker-tag docker-push
 docker-build:
 	@printf '${BLD}${RED}make: *** [$@]${RST}${EOL}'
 	@printf '${BLD}${YLW}$$${RST} '
-	docker build --build-arg DOCKER_VERSION=$(DOCKER_VERSION) --tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT}-${DOCKER_VERSION} .
+	docker build --build-arg DOCKER_VERSION=$(DOCKER_VERSION) --tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT} .
 
 docker-tag:
 	@printf '${BLD}${RED}make: *** [$@]${RST}${EOL}'
 	@printf '${BLD}${YLW}$$${RST} '
-	docker tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT}-${DOCKER_VERSION} ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${IMAGE_VERSION}${IMAGE_VARIANT}-${DOCKER_VERSION}
+	docker tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT} ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${IMAGE_VERSION}${IMAGE_VARIANT}
 	@printf '${BLD}${YLW}$$${RST} '
-	docker tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT}-${DOCKER_VERSION} ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:latest${IMAGE_VARIANT}-${DOCKER_VERSION}
-	@printf '${BLD}${YLW}$$${RST} '
-	docker tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT}-${DOCKER_VERSION} ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${IMAGE_VERSION}${IMAGE_VARIANT}
-	@printf '${BLD}${YLW}$$${RST} '
-	docker tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT}-${DOCKER_VERSION} ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:latest${IMAGE_VARIANT}
+	docker tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT} ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:latest${IMAGE_VARIANT}
 
 docker-push:
 	@printf '${BLD}${RED}make: *** [$@]${RST}${EOL}'
-	@printf '${BLD}${YLW}$$${RST} '
-	docker push ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${IMAGE_VERSION}${IMAGE_VARIANT}-${DOCKER_VERSION}
-	@printf '${BLD}${YLW}$$${RST} '
-	docker push ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:latest${IMAGE_VARIANT}-${DOCKER_VERSION}
 	@printf '${BLD}${YLW}$$${RST} '
 	docker push ${IMAGE_REGISTRY}/${IMAGE_REPOSITORY}:${IMAGE_VERSION}${IMAGE_VARIANT}
 	@printf '${BLD}${YLW}$$${RST} '
