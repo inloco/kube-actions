@@ -17,16 +17,10 @@ RUN set -x && \
     unset IFS && \
     apt-get update && \
     apt-get install -y apt-transport-https apt-utils busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make parallel python3 python3-distutils software-properties-common ssh sudo zstd && \
-
-    # signing key for githubcli repository is expired. install manually for now
-    # apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0 && \
-    # apt-add-repository https://cli.github.com/packages && \
-    curl -SLf https://api.github.com/repos/cli/cli/releases/latest | jq -r '.assets[] | select(.name | test(".*linux_amd64.deb")) | .browser_download_url' | xargs curl -SLfo githubcli.deb && \
-    dpkg -i githubcli.deb && \
-    rm githubcli.deb && \
-
     curl -sSLf https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
+    curl -sSLf https://cli.github.com/packages/githubcli-archive-keyring.gpg | apt-key add - && \
+    add-apt-repository 'deb [arch=amd64] https://cli.github.com/packages stable main' && \
     export DEBIAN_MIRROR=http://deb.debian.org/debian && \
     export GGCI_PACKAGE=golang-github-containers-image && \
     export GGCI_VERSION=5.10.3-1 && \
