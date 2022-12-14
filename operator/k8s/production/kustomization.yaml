@@ -7,3 +7,7 @@ resources:
   - ./configmap.yaml
 generators:
   - ./secret.yaml
+images:
+- name: inloco/kube-actions
+  newName: public.ecr.aws/incognia/kube-actions
+  newTag: latest-operator
