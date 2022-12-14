@@ -77,6 +77,7 @@ RUN set -x && \
 COPY --from=build /go/bin/dlv /usr/local/bin/dlv
 COPY --from=build /go/bin/runner /sbin/init
 ENV ACTIONS_ALLOW_UNSECURE_COMMANDS true
+ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT true
 ENV AWS_EC2_METADATA_DISABLED true
 ENV AWS_SDK_LOAD_CONFIG 1
 ENV BUILDX_NO_DEFAULT_LOAD false
