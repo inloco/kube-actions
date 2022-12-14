@@ -8,6 +8,7 @@ on:
       - master
   schedule:
     - cron: 37 13 * * 1
+  workflow_dispatch: {}
 jobs:
   analyze:
     name: Analyze
