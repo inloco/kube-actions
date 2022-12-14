@@ -24,9 +24,7 @@ spec:
       securityContext:
         runAsNonRoot: true
       containers:
-      - command:
-        - /manager
-        args:
+      - args:
         - --max-concurrent-reconciles=1000
         - --metrics-bind-address=:9102
         image: inloco/kube-actions
