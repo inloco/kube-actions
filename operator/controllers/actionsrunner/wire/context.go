@@ -2,7 +2,6 @@ package wire
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 )
 
@@ -19,117 +18,54 @@ const (
 
 type ArrayContextData []PipelineContextData
 
-var _ json.Unmarshaler = (*ArrayContextData)(nil)
-
-func (acd *ArrayContextData) UnmarshalJSON(data []byte) error {
-	var s []interface{}
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-
-	pcds := make([]PipelineContextData, len(s))
-	for idx, i := range s {
-		var pcd PipelineContextData
-		switch i.(type) {
-		case string:
-			pcd.Type = PipelineContextDataTypeString
-			pcd.String = i.(string)
-
-		case bool:
-			pcd.Type = PipelineContextDataTypeBoolean
-			pcd.Boolean = i.(bool)
-
-		case float64:
-			pcd.Type = PipelineContextDataTypeNumber
-			pcd.Number = i.(float64)
-
-		default:
-			j, err := json.Marshal(i)
-			if err != nil {
-				return err
-			}
-
-			if err := json.Unmarshal(j, &pcd); err != nil {
-				return err
-			}
-		}
-
-		pcds[idx] = pcd
-	}
-
-	*acd = pcds
-
-	return nil
-}
-
 type DictionaryContextDataPair struct {
 	Key string              `json:"k"`
 	Val PipelineContextData `json:"v"`
 }
 
-var _ json.Unmarshaler = (*DictionaryContextDataPair)(nil)
-
-func (dcdp *DictionaryContextDataPair) UnmarshalJSON(data []byte) error {
-	var m map[string]interface{}
-	if err := json.Unmarshal(data, &m); err != nil {
-		return err
-	}
-
-	ki, ok := m["k"]
-	if !ok {
-		return errors.New(`m["k"] == nil`)
-	}
-
-	ks, ok := ki.(string)
-	if !ok {
-		return errors.New(`ki.(string) == nil`)
-	}
-
-	vi, ok := m["v"]
-	if !ok {
-		return errors.New(`m["v"] == nil`)
-	}
-
-	var pcd PipelineContextData
-	switch vi.(type) {
-	case string:
-		pcd.Type = PipelineContextDataTypeString
-		pcd.String = vi.(string)
-
-	case bool:
-		pcd.Type = PipelineContextDataTypeBoolean
-		pcd.Boolean = vi.(bool)
-
-	case float64:
-		pcd.Type = PipelineContextDataTypeNumber
-		pcd.Number = vi.(float64)
-
-	default:
-		j, err := json.Marshal(vi)
-		if err != nil {
-			return err
-		}
-
-		if err := json.Unmarshal(j, &pcd); err != nil {
-			return err
-		}
-	}
-
-	dcdp.Key = ks
-	dcdp.Val = pcd
-
-	return nil
-}
-
 type DictionaryContextData []DictionaryContextDataPair
 
-type PipelineContextData struct {
+type pipelineContextData struct {
 	Type       PipelineContextDataType `json:"t"`
 	String     string                  `json:"s"`
 	Array      ArrayContextData        `json:"a"`
 	Dictionary DictionaryContextData   `json:"d"`
 	Boolean    bool                    `json:"b"`
 	Number     float64                 `json:"n"`
+}
+
+type PipelineContextData struct {
+	pipelineContextData `json:",inline"`
+}
+
+var _ json.Unmarshaler = (*PipelineContextData)(nil)
+
+func (pcd *PipelineContextData) UnmarshalJSON(data []byte) error {
+	var i interface{}
+	if err := json.Unmarshal(data, &i); err != nil {
+		return err
+	}
+
+	switch i.(type) {
+	case string:
+		pcd.Type = PipelineContextDataTypeString
+		pcd.String = i.(string)
+
+	case bool:
+		pcd.Type = PipelineContextDataTypeBoolean
+		pcd.Boolean = i.(bool)
+
+	case float64:
+		pcd.Type = PipelineContextDataTypeNumber
+		pcd.Number = i.(float64)
+
+	default:
+		if err := json.Unmarshal(data, &pcd.pipelineContextData); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (pcd *PipelineContextData) Flattened() (interface{}, error) {
