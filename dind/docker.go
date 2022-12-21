@@ -159,18 +159,20 @@ func (c *DockerClient) GetResourcesInfoFromEvents() (chan NetworkInfo, chan Cont
 		for {
 			msgs, errs := c.docker.Events(context.Background(), dockerTypes.EventsOptions{})
 
+			EventLoop:
 			for {
 				select {
 				case err := <-errs:
 					if err == io.EOF || err == nil {
-						c.logger.Println("EOF received from events channel, shutdown")
+						c.logger.Println("EOF received from events channel, shutdown docker event loop")
 						close(networks)
 						close(containers)
 						return
 					}
 
 					c.logger.Printf("error from events channel: %+v\n", err)
-					break
+					// event loop stops on errors, so restart is needed
+					break EventLoop
 
 				case msg := <-msgs:
 					kind, knownKind := resourceKindByString[msg.Type]
