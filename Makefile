@@ -4,6 +4,7 @@ SHELL = /bin/bash
 .ONESHELL:
 continuous-upgrade:
 	@
+	echo 'Checking for updates'
 	LATEST="$$(curl -Lsf https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name | ltrimstr("v")')"
 	if grep -qE "^RUNNER_VERSION \?= $${LATEST}$$" ./runner/Makefile
 	then
@@ -15,6 +16,7 @@ continuous-upgrade:
 	then
 		echo 'Master already changed'
 	else
+		echo 'Creating update PR'
 		sed -Ei "s/^AGENT_VERSION \?= .*/AGENT_VERSION ?= $${LATEST}/" ./operator/Makefile
 		sed -Ei "s/^RUNNER_VERSION \?= .*/RUNNER_VERSION ?= $${LATEST}/" ./runner/Makefile
 		git add -A
