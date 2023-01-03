@@ -6,6 +6,7 @@ continuous-upgrade:
 	@
 	echo 'Checking for updates'
 	LATEST="$$(curl -Lsf https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name | ltrimstr("v")')"
+	echo 'Latest version is' $$LATEST
 	if grep -qE "^RUNNER_VERSION \?= $${LATEST}$$" ./runner/Makefile
 	then
 		echo 'Everything up-to-date'
