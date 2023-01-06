@@ -5,7 +5,7 @@ SHELL = /bin/bash
 continuous-upgrade:
 	@
 	echo 'Checking for updates'
-	LATEST="$$(curl -Lsf --retry 5 https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name | ltrimstr("v")')"
+	LATEST="$$(curl -sSLf --retry 5 https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name | ltrimstr("v")')"
 	echo 'Latest version is' $$LATEST
 	if grep -qE "^RUNNER_VERSION \?= $${LATEST}$$" ./runner/Makefile
 	then
