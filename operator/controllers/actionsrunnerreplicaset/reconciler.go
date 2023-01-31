@@ -141,7 +141,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Info("ActionsRunnerReplicaSetStatus needs to be updated")
 		actionsRunnerReplicaSet.Status.Selector = selector
 
-		if err := r.Status().Update(ctx, &actionsRunnerReplicaSet, controllers.UpdateOpts...); client.IgnoreNotFound(err) != nil {
+		if err := r.Status().Update(ctx, &actionsRunnerReplicaSet); client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "Failed to update ActionsRunnerReplicaSetStatus")
 			return ctrl.Result{}, err
 		}
@@ -181,7 +181,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Info("ActionsRunnerReplicaSetStatus needs to be updated")
 		actionsRunnerReplicaSet.Status.Replicas = uint(actual + 1)
 
-		if err := r.Status().Update(ctx, &actionsRunnerReplicaSet, controllers.UpdateOpts...); client.IgnoreNotFound(err) != nil {
+		if err := r.Status().Update(ctx, &actionsRunnerReplicaSet); client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "Failed to update ActionsRunnerReplicaSetStatus")
 			return ctrl.Result{}, err
 		}
@@ -203,7 +203,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Info("ActionsRunnerReplicaSetStatus needs to be updated")
 		actionsRunnerReplicaSet.Status.Replicas = uint(actual - 1)
 
-		if err := r.Status().Update(ctx, &actionsRunnerReplicaSet, controllers.UpdateOpts...); client.IgnoreNotFound(err) != nil {
+		if err := r.Status().Update(ctx, &actionsRunnerReplicaSet); client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "Failed to update ActionsRunnerReplicaSetStatus")
 			return ctrl.Result{}, err
 		}
