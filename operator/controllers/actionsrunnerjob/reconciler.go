@@ -139,7 +139,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		actionsRunnerJob.Status.PersistentVolumeClaimPhase = pvcPhase
 
 		logger.Info("ActionsRunnerJobStatus needs to be updated")
-		if err := r.Status().Update(ctx, &actionsRunnerJob, controllers.UpdateOpts...); client.IgnoreNotFound(err) != nil {
+		if err := r.Status().Update(ctx, &actionsRunnerJob); client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "Failed to update ActionsRunnerJobStatus")
 			return ctrl.Result{}, err
 		}
@@ -190,7 +190,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		actionsRunnerJob.Status.PodPhase = podPhase
 
 		logger.Info("ActionsRunnerJobStatus needs to be updated")
-		if err := r.Status().Update(ctx, &actionsRunnerJob, controllers.UpdateOpts...); client.IgnoreNotFound(err) != nil {
+		if err := r.Status().Update(ctx, &actionsRunnerJob); client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "Failed to update ActionsRunnerJobStatus")
 			return ctrl.Result{}, err
 		}
