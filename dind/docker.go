@@ -272,7 +272,7 @@ func (c *DockerClient) GetResourcesInfoFromEvents() (chan NetworkInfo, chan Cont
 }
 
 func (c *DockerClient) getNetworkSubnets(id string) ([]string, error) {
-	info, err := c.docker.NetworkInspect(context.Background(), id)
+	info, err := c.docker.NetworkInspect(context.Background(), id, dockerTypes.NetworkInspectOptions{})
 	if err != nil {
 		return nil, err
 	}
