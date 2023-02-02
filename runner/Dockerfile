@@ -30,7 +30,7 @@ RUN set -x && \
     export GGCC_VERSION=0.33.4+ds1-1+deb11u1 && \
     $CURL -o "/tmp/${GGCC_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCC_PACKAGE}/${GGCC_PACKAGE}_${GGCC_VERSION}_all.deb" && \
     export SKOPEO_PACKAGE=skopeo && \
-    export SKOPEO_VERSION=1.2.2+dfsg1-1+b6 && \
+    export SKOPEO_VERSION=1.9.3+ds1-1 && \
     $CURL -o "/tmp/${SKOPEO_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/s/${SKOPEO_PACKAGE}/${SKOPEO_PACKAGE}_${SKOPEO_VERSION}_amd64.deb" && \
     apt-get update && \
     apt-get install -y docker-ce-cli gh "/tmp/${GGCI_PACKAGE}.deb" "/tmp/${GGCC_PACKAGE}.deb" "/tmp/${SKOPEO_PACKAGE}.deb" && \
