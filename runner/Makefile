@@ -12,7 +12,7 @@ IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -runner
 
 RUNNER_VERSION ?= 2.300.2
-UBUNTU_VERSION ?= focal
+UBUNTU_VERSION ?= jammy
 
 docker: docker-build docker-tag docker-push
 	@printf '${BLD}${RED}make: *** [$@]${RST}${EOL}'
