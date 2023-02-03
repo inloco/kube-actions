@@ -23,17 +23,20 @@ RUN set -x && \
     $CURL https://cli.github.com/packages/githubcli-archive-keyring.gpg | apt-key add - && \
     add-apt-repository 'deb [arch=amd64] https://cli.github.com/packages stable main' && \
     export DEBIAN_MIRROR=http://deb.debian.org/debian && \
+    export NETAVARK_PACKAGE=netavark && \
+    export NETAVARK_VERSION=1.4.0-2 && \
+    $CURL -o "/tmp/${NETAVARK_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/n/${NETAVARK_PACKAGE}/${NETAVARK_PACKAGE}_${NETAVARK_VERSION}_amd64.deb" && \
     export GGCI_PACKAGE=golang-github-containers-image && \
     export GGCI_VERSION=5.10.3-1 && \
     $CURL -o "/tmp/${GGCI_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCI_PACKAGE}/${GGCI_PACKAGE}_${GGCI_VERSION}_all.deb" && \
     export GGCC_PACKAGE=golang-github-containers-common && \
-    export GGCC_VERSION=0.33.4+ds1-1+deb11u1 && \
+    export GGCC_VERSION=0.50.1+ds1-3 && \
     $CURL -o "/tmp/${GGCC_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCC_PACKAGE}/${GGCC_PACKAGE}_${GGCC_VERSION}_all.deb" && \
     export SKOPEO_PACKAGE=skopeo && \
-    export SKOPEO_VERSION=1.2.2+dfsg1-1+b6 && \
+    export SKOPEO_VERSION=1.9.3+ds1-1 && \
     $CURL -o "/tmp/${SKOPEO_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/s/${SKOPEO_PACKAGE}/${SKOPEO_PACKAGE}_${SKOPEO_VERSION}_amd64.deb" && \
     apt-get update && \
-    apt-get install -y docker-ce-cli gh "/tmp/${GGCI_PACKAGE}.deb" "/tmp/${GGCC_PACKAGE}.deb" "/tmp/${SKOPEO_PACKAGE}.deb" && \
+    apt-get install -y docker-ce-cli gh "/tmp/${NETAVARK_PACKAGE}.deb" "/tmp/${GGCI_PACKAGE}.deb" "/tmp/${GGCC_PACKAGE}.deb" "/tmp/${SKOPEO_PACKAGE}.deb" && \
     busybox --install && \
     $CURL https://bootstrap.pypa.io/get-pip.py | python3 - && \
     export HUB_URL=$($CURL https://api.github.com/repos/github/hub/releases/latest | jq -r '.assets[] | select(.name | match("linux-amd64")) | .browser_download_url') && \
