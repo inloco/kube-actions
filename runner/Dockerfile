@@ -77,6 +77,8 @@ RUN set -x && \
     export RUNNER_URL=$($CURL https://api.github.com/repos/actions/runner/releases | jq -r '.[] | select(.tag_name == "v'${RUNNER_VERSION}'") | .assets[] | select(.name | endswith("linux-x64-'${RUNNER_VERSION}'.tar.gz")) | .browser_download_url') && \
     $CURL ${RUNNER_URL} | runuser -u user -- tar -vxzC /opt/actions-runner && \
     /opt/actions-runner/bin/installdependencies.sh && \
+    # Support Node 12 https://github.com/nodejs/node/discussions/43184
+    sed -i "s/^providers = provider_sect$/# providers = provider_sect/" /etc/ssl/openssl.cnf && \
     rm -fRv ${XDG_CACHE_HOME:-${HOME}/.cache}/pip/* /var/lib/apt/lists/* /tmp/*
 COPY --from=build /go/bin/dlv /usr/local/bin/dlv
 COPY --from=build /go/bin/runner /sbin/init
