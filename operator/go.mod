@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	golang.org/x/oauth2 v0.4.0
-	golang.org/x/text v0.6.0
+	golang.org/x/text v0.7.0
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.1
