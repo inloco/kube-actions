@@ -24,7 +24,7 @@ RUN set -x && \
     add-apt-repository 'deb [arch=amd64] https://cli.github.com/packages stable main' && \
     export DEBIAN_MIRROR=http://deb.debian.org/debian && \
     export NETAVARK_PACKAGE=netavark && \
-    export NETAVARK_VERSION=1.4.0-2 && \
+    export NETAVARK_VERSION=1.4.0-3 && \
     $CURL -o "/tmp/${NETAVARK_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/n/${NETAVARK_PACKAGE}/${NETAVARK_PACKAGE}_${NETAVARK_VERSION}_amd64.deb" && \
     export GGCI_PACKAGE=golang-github-containers-image && \
     export GGCI_VERSION=5.10.3-1 && \
