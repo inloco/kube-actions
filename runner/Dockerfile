@@ -1,5 +1,4 @@
 ARG UBUNTU_VERSION
-ARG UBUNTU_VERSION_NUMBER
 
 FROM golang:1.19-alpine AS build
 RUN CGO_ENABLED=0 go install -v github.com/go-delve/delve/cmd/dlv@latest
@@ -10,6 +9,7 @@ COPY ./main.go ./util.go ./
 RUN CGO_ENABLED=0 go install -a -gcflags 'all=-N -l' -ldflags '-d -extldflags "-fno-PIC -static"' -tags 'netgo osusergo static_build' -trimpath -v ./...
 
 FROM ubuntu:${UBUNTU_VERSION}
+ARG UBUNTU_VERSION_NUMBER
 ARG RUNNER_VERSION
 RUN set -x && \
     export DEBIAN_FRONTEND=noninteractive && \
