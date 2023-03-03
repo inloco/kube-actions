@@ -1,4 +1,5 @@
 ARG UBUNTU_VERSION
+ARG UBUNTU_VERSION_NUMBER
 
 FROM golang:1.19-alpine AS build
 RUN CGO_ENABLED=0 go install -v github.com/go-delve/delve/cmd/dlv@latest
@@ -82,6 +83,7 @@ RUN set -x && \
     rm -fRv ${XDG_CACHE_HOME:-${HOME}/.cache}/pip/* /var/lib/apt/lists/* /tmp/*
 COPY --from=build /go/bin/dlv /usr/local/bin/dlv
 COPY --from=build /go/bin/runner /sbin/init
+ENV ImageOS ubuntu${UBUNTU_VERSION_NUMBER}
 ENV ACTIONS_ALLOW_UNSECURE_COMMANDS true
 ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT true
 ENV AWS_EC2_METADATA_DISABLED true
