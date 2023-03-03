@@ -11,6 +11,20 @@ RUN CGO_ENABLED=0 go install -a -gcflags 'all=-N -l' -ldflags '-d -extldflags "-
 FROM ubuntu:${UBUNTU_VERSION}
 ARG UBUNTU_VERSION_NUMBER
 ARG RUNNER_VERSION
+
+# Follow config for hosted runners
+ENV ImageOS ubuntu${UBUNTU_VERSION_NUMBER}
+ENV RUNNER_TOOL_CACHE /opt/hostedtoolcache
+
+ENV ACTIONS_ALLOW_UNSECURE_COMMANDS true
+ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT true
+ENV AWS_EC2_METADATA_DISABLED true
+ENV AWS_SDK_LOAD_CONFIG 1
+ENV BUILDX_NO_DEFAULT_LOAD false
+ENV DOCKER_BUILDKIT 0
+ENV DOCKER_CLI_EXPERIMENTAL enabled
+ENV RUNNER_ALLOW_RUNASROOT true
+
 RUN set -x && \
     export DEBIAN_FRONTEND=noninteractive && \
     export IFS="$(printf '\n\b')" && \
@@ -80,16 +94,10 @@ RUN set -x && \
     /opt/actions-runner/bin/installdependencies.sh && \
     # Support Node 12 https://github.com/nodejs/node/discussions/43184
     sed -i "s/^providers = provider_sect$/# providers = provider_sect/" /etc/ssl/openssl.cnf && \
-    rm -fRv ${XDG_CACHE_HOME:-${HOME}/.cache}/pip/* /var/lib/apt/lists/* /tmp/*
+    rm -fRv ${XDG_CACHE_HOME:-${HOME}/.cache}/pip/* /var/lib/apt/lists/* /tmp/* && \
+    mkdir -p ${RUNNER_TOOL_CACHE} && \
+    chown user:user ${RUNNER_TOOL_CACHE}
+
 COPY --from=build /go/bin/dlv /usr/local/bin/dlv
 COPY --from=build /go/bin/runner /sbin/init
-ENV ImageOS ubuntu${UBUNTU_VERSION_NUMBER}
-ENV ACTIONS_ALLOW_UNSECURE_COMMANDS true
-ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT true
-ENV AWS_EC2_METADATA_DISABLED true
-ENV AWS_SDK_LOAD_CONFIG 1
-ENV BUILDX_NO_DEFAULT_LOAD false
-ENV DOCKER_BUILDKIT 0
-ENV DOCKER_CLI_EXPERIMENTAL enabled
-ENV RUNNER_ALLOW_RUNASROOT true
 ENTRYPOINT ["/sbin/init"]
