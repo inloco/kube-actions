@@ -13,6 +13,7 @@ IMAGE_VARIANT ?= -runner
 
 RUNNER_VERSION ?= 2.301.1
 UBUNTU_VERSION ?= jammy
+UBUNTU_VERSION_NUMBER ?= 22
 
 docker: docker-build docker-tag docker-push
 	@printf '${BLD}${RED}make: *** [$@]${RST}${EOL}'
@@ -20,7 +21,7 @@ docker: docker-build docker-tag docker-push
 docker-build:
 	@printf '${BLD}${RED}make: *** [$@]${RST}${EOL}'
 	@printf '${BLD}${YLW}$$${RST} '
-	docker build --build-arg RUNNER_VERSION=${RUNNER_VERSION} --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} --tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT} .
+	docker build --build-arg RUNNER_VERSION=${RUNNER_VERSION} --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} --build-arg UBUNTU_VERSION_NUMBER=${UBUNTU_VERSION_NUMBER} --tag kube-actions:${IMAGE_VERSION}${IMAGE_VARIANT} .
 
 docker-tag:
 	@printf '${BLD}${RED}make: *** [$@]${RST}${EOL}'
