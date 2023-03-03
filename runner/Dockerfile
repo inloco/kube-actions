@@ -1,6 +1,6 @@
 ARG UBUNTU_VERSION
 
-FROM golang:1.19-alpine AS build
+FROM golang:1.20-alpine AS build
 RUN CGO_ENABLED=0 go install -v github.com/go-delve/delve/cmd/dlv@latest
 WORKDIR /go/src/github.com/inloco/kube-actions/runner
 COPY ./go.mod ./go.sum ./
