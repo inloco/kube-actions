@@ -22,7 +22,7 @@ jobs:
       - name: docker build
         run: make -C '${{ matrix.component }}' docker-build
       - name: aws configure
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         if: github.ref == 'refs/heads/master'
         with:
           aws-region: ${{ secrets.AWS_REGION }}
