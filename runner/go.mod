@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.18.19
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.2
-	github.com/aws/aws-sdk-go-v2/service/sts v1.18.8
+	github.com/aws/aws-sdk-go-v2/service/sts v1.18.9
 	github.com/docker/cli v20.10.23+incompatible
 	github.com/docker/docker v20.10.23+incompatible
 	github.com/pkg/errors v0.9.1
