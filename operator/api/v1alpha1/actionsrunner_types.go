@@ -48,6 +48,7 @@ type ActionsRunnerSpec struct {
 	Capabilities []ActionsRunnerCapability `json:"capabilities,omitempty"`
 	Annotations  map[string]string         `json:"annotations,omitempty"`
 	Labels       []string                  `json:"labels,omitempty"`
+	Version      string                    `json:"version,omitempty"` // image override for debugging
 
 	Volumes      []corev1.Volume                        `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 	VolumeMounts []corev1.VolumeMount                   `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath"`
