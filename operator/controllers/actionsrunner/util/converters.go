@@ -324,6 +324,11 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 		)
 	}
 
+	imageVersion := runnerImageVersion
+	if actionsRunner.Spec.Version != "" {
+		imageVersion = actionsRunner.Spec.Version
+	}
+
 	pod := corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),
@@ -343,7 +348,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 			Containers: []corev1.Container{
 				{
 					Name:  runnerContainerName,
-					Image: fmt.Sprintf("%s:%s%s", runnerImageName, runnerImageVersion, runnerImageVariant),
+					Image: fmt.Sprintf("%s:%s%s", runnerImageName, imageVersion, runnerImageVariant),
 					EnvFrom: filteredEnvFromSources(actionsRunner.Spec.EnvFrom, func(envFromSource corev1.EnvFromSource) bool {
 						return envFromSource.SecretRef == nil
 					}),
@@ -615,9 +620,14 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 		)
 	}
 
+	imageVersion := dindImageVersion
+	if actionsRunner.Spec.Version != "" {
+		imageVersion = actionsRunner.Spec.Version
+	}
+
 	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
 		Name:  dindContainerName,
-		Image: fmt.Sprintf("%s:%s%s", dindImageName, dindImageVersion, dindImageVariant),
+		Image: fmt.Sprintf("%s:%s%s", dindImageName, imageVersion, dindImageVariant),
 		Env: []corev1.EnvVar{
 			corev1.EnvVar{
 				Name:  "DOCKER_TLS_CERTDIR",
