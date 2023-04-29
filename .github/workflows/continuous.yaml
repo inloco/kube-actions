@@ -23,19 +23,16 @@ jobs:
         run: make -C '${{ matrix.component }}' docker-build
       - name: aws configure
         uses: aws-actions/configure-aws-credentials@v2
-        if: github.ref == 'refs/heads/master'
         with:
           aws-region: ${{ secrets.AWS_REGION }}
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT }}:role/ecr-public
       - name: docker login
-        if: github.ref == 'refs/heads/master'
         run: |
           docker login -u '${{ secrets.DOCKERHUB_USER }}' -p '${{ secrets.DOCKERHUB_PASS }}' docker.io
           docker login -u '${{ secrets.QUAY_USER }}' -p '${{ secrets.QUAY_PASS }}' quay.io
           docker login -u '${{ github.actor }}' -p '${{ github.token }}' ghcr.io
           docker login -u 'AWS' -p "$(aws ecr-public get-login-password)" public.ecr.aws
       - name: docker tag
-        if: github.ref == 'refs/heads/master'
         run: |
           make 'IMAGE_REGISTRY=docker.io' 'IMAGE_REPOSITORY=inloco/kube-actions' -C '${{ matrix.component }}' docker-tag
           make 'IMAGE_REGISTRY=quay.io' 'IMAGE_REPOSITORY=inloco/kube-actions' -C '${{ matrix.component }}' docker-tag
@@ -43,7 +40,6 @@ jobs:
           make 'IMAGE_REGISTRY=public.ecr.aws' 'IMAGE_REPOSITORY=incognia/kube-actions' -C '${{ matrix.component }}' docker-tag
       - name: docker push
         shell: '/usr/bin/env parallel --lb --retries 3 :::: {0}'
-        if: github.ref == 'refs/heads/master'
         run: |
           make 'IMAGE_REGISTRY=docker.io' 'IMAGE_REPOSITORY=inloco/kube-actions' -C '${{ matrix.component }}' docker-push
           make 'IMAGE_REGISTRY=quay.io' 'IMAGE_REPOSITORY=inloco/kube-actions' -C '${{ matrix.component }}' docker-push
