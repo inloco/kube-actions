@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 go install -a -gcflags 'all=-N -l' -ldflags '-d -extldflags "-
 FROM docker:${DOCKER_VERSION}-dind-rootless
 USER root
 RUN apk add --no-cache jq socat fuse3 sudo shadow && \
-    export CRUN_URL=$(wget -qO- https://api.github.com/repos/containers/crun/releases | jq -r '.[0].assets[] | select(.name | match("linux-amd64$")) | .browser_download_url') && \
+    export CRUN_URL=https://github.com/containers/crun/releases/download/1.5/crun-1.5-linux-amd64 && \
     wget -qO /usr/local/bin/crun ${CRUN_URL} && \
     chmod +x /usr/local/bin/crun && \
     export SLIRP4NETNS_URL=$(wget -qO- https://api.github.com/repos/rootless-containers/slirp4netns/releases | jq -r '.[0].assets[] | select(.name | match("x86_64$")) | .browser_download_url') && \
