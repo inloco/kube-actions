@@ -27,14 +27,14 @@ func main() {
 		logger.Panic(err)
 	}
 
-	logger.Println("creating docker client")
-	docker, err := NewDockerClient(logger, cache)
-	if err != nil {
+	logger.Println("removing rootless privileges")
+	if err := removeRootlessUserPrivileges(); err != nil {
 		logger.Panic(err)
 	}
 
-	logger.Println("patching runtime dirs")
-	if err := docker.PatchRuntimeDirs(); err != nil {
+	logger.Println("creating docker client")
+	docker, err := NewDockerClient(logger, cache)
+	if err != nil {
 		logger.Panic(err)
 	}
 
@@ -204,6 +204,21 @@ func setdownContainerPortProxy(portProxy *PortProxyClient, info ContainerInfo) e
 	}
 
 	cache.DeleteProxyPortPIDs(info.ID)
+
+	return nil
+}
+
+func removeRootlessUserPrivileges() error {
+	cmd := exec.Cmd{
+		Path:   "/usr/sbin/usermod",
+		Args:   []string{"/usr/sbin/usermod", "-r", "-G", "wheel", "rootless"},
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
 
 	return nil
 }
