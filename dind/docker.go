@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	dockerTypes "github.com/docker/docker/api/types"
@@ -73,16 +72,6 @@ func NewDockerClient(logger *log.Logger, cache *Cache) (*DockerClient, error) {
 	}, nil
 }
 
-func (c *DockerClient) PatchRuntimeDirs() error {
-	for _, dir := range []string{"/var/lib/docker", "/home/rootless/.local/share/docker"} {
-		if err := os.Chown(dir, os.Getuid(), os.Getgid()); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (c *DockerClient) StartDockerd() (chan error, error) {
 	logger.Println("looking for dockerd-entrypoint.sh")
 	path, err := exec.LookPath("dockerd-entrypoint.sh")
@@ -97,23 +86,20 @@ func (c *DockerClient) StartDockerd() (chan error, error) {
 	if ok {
 		args = append(args, strings.Split(env, " ")...)
 	}
+
+	args = append([]string { "/usr/bin/sudo",
+	"--preserve-env=DOCKER_HOST,DOCKER_TLS_CERTDIR,DOCKERD_ROOTLESS_ROOTLESSKIT_NET,DOCKERD_ROOTLESS_ROOTLESSKIT_MTU,DOCKERD_ENTRYPOINT_ARGS",
+	"-u", "rootless" }, args...)
+
 	logger.Println("Dockerd args: %v", args)
 
 	logger.Println("starting dockerd-entrypoint.sh")
 	cmd := exec.Cmd{
-		Path:   path,
+		Path:   "/usr/bin/sudo",
 		Args:   args,
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
-
-		SysProcAttr: &syscall.SysProcAttr{
-			Credential: &syscall.Credential{
-				Uid: uint32(syscall.Getuid()),
-				Gid: uint32(syscall.Getgid()),
-			},
-			Pdeathsig: syscall.SIGINT,
-		},
 	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
