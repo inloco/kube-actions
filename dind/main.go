@@ -27,14 +27,19 @@ func main() {
 		logger.Panic(err)
 	}
 
-	logger.Println("removing rootless privileges")
-	if err := removeRootlessUserPrivileges(); err != nil {
-		logger.Panic(err)
-	}
-
 	logger.Println("creating docker client")
 	docker, err := NewDockerClient(logger, cache)
 	if err != nil {
+		logger.Panic(err)
+	}
+
+	logger.Println("patching runtime dirs")
+	if err := docker.PatchRuntimeDirs(); err != nil {
+		logger.Panic(err)
+	}
+
+	logger.Println("removing rootless privileges")
+	if err := removeRootlessUserPrivileges(); err != nil {
 		logger.Panic(err)
 	}
 

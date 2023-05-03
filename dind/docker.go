@@ -72,6 +72,16 @@ func NewDockerClient(logger *log.Logger, cache *Cache) (*DockerClient, error) {
 	}, nil
 }
 
+func (c *DockerClient) PatchRuntimeDirs() error {
+	for _, dir := range []string{"/var/lib/docker", "/home/rootless/.local/share/docker"} {
+		if err := os.Chown(dir, 1000, 1000); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (c *DockerClient) StartDockerd() (chan error, error) {
 	logger.Println("looking for dockerd-entrypoint.sh")
 	path, err := exec.LookPath("dockerd-entrypoint.sh")
