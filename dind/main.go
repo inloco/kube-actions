@@ -40,11 +40,15 @@ func main() {
 	if err != nil {
 		logger.Panic(err)
 	}
-	rootlessUserGid, err := strconv.ParseInt(rootlessUser.Gid, 10, 64)
+	rootlessUid, err := strconv.Atoi(rootlessUser.Uid)
 	if err != nil {
 		logger.Panic(err)
 	}
-	if err := docker.PatchRuntimeDirs(int(rootlessUserGid)); err != nil {
+	rootlessGid, err := strconv.Atoi(rootlessUser.Gid)
+	if err != nil {
+		logger.Panic(err)
+	}
+	if err := docker.PatchRuntimeDirs(rootlessUid, rootlessGid); err != nil {
 		logger.Panic(err)
 	}
 
