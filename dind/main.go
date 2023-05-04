@@ -231,7 +231,7 @@ func removeRootlessUserPrivileges() error {
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	}
-	if err := cmd.Start(); err != nil {
+	if err := cmd.Run(); err != nil {
 		return err
 	}
 
