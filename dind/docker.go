@@ -72,9 +72,9 @@ func NewDockerClient(logger *log.Logger, cache *Cache) (*DockerClient, error) {
 	}, nil
 }
 
-func (c *DockerClient) PatchRuntimeDirs() error {
+func (c *DockerClient) PatchRuntimeDirs(userGid int) error {
 	for _, dir := range []string{"/var/lib/docker", "/home/rootless/.local/share/docker"} {
-		if err := os.Chown(dir, 1000, 1000); err != nil {
+		if err := os.Chown(dir, userGid, userGid); err != nil {
 			return err
 		}
 	}

@@ -30,8 +30,8 @@ RUN apk add --no-cache jq socat fuse3 sudo shadow && \
 # Sounds a bit off to add root permission to rootless user, but its privileges are removed as soon as the container starts
 RUN echo '%wheel ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/wheel && \
     adduser rootless wheel && \
-    mkdir /run/user/1000 && \
-    chown -R rootless:rootless /home/rootless /run/user/1000/
+    mkdir /run/user/$(id -u rootless) && \
+    chown -R rootless:rootless /home/rootless /run/user/$(id -u rootless)/
 
 COPY --from=build /go/bin/dlv /usr/local/bin/dlv
 COPY --from=build /go/bin/dind /sbin/init

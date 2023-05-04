@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
 	"syscall"
+	"strconv"
 
 	"github.com/coreos/go-iptables/iptables"
 )
@@ -34,7 +36,15 @@ func main() {
 	}
 
 	logger.Println("patching runtime dirs")
-	if err := docker.PatchRuntimeDirs(); err != nil {
+	rootlessUser, err := user.Lookup("rootless")
+	if err != nil {
+		logger.Panic(err)
+	}
+	rootlessUserGid, err := strconv.ParseInt(rootlessUser.Gid, 10, 64)
+	if err != nil {
+		logger.Panic(err)
+	}
+	if err := docker.PatchRuntimeDirs(int(rootlessUserGid)); err != nil {
 		logger.Panic(err)
 	}
 
