@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/coreos/go-iptables v0.6.0
-	github.com/docker/docker v23.0.5+incompatible
+	github.com/docker/docker v23.0.6+incompatible
 )
 
 require (
