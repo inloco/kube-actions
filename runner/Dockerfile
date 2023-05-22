@@ -31,7 +31,7 @@ RUN set -x && \
     export $(cat /etc/os-release | sed 's/"//g') && \
     unset IFS && \
     apt-get update && \
-    apt-get install -y apt-transport-https apt-utils busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make parallel python3 python3-distutils software-properties-common ssh sudo zstd && \
+    apt-get install -y apt-transport-https apt-utils busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make parallel ripgrep python3 python3-distutils software-properties-common ssh sudo zstd && \
     CURL="curl -sSLf --retry 3" && \
     $CURL https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
@@ -48,8 +48,8 @@ RUN set -x && \
     export GGCC_VERSION=0.51.0+ds1-1 && \
     $CURL -o "/tmp/${GGCC_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCC_PACKAGE}/${GGCC_PACKAGE}_${GGCC_VERSION}_all.deb" && \
     export SKOPEO_PACKAGE=skopeo && \
-    export SKOPEO_VERSION=1.9.3+ds1-1+b4 && \
-    $CURL -o "/tmp/${SKOPEO_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/s/${SKOPEO_PACKAGE}/${SKOPEO_PACKAGE}_${SKOPEO_VERSION}_amd64.deb" && \
+    export SKOPEO_PACKAGE_FILE=$($CURL ${DEBIAN_MIRROR}/pool/main/s/${SKOPEO_PACKAGE}/ | rg -o '<a.*>(skopeo_1.9.*_amd64.deb)</a>' -r '$1') && \
+    $CURL -o "/tmp/${SKOPEO_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/s/${SKOPEO_PACKAGE}/${SKOPEO_PACKAGE_FILE}" && \
     apt-get update && \
     apt-get install -y docker-ce-cli gh "/tmp/${NETAVARK_PACKAGE}.deb" "/tmp/${GGCI_PACKAGE}.deb" "/tmp/${GGCC_PACKAGE}.deb" "/tmp/${SKOPEO_PACKAGE}.deb" && \
     busybox --install && \
