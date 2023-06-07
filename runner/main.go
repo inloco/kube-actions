@@ -41,6 +41,8 @@ const (
 
 	prometheusPushGatewayAddr = "push-gateway.prometheus.svc.cluster.local:9091"
 	prometheusPushJob         = "kubeactions_runner"
+
+	runnerListenerProcessName = "Runner.Listener"
 )
 
 var (
@@ -355,8 +357,17 @@ func requestDindTermination() error {
 
 func runGitHubActionsRunner() error {
 	if err := <-run(gitHubActionsRunnerPath, gitHubActionsRunnerArgs...); err != nil {
+		gracefullyShutdownRunnerListener()
 		return errors.Wrap(err, "Error waiting for GitHub Actions Runner process")
 	}
 
 	return nil
+}
+
+// gracefullyShutdownRunnerListener tries to send a SIGINT to the Runner.Listener
+// process so the workflow can be properly cancelled
+func gracefullyShutdownRunnerListener() {
+	if err := <-run("pkill", "-SIGINT", runnerListenerProcessName); err != nil {
+		logger.Println(errors.Wrap(err, "Error gracefully terminating Runner.Listener process"))
+	}
 }
