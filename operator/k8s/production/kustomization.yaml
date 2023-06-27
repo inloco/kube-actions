@@ -10,4 +10,4 @@ generators:
 images:
 - name: inloco/kube-actions
   newName: public.ecr.aws/incognia/kube-actions
-  newTag: 2adf28e-operator
+  newTag: 82dd88e-operator
