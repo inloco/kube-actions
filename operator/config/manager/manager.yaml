@@ -38,7 +38,8 @@ spec:
           allowPrivilegeEscalation: false
         resources:
           limits:
-            cpu: 500m
             memory: 1Gi
+          requests:
+            cpu: 5000m
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
