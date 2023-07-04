@@ -40,6 +40,6 @@ spec:
           limits:
             memory: 1Gi
           requests:
-            cpu: 5000m
+            cpu: 1500m
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
