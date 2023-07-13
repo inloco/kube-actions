@@ -97,7 +97,10 @@ RUN set -x && \
     sed -i "s/^providers = provider_sect$/# providers = provider_sect/" /etc/ssl/openssl.cnf && \
     rm -fRv ${XDG_CACHE_HOME:-${HOME}/.cache}/pip/* /var/lib/apt/lists/* /tmp/* && \
     mkdir -p ${RUNNER_TOOL_CACHE} && \
-    chown user:user ${RUNNER_TOOL_CACHE}
+    chown user:user ${RUNNER_TOOL_CACHE} && \
+    echo "net.ipv4.tcp_keepalive_time = 30" >> /etc/sysctl.conf && \
+    echo "net.ipv4.tcp_keepalive_intvl = 30" >> /etc/sysctl.conf && \
+    echo "net.ipv4.tcp_keepalive_probes = 10" >> /etc/sysctl.conf
 
 COPY --from=build /go/bin/dlv /usr/local/bin/dlv
 COPY --from=build /go/bin/runner /sbin/init
