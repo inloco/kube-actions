@@ -3,10 +3,20 @@ kind: Kustomization
 namespace: kube-actions
 resources:
 - ../../config/default
+- ./docker-pull.daemonset.yaml
 - ./configmap.yaml
 generators:
 - ./secret.yaml
 images:
-- name: inloco/kube-actions
+- name: incognia/kube-actions
   newName: public.ecr.aws/incognia/kube-actions
   newTag: dbd5cc0-operator
+- name: incognia/kube-actions-operator
+  newName: public.ecr.aws/incognia/kube-actions
+  newTag: dbd5cc0-operator
+- name: incognia/kube-actions-runner
+  newName: public.ecr.aws/incognia/kube-actions
+  newTag: dbd5cc0-runner
+- name: incognia/kube-actions-dind
+  newName: public.ecr.aws/incognia/kube-actions
+  newTag: dbd5cc0-dind
