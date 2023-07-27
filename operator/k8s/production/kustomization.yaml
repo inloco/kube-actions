@@ -1,12 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: kube-actions
-bases:
-  - ../../config/default
 resources:
-  - ./configmap.yaml
+- ../../config/default
+- ./configmap.yaml
 generators:
-  - ./secret.yaml
+- ./secret.yaml
 images:
 - name: inloco/kube-actions
   newName: public.ecr.aws/incognia/kube-actions
