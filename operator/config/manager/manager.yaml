@@ -27,7 +27,7 @@ spec:
       - args:
         - --max-concurrent-reconciles=1000
         - --metrics-bind-address=:9102
-        image: inloco/kube-actions
+        image: incognia/kube-actions
         name: manager
         envFrom:
         - configMapRef:

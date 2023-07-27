@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: docker-pull
+  labels:
+    app.kubernetes.io/name: kube-actions
+    app.kubernetes.io/component: docker-pull
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-actions
+      app.kubernetes.io/component: docker-pull
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-actions
+        app.kubernetes.io/component: docker-pull
+    spec:
+      containers:
+        - name: pause
+          image: k8s.gcr.io/pause
+      initContainers:
+        - name: docker-pull-runner
+          image: incognia/kube-actions-runner
+          command:
+            - dlv
+          args:
+            - version
+        - name: docker-pull-operator
+          image: incognia/kube-actions-operator
+          command:
+            - dlv
+          args:
+            - version
+        - name: docker-pull-dind
+          image: incognia/kube-actions-dind
+          command:
+            - dlv
+          args:
+            - version
