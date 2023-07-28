@@ -11,7 +11,7 @@ IMAGE_REPOSITORY ?= inloco/kube-actions
 IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -dind
 
-DOCKER_VERSION ?= 23.0.5
+DOCKER_VERSION ?= 24.0
 
 docker: docker-build docker-tag docker-push
 	@printf '${BLD}${RED}make: *** [$@]${RST}${EOL}'
