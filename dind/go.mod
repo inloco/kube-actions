@@ -3,7 +3,7 @@ module github.com/inloco/kube-actions/dind
 go 1.17
 
 require (
-	github.com/coreos/go-iptables v0.6.0
+	github.com/coreos/go-iptables v0.7.0
 	github.com/docker/docker v24.0.5+incompatible
 )
 
