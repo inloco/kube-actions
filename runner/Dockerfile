@@ -46,7 +46,7 @@ RUN set -x && \
     export GGCI_VERSION=5.10.3-1 && \
     $CURL -o "/tmp/${GGCI_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCI_PACKAGE}/${GGCI_PACKAGE}_${GGCI_VERSION}_all.deb" && \
     export GGCC_PACKAGE=golang-github-containers-common && \
-    export GGCC_VERSION=0.51.0+ds1-1 && \
+    export GGCC_VERSION=0.52.0+ds1-1 && \
     $CURL -o "/tmp/${GGCC_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCC_PACKAGE}/${GGCC_PACKAGE}_${GGCC_VERSION}_all.deb" && \
     export SKOPEO_PACKAGE=skopeo && \
     export SKOPEO_PACKAGE_FILE=$($CURL ${DEBIAN_MIRROR}/pool/main/s/${SKOPEO_PACKAGE}/ | rg -o '<a.*>(skopeo_1.9.*_amd64.deb)</a>' -r '$1') && \
