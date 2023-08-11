@@ -343,7 +343,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 			},
 		},
 		Spec: corev1.PodSpec{
-			ActiveDeadlineSeconds: pointer.Int64Ptr(3000),
+			ActiveDeadlineSeconds: pointer.Int64(3000),
 			Volumes:               withVolumes(actionsRunner),
 			Containers: []corev1.Container{
 				{
@@ -378,12 +378,15 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 				},
 			},
 			RestartPolicy:                corev1.RestartPolicyNever,
-			AutomountServiceAccountToken: pointer.BoolPtr(false),
+			AutomountServiceAccountToken: pointer.Bool(false),
 			SecurityContext: &corev1.PodSecurityContext{
-				RunAsUser:    pointer.Int64Ptr(1000),
-				RunAsGroup:   pointer.Int64Ptr(1000),
-				RunAsNonRoot: pointer.BoolPtr(true),
-				FSGroup:      pointer.Int64Ptr(1000),
+				RunAsUser:    pointer.Int64(1000),
+				RunAsGroup:   pointer.Int64(1000),
+				RunAsNonRoot: pointer.Bool(true),
+				FSGroup:      pointer.Int64(1000),
+				Sysctls:      []corev1.Sysctl{
+					{Name: "net.ipv4.ping_group_range", Value: "0 2147483647"},
+				},
 			},
 			Affinity:     withRuntimeAffinity(actionsRunner.Spec.Affinity),
 			Tolerations:  actionsRunner.Spec.Tolerations,
@@ -578,7 +581,7 @@ func addSecretCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 	runnerContainer.Env = append(runnerContainer.Env, env...)
 
 	pod.Spec.ServiceAccountName = actionsRunner.Spec.ServiceAccountName
-	pod.Spec.AutomountServiceAccountToken = pointer.BoolPtr(true)
+	pod.Spec.AutomountServiceAccountToken = pointer.Bool(true)
 }
 
 func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsRunner) error {
@@ -650,7 +653,7 @@ func addDockerCapability(pod *corev1.Pod, actionsRunner *inlocov1alpha1.ActionsR
 		},
 		Resources: resources,
 		SecurityContext: &corev1.SecurityContext{
-			Privileged: pointer.BoolPtr(true),
+			Privileged: pointer.Bool(true),
 		},
 	})
 
