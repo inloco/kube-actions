@@ -39,7 +39,7 @@ const (
 	dockerConfigCredHelpersKey = "credHelpers"
 	dockerConfigPluginsKey     = "plugins"
 
-	prometheusPushGatewayAddr = "push-gateway.prometheus.svc.cluster.local:9091"
+	prometheusPushGatewayAddr = "prometheus-pushgateway.pushgateway.svc.cluster.local:9091"
 	prometheusPushJob         = "kubeactions_runner"
 )
 
