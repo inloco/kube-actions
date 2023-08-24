@@ -22,7 +22,7 @@ jobs:
       - name: docker build
         run: make -C '${{ matrix.component }}' docker-build
       - name: aws configure
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-region: ${{ secrets.AWS_REGION }}
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT }}:role/ecr-public
