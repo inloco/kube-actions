@@ -18,12 +18,42 @@ continuous-upgrade:
 		echo 'Master already changed'
 	else
 		echo 'Creating update PR'
+
 		sed -Ei "s/^AGENT_VERSION \?= .*/AGENT_VERSION ?= $${LATEST}/" ./operator/Makefile
 		sed -Ei "s/^RUNNER_VERSION \?= .*/RUNNER_VERSION ?= $${LATEST}/" ./runner/Makefile
 		git add -A
-		git commit -m "feat: actions/runner#v$${LATEST}"
-		git checkout -b "feat/actions-runner-v$${LATEST}"
-		git push -u "$$(git remote show)" "$$(git branch --show-current)"
-		gh pr create -t "Actions Runner v$${LATEST}" -b "https://github.com/actions/runner/releases/tag/v$${LATEST}"
+
+		git push -fu "$$(git remote show)" "$$(git branch --show-current):feat/actions-runner-v$${LATEST}"
+
+		cat <<-EOF | gh api graphql -F query=@-
+		mutation {
+			createCommitOnBranch(
+				input: {
+					branch: {
+					  repositoryNameWithOwner: "inloco/kube-actions",
+					  branchName: "feat/actions-runner-v$${LATEST}",
+					},
+					fileChanges: {
+					  additions: [$(
+						for F in $(git diff --cached --name-only)
+						do
+						  printf '{path:"%s",contents:"%s"},' "${F}" "$(base64 ${F} | sed -e ':a' -e '$!N' -e '$!ba' -e 's/\n//g')"
+						done
+					  )],
+					},
+					message: {
+					  headline: "feat: actions/runner#v$${LATEST}",
+					},
+					expectedHeadOid: "$(git rev-parse HEAD)",
+				},
+			) {
+				commit {
+					oid
+				}
+			}
+		}
+		EOF
+
+		gh pr create -t "Actions Runner v$${LATEST}" -b "https://github.com/actions/runner/releases/tag/v$${LATEST}" -H "feat/actions-runner-v$${LATEST}"
 	fi
 .PHONY: continuous-upgrade
