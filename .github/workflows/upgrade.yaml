@@ -30,7 +30,7 @@ jobs:
           elif git ls-remote --exit-code origin "feat/actions-runner-v${LATEST}"
           then
             echo 'Pending merge'
-          elif [ "$(git ls-remote origin master | cut -f 1)" != "$(git rev-parse master)" ]
+          elif [ "$(git ls-remote origin master | cut -f 1)" != "$(git fetch -q origin master && git rev-parse origin/master)" ]
           then
             echo 'Master already changed'
           else
