@@ -30,38 +30,54 @@ RUN set -x && \
     export DEBIAN_FRONTEND=noninteractive && \
     export IFS="$(printf '\n\b')" && \
     export $(cat /etc/os-release | sed 's/"//g') && \
+    export DEBIAN_MIRROR="http://deb.debian.org/debian/pool/main" && \
+    export CURL="curl -sSLf --retry 3" && \
     unset IFS && \
+    \
     apt-get update && \
-    apt-get install -y apt-transport-https apt-utils busybox ca-certificates curl gettext-base git gnupg-agent iputils-ping jq make parallel ripgrep python3 python3-distutils software-properties-common ssh sudo zstd && \
-    CURL="curl -sSLf --retry 3" && \
+    apt-get install -y apt-transport-https apt-utils software-properties-common ca-certificates curl gnupg-agent && \
     $CURL https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
     $CURL https://cli.github.com/packages/githubcli-archive-keyring.gpg | apt-key add - && \
     add-apt-repository 'deb [arch=amd64] https://cli.github.com/packages stable main' && \
-    export DEBIAN_MIRROR=http://deb.debian.org/debian && \
-    export NETAVARK_PACKAGE=netavark && \
-    export NETAVARK_VERSION=1.4.0-3 && \
-    $CURL -o "/tmp/${NETAVARK_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/n/${NETAVARK_PACKAGE}/${NETAVARK_PACKAGE}_${NETAVARK_VERSION}_amd64.deb" && \
-    export GGCI_PACKAGE=golang-github-containers-image && \
-    export GGCI_VERSION=5.25.0-11 && \
-    $CURL -o "/tmp/${GGCI_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCI_PACKAGE}/${GGCI_PACKAGE}_${GGCI_VERSION}_all.deb" && \
-    export GGCC_PACKAGE=golang-github-containers-common && \
-    export GGCC_VERSION=0.52.0+ds1-2 && \
-    $CURL -o "/tmp/${GGCC_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/g/${GGCC_PACKAGE}/${GGCC_PACKAGE}_${GGCC_VERSION}_all.deb" && \
-    export SKOPEO_PACKAGE=skopeo && \
-    export SKOPEO_PACKAGE_FILE=$($CURL ${DEBIAN_MIRROR}/pool/main/s/${SKOPEO_PACKAGE}/ | rg -o '<a.*>(skopeo_1.9.*_amd64.deb)</a>' -r '$1' | sort -r | head -n 1) && \
-    $CURL -o "/tmp/${SKOPEO_PACKAGE}.deb" "${DEBIAN_MIRROR}/pool/main/s/${SKOPEO_PACKAGE}/${SKOPEO_PACKAGE_FILE}" && \
-    apt-get update && \
-    apt-get install -y docker-ce-cli gh "/tmp/${NETAVARK_PACKAGE}.deb" "/tmp/${GGCI_PACKAGE}.deb" "/tmp/${GGCC_PACKAGE}.deb" "/tmp/${SKOPEO_PACKAGE}.deb" && \
+    \
+    apt-get install -y busybox gettext-base git iputils-ping jq make parallel ripgrep python3 python3-distutils ssh sudo zstd docker-ce-cli gh && \
     busybox --install && \
+    \
+    latest_version() { $CURL "${1}/${2}/" | rg -o "<a.*>(${2}_${3}.*_(amd64|all).deb)</a>" -r '$1' | sort -r | head -n 1; } && \
+    \
+    export NETAVARK_PKG=netavark && \
+    export NETAVARK_VER=1.4.0 && \
+    export NETAVARK_FILE=$(latest_version "${DEBIAN_MIRROR}/n" ${NETAVARK_PKG} ${NETAVARK_VER}) && \
+    $CURL -o "/tmp/${NETAVARK_PKG}.deb" "${DEBIAN_MIRROR}/n/${NETAVARK_PKG}/${NETAVARK_FILE}" && \
+    \
+    export GGCI_PKG=golang-github-containers-image && \
+    export GGCI_VER=5.25.0 && \
+    export GGCI_FILE=$(latest_version "${DEBIAN_MIRROR}/g" ${GGCI_PKG} ${GGCI_VER}) && \
+    $CURL -o "/tmp/${GGCI_PKG}.deb" "${DEBIAN_MIRROR}/g/${GGCI_PKG}/${GGCI_FILE}" && \
+    \
+    export GGCC_PKG=golang-github-containers-common && \
+    export GGCC_VER=0.52.0 && \
+    export GGCC_FILE=$(latest_version "${DEBIAN_MIRROR}/g" ${GGCC_PKG} ${GGCC_VER}) && \
+    $CURL -o "/tmp/${GGCC_PKG}.deb" "${DEBIAN_MIRROR}/g/${GGCC_PKG}/${GGCC_FILE}" && \
+    \
+    export SKOPEO_PKG=skopeo && \
+    export SKOPEO_VER=1.9.3 && \
+    export SKOPEO_FILE=$(latest_version "${DEBIAN_MIRROR}/s" ${SKOPEO_PKG} ${SKOPEO_VER}) && \
+    $CURL -o "/tmp/${SKOPEO_PKG}.deb" "${DEBIAN_MIRROR}/s/${SKOPEO_PKG}/${SKOPEO_FILE}" && \
+    \
+    apt install -y /tmp/*.deb && \
+    \
     $CURL https://bootstrap.pypa.io/get-pip.py | python3 - && \
     export HUB_URL=$($CURL https://api.github.com/repos/github/hub/releases/latest | jq -r '.assets[] | select(.name | match("linux-amd64")) | .browser_download_url') && \
     $CURL ${HUB_URL} | tar -xzvC /tmp && \
     /tmp/hub-*/install && \
+    \
     mkdir -p /usr/local/lib/docker/cli-plugins && \
     export APP_URL=$($CURL https://api.github.com/repos/docker/app/releases | jq -r '.[0].assets[] | select(.name | match("linux.tar.gz$")) | .browser_download_url') && \
     $CURL ${APP_URL} | tar -xzvC /usr/local/lib/docker/cli-plugins && \
     mv /usr/local/lib/docker/cli-plugins/docker-app* /usr/local/lib/docker/cli-plugins/docker-app && \
+    \
     export BUILDX_URL=$($CURL https://api.github.com/repos/docker/buildx/releases/latest | jq -r '.assets[] | select(.name | match("linux-amd64$")) | .browser_download_url') && \
     $CURL -o /usr/local/lib/docker/cli-plugins/docker-buildx ${BUILDX_URL} && \
     chmod 0755 /usr/local/lib/docker/cli-plugins/docker-buildx && \
@@ -85,6 +101,7 @@ RUN set -x && \
     pip3 install git-remote-codecommit yq && \
     export CODECOMMIT_ENDPOINTS="$($CURL https://ip-ranges.amazonaws.com/ip-ranges.json | jq -r '.prefixes | unique_by(.region) | map("git-codecommit.\(.region).amazonaws.com") | join(" ")')" && \
     ssh-keyscan github.com ${CODECOMMIT_ENDPOINTS} >> /etc/ssh/ssh_known_hosts && \
+    \
     useradd -u 1000 -m user && \
     echo 'user ALL=(root) NOPASSWD:ALL' > /etc/sudoers.d/user && \
     chmod 0440 /etc/sudoers.d/user && \
@@ -93,8 +110,6 @@ RUN set -x && \
     export RUNNER_URL=$($CURL https://api.github.com/repos/actions/runner/releases | jq -r '.[] | select(.tag_name == "v'${RUNNER_VERSION}'") | .assets[] | select(.name | endswith("linux-x64-'${RUNNER_VERSION}'.tar.gz")) | .browser_download_url') && \
     $CURL ${RUNNER_URL} | runuser -u user -- tar -vxzC /opt/actions-runner && \
     /opt/actions-runner/bin/installdependencies.sh && \
-    # Support Node 12 https://github.com/nodejs/node/discussions/43184
-    sed -i "s/^providers = provider_sect$/# providers = provider_sect/" /etc/ssl/openssl.cnf && \
     rm -fRv ${XDG_CACHE_HOME:-${HOME}/.cache}/pip/* /var/lib/apt/lists/* /tmp/* && \
     mkdir -p ${RUNNER_TOOL_CACHE} && \
     chown user:user ${RUNNER_TOOL_CACHE}
