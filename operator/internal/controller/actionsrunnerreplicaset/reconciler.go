@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers"
+	"github.com/inloco/kube-actions/operator/internal/controller"
 )
 
 func matchingLabels(actionsRunnerReplicaSet inlocov1alpha1.ActionsRunnerReplicaSet) client.MatchingLabels {

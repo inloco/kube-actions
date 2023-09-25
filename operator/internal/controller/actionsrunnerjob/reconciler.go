@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
+	"github.com/inloco/kube-actions/operator/internal/controller"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/util"
 )
 
 // Reconciler reconciles an ActionsRunnerJob object

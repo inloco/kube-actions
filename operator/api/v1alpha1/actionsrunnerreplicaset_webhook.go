@@ -23,6 +23,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -39,7 +40,7 @@ func (r *ActionsRunnerReplicaSet) SetupWebhookWithManager(mgr ctrl.Manager) erro
 var _ webhook.Validator = &ActionsRunnerReplicaSet{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (arrs *ActionsRunnerReplicaSet) ValidateCreate() error {
+func (arrs *ActionsRunnerReplicaSet) ValidateCreate() (warnings admission.Warnings, err error) {
 	actionsrunnerreplicasetlog.Info("validate create", "name", arrs.Name)
 
 	ar := &ActionsRunner{
@@ -49,12 +50,12 @@ func (arrs *ActionsRunnerReplicaSet) ValidateCreate() error {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (arrs *ActionsRunnerReplicaSet) ValidateUpdate(old runtime.Object) error {
+func (arrs *ActionsRunnerReplicaSet) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	actionsrunnerreplicasetlog.Info("validate update", "name", arrs.Name)
 
 	oldARRS, ok := old.(*ActionsRunnerReplicaSet)
 	if !ok {
-		return errors.New("old.(*ActionsRunnerReplicaSet) == nil")
+		return nil, errors.New("old.(*ActionsRunnerReplicaSet) == nil")
 	}
 
 	ar := &ActionsRunner{
@@ -67,7 +68,7 @@ func (arrs *ActionsRunnerReplicaSet) ValidateUpdate(old runtime.Object) error {
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (arrs *ActionsRunnerReplicaSet) ValidateDelete() error {
+func (arrs *ActionsRunnerReplicaSet) ValidateDelete() (admission.Warnings, error) {
 	actionsrunnerreplicasetlog.Info("validate delete", "name", arrs.Name)
 
 	ar := &ActionsRunner{
