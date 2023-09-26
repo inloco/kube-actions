@@ -29,9 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/facades"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/dot"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/facades"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/util"
 	"github.com/inloco/kube-actions/operator/metrics"
 )
 

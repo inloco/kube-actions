@@ -26,6 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -42,61 +43,61 @@ func (r *ActionsRunner) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &ActionsRunner{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (ar *ActionsRunner) ValidateCreate() error {
+func (ar *ActionsRunner) ValidateCreate() (warnings admission.Warnings, err error) {
 	actionsrunnerlog.Info("validate create", "name", ar.Name)
 
 	for _, policyRule := range ar.Spec.Policy.Must {
 		if err := validatePolicyRule(policyRule); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	for _, policyRule := range ar.Spec.Policy.MustNot {
 		if err := validatePolicyRule(policyRule); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (ar *ActionsRunner) ValidateUpdate(old runtime.Object) error {
+func (ar *ActionsRunner) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	actionsrunnerlog.Info("validate update", "name", ar.Name)
 
 	oldAR, ok := old.(*ActionsRunner)
 	if !ok {
-		return errors.New("old.(*ActionsRunner) == nil")
+		return nil, errors.New("old.(*ActionsRunner) == nil")
 	}
 
 	if !reflect.DeepEqual(ar.Spec.Repository, oldAR.Spec.Repository) {
-		return errors.New(".Spec.Repository is immutable")
+		return nil, errors.New(".Spec.Repository is immutable")
 	}
 
 	if !reflect.DeepEqual(ar.Spec.Labels, oldAR.Spec.Labels) {
-		return errors.New(".Spec.Labels is immutable")
+		return nil, errors.New(".Spec.Labels is immutable")
 	}
 
 	for _, policyRule := range ar.Spec.Policy.Must {
 		if err := validatePolicyRule(policyRule); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	for _, policyRule := range ar.Spec.Policy.MustNot {
 		if err := validatePolicyRule(policyRule); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (ar *ActionsRunner) ValidateDelete() error {
+func (ar *ActionsRunner) ValidateDelete() (admission.Warnings, error) {
 	actionsrunnerlog.Info("validate delete", "name", ar.Name)
 
-	return nil
+	return nil, nil
 }
 
 func validatePolicyRule(policyRule ActionsRunnerPolicyRule) error {
