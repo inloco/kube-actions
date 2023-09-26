@@ -31,11 +31,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerjob"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunnerreplicaset"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunnerjob"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunnerreplicaset"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -110,13 +112,15 @@ func main() {
 	mgr, err := ctrl.NewManager(
 		ctrl.GetConfigOrDie(),
 		ctrl.Options{
-			Scheme:                  scheme,
-			MetricsBindAddress:      metricsBindAddress,
+			Scheme: scheme,
+			Metrics: server.Options{
+				BindAddress: metricsBindAddress,
+			},
 			HealthProbeBindAddress:  healthProbeBindAddress,
 			LeaderElection:          leaderElect,
 			LeaderElectionNamespace: leaderElectionNamespace,
 			LeaderElectionID:        leaderElectionId,
-			Port:                    9443,
+			WebhookServer:           webhook.NewServer(webhook.Options{Port: 9443}),
 		},
 	)
 	if err != nil {

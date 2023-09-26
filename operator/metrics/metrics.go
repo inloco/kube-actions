@@ -77,7 +77,7 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "actions",
-			Name: "job_alive",
+			Name:      "job_alive",
 		},
 		[]string{"repository", "runner_job"},
 	)
@@ -86,7 +86,7 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "actions",
-			Name: "job_started_timestamp_seconds",
+			Name:      "job_started_timestamp_seconds",
 		},
 		[]string{"repository", "runner_job"},
 	)
@@ -95,7 +95,7 @@ var (
 		prometheus.GaugeOpts{
 			Namespace: "kubeactions",
 			Subsystem: "actions",
-			Name: "job_finished_timestamp_seconds",
+			Name:      "job_finished_timestamp_seconds",
 		},
 		[]string{"repository", "runner_job"},
 	)

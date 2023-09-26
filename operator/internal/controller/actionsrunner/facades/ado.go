@@ -39,8 +39,8 @@ import (
 	"golang.org/x/text/encoding/unicode"
 
 	"github.com/inloco/kube-actions/operator/constants"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/dot"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/util"
 )
 
 const (

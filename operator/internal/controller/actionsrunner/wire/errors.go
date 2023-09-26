@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
 
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/util"
 )
 
 func IsUnrecoverable(err error) bool {

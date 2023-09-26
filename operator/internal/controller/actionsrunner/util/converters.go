@@ -31,8 +31,8 @@ import (
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
 	"github.com/inloco/kube-actions/operator/constants"
-	"github.com/inloco/kube-actions/operator/controllers"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/dot"
+	"github.com/inloco/kube-actions/operator/internal/controller"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/dot"
 )
 
 var (
@@ -384,7 +384,7 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 				RunAsGroup:   pointer.Int64(1000),
 				RunAsNonRoot: pointer.Bool(true),
 				FSGroup:      pointer.Int64(1000),
-				Sysctls:      []corev1.Sysctl{
+				Sysctls: []corev1.Sysctl{
 					{Name: "net.ipv4.ping_group_range", Value: "0 2147483647"},
 				},
 			},

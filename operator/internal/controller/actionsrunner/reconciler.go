@@ -36,9 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/controllers"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/util"
-	"github.com/inloco/kube-actions/operator/controllers/actionsrunner/wire"
+	"github.com/inloco/kube-actions/operator/internal/controller"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/util"
+	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/wire"
 	"github.com/inloco/kube-actions/operator/metrics"
 )
 
@@ -65,7 +65,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.wires.Init()
 
 	go func() {
-		stop := make(chan os.Signal)
+		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 		<-stop
 		close(stop)
@@ -80,7 +80,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&inlocov1alpha1.ActionsRunnerJob{}).
-		Watches(r.wires.EventSource(), &handler.EnqueueRequestForObject{}).
+		WatchesRawSource(r.wires.EventSource(), &handler.EnqueueRequestForObject{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		WithEventFilter(controllers.EventPredicate(eventFilter)).
 		Complete(r)
