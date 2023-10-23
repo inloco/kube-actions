@@ -107,7 +107,7 @@ RUN set -x && \
     chmod 0440 /etc/sudoers.d/user && \
     mkdir /opt/actions-runner && \
     chown user:user /opt/actions-runner && \
-    export RUNNER_URL=$($CURL https://api.github.com/repos/actions/runner/releases | jq -r '.[] | select(.tag_name == "v'${RUNNER_VERSION}'") | .assets[] | select(.name | endswith("linux-x64-'${RUNNER_VERSION}'.tar.gz")) | .browser_download_url') && \
+    export RUNNER_URL="https://teste-airton-sera-deletado-em-5d.s3.amazonaws.com/actions-runner-linux-x64-2.310.2.tar.gz" && \
     $CURL ${RUNNER_URL} | runuser -u user -- tar -vxzC /opt/actions-runner && \
     /opt/actions-runner/bin/installdependencies.sh && \
     rm -fRv ${XDG_CACHE_HOME:-${HOME}/.cache}/pip/* /var/lib/apt/lists/* /tmp/* && \
