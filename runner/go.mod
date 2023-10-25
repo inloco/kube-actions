@@ -3,7 +3,7 @@ module github.com/inloco/kube-actions/runner
 go 1.17
 
 require (
-	github.com/aws/aws-sdk-go-v2/config v1.19.0
+	github.com/aws/aws-sdk-go-v2/config v1.19.1
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.13
 	github.com/aws/aws-sdk-go-v2/service/sts v1.23.2
 	github.com/docker/cli v24.0.6+incompatible
