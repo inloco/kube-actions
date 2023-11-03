@@ -11,7 +11,7 @@ IMAGE_REPOSITORY ?= inloco/kube-actions
 IMAGE_VERSION ?= $(shell git describe --dirty --broken --always)
 IMAGE_VARIANT ?= -runner
 
-RUNNER_VERSION ?= 2.310.2
+RUNNER_VERSION ?= 2.311.0
 UBUNTU_VERSION ?= jammy
 UBUNTU_VERSION_NUMBER ?= 22
 
