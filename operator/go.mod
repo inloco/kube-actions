@@ -6,7 +6,7 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.1
 	github.com/go-logr/logr v1.4.1
 	github.com/google/go-github/v32 v32.1.0
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.5.0
 	github.com/itchyny/gojq v0.12.14
 	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b5
 	github.com/patrickmn/go-cache v2.1.0+incompatible
