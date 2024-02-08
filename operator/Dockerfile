@@ -1,4 +1,4 @@
-FROM golang:1.20-alpine as build
+FROM golang:1.22-alpine as build
 RUN CGO_ENABLED=0 go install -v github.com/go-delve/delve/cmd/dlv@latest
 WORKDIR /workspace
 COPY ./go.mod ./go.sum ./
