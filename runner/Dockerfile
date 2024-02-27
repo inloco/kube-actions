@@ -52,12 +52,12 @@ RUN set -x && \
     $CURL -o "/tmp/${NETAVARK_PKG}.deb" "${DEBIAN_MIRROR}/n/${NETAVARK_PKG}/${NETAVARK_FILE}" && \
     \
     export GGCI_PKG=golang-github-containers-image && \
-    export GGCI_VER=5.28 && \
+    export GGCI_VER=5.29 && \
     export GGCI_FILE=$(latest_version "${DEBIAN_MIRROR}/g" ${GGCI_PKG} ${GGCI_VER}) && \
     $CURL -o "/tmp/${GGCI_PKG}.deb" "${DEBIAN_MIRROR}/g/${GGCI_PKG}/${GGCI_FILE}" && \
     \
     export GGCC_PKG=golang-github-containers-common && \
-    export GGCC_VER=0.56 && \
+    export GGCC_VER=0.57 && \
     export GGCC_FILE=$(latest_version "${DEBIAN_MIRROR}/g" ${GGCC_PKG} ${GGCC_VER}) && \
     $CURL -o "/tmp/${GGCC_PKG}.deb" "${DEBIAN_MIRROR}/g/${GGCC_PKG}/${GGCC_FILE}" && \
     \
