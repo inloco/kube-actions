@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.26.2
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.14.10
 	github.com/aws/aws-sdk-go-v2/service/sts v1.26.6
-	github.com/docker/cli v24.0.7+incompatible
+	github.com/docker/cli v25.0.3+incompatible
 	github.com/docker/docker v23.0.8+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
