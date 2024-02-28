@@ -10,13 +10,13 @@ generators:
 images:
 - name: incognia/kube-actions
   newName: public.ecr.aws/incognia/kube-actions
-  newTag: cc60cb8-operator
+  newTag: 5a7d54f-operator
 - name: incognia/kube-actions-operator
   newName: public.ecr.aws/incognia/kube-actions
-  newTag: cc60cb8-operator
+  newTag: 5a7d54f-operator
 - name: incognia/kube-actions-runner
   newName: public.ecr.aws/incognia/kube-actions
-  newTag: cc60cb8-runner
+  newTag: 5a7d54f-runner
 - name: incognia/kube-actions-dind
   newName: public.ecr.aws/incognia/kube-actions
-  newTag: cc60cb8-dind
+  newTag: 5a7d54f-dind
