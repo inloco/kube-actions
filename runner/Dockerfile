@@ -35,7 +35,7 @@ RUN set -Eeux && \
     unset IFS && \
     \
     apt-get update && \
-    apt-get install -y apt-transport-https apt-utils software-properties-common ca-certificates curl gnupg-agent && \
+    apt-get install -y apt-transport-https apt-utils software-properties-common ca-certificates curl gnupg-agent file && \
     $CURL https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
     $CURL https://cli.github.com/packages/githubcli-archive-keyring.gpg | apt-key add - && \
