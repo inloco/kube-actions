@@ -953,8 +953,8 @@ github.com/inloco/go-github/v32 v32.0.0-20200716220920-8f1b474407bc h1:muZkeXP0C
 github.com/inloco/go-github/v32 v32.0.0-20200716220920-8f1b474407bc/go.mod h1:rIEpZD9CTDQwDK9GDrtMTycQNA4JU3qBsCizh3q2WCI=
 github.com/inloco/pkcs7 v0.0.0-20220127055019-e6b9106331c4 h1:q8JLm+7Sl3P4r/z2t1hp2T/nlRARl/fm1Ijke8CNZQ0=
 github.com/inloco/pkcs7 v0.0.0-20220127055019-e6b9106331c4/go.mod h1:SNgMg+EgDFwmvSmLRTNKC5fegJjB7v23qTQ0XLGUNHk=
-github.com/itchyny/gojq v0.12.14 h1:6k8vVtsrhQSYgSGg827AD+PVVaB1NLXEdX+dda2oZCc=
-github.com/itchyny/gojq v0.12.14/go.mod h1:y1G7oO7XkcR1LPZO59KyoCRy08T3j9vDYRV0GgYSS+s=
+github.com/itchyny/gojq v0.12.15 h1:WC1Nxbx4Ifw5U2oQWACYz32JK8G9qxNtHzrvW4KEcqI=
+github.com/itchyny/gojq v0.12.15/go.mod h1:uWAHCbCIla1jiNxmeT5/B5mOjSdfkCq6p8vxWg+BM10=
 github.com/itchyny/timefmt-go v0.1.5 h1:G0INE2la8S6ru/ZI5JecgyzbbJNs5lG1RcBqa7Jm6GE=
 github.com/itchyny/timefmt-go v0.1.5/go.mod h1:nEP7L+2YmAbT2kZ2HfSs1d8Xtw9LY8D2stDBckWakZ8=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
@@ -1152,7 +1152,7 @@ github.com/prometheus/procfs v0.12.0/go.mod h1:pcuDEFsWDnvcgNzo4EEweacyhjeA9Zk3c
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
-github.com/rivo/uniseg v0.4.4/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
+github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
