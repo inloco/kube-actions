@@ -9,7 +9,7 @@ require (
 	github.com/docker/cli v26.1.2+incompatible
 	github.com/docker/docker v23.0.8+incompatible
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.19.0
+	github.com/prometheus/client_golang v1.19.1
 )
 
 require (
