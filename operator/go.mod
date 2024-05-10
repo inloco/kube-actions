@@ -10,7 +10,7 @@ require (
 	github.com/itchyny/gojq v0.12.15
 	github.com/microsoft/azure-devops-go-api/azuredevops v1.0.0-b5
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/prometheus/client_golang v1.19.0
+	github.com/prometheus/client_golang v1.19.1
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	golang.org/x/oauth2 v0.18.0
 	golang.org/x/text v0.14.0
