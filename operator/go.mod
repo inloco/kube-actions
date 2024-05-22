@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/go-jose/go-jose/v3 v3.0.3
-	github.com/go-logr/logr v1.4.1
+	github.com/go-logr/logr v1.4.2
 	github.com/google/go-github/v32 v32.1.0
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.15
