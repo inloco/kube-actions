@@ -78,21 +78,19 @@ func (w *Wire) init(ctx context.Context) error {
 	// TODO: check if runner needs to be re-registered
 	logger := log.FromContext(ctx)
 
-	if w.DotFiles == nil {
-		if err := w.initDotFiles(); err != nil {
-			logger.Error(err, "Error initializing dot files")
-			return err
-		}
+	if err := w.initDotFiles(); err != nil {
+		logger.Error(err, "Error initializing dot files")
+		return err
+	}
 
-		if err := w.initGH(ctx); err != nil {
-			logger.Error(err, "Error initializing GitHub facade")
-			return err
-		}
+	if err := w.initGH(ctx); err != nil {
+		logger.Error(err, "Error initializing GitHub facade")
+		return err
+	}
 
-		if err := w.initADO(ctx, facades.RunnerEventRegister); err != nil {
-			logger.Error(err, "Error initializing Azure DevOps facade")
-			return err
-		}
+	if err := w.initADO(ctx, facades.RunnerEventRegister); err != nil {
+		logger.Error(err, "Error initializing Azure DevOps facade")
+		return err
 	}
 
 	if err := w.adoFacade.InitForRun(ctx, w.DotFiles, w.actionsRunner.Spec.Labels); err != nil {

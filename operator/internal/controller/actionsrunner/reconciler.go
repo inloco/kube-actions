@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	inlocov1alpha1 "github.com/inloco/kube-actions/operator/api/v1alpha1"
-	"github.com/inloco/kube-actions/operator/internal/controller"
+	controllers "github.com/inloco/kube-actions/operator/internal/controller"
 	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/util"
 	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/wire"
 	"github.com/inloco/kube-actions/operator/metrics"
@@ -148,7 +148,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	w, err := r.wires.WireFor(ctx, &actionsRunner, util.ToDotFiles(&configMap, &secret))
+	w, err := r.wires.WireFor(ctx, &actionsRunner, nil)
 	if err != nil {
 		logger.Error(err, "Failed to get Wire")
 
