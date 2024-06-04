@@ -41,6 +41,8 @@ import (
 	"github.com/inloco/kube-actions/operator/constants"
 	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/dot"
 	"github.com/inloco/kube-actions/operator/internal/controller/actionsrunner/util"
+
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -97,19 +99,25 @@ func (ado *AzureDevOps) InitForCRUD(ctx context.Context, dotFiles *dot.Files, la
 }
 
 func (ado *AzureDevOps) InitForRun(ctx context.Context, dotFiles *dot.Files, labels []string) error {
+	logger := log.FromContext(ctx)
+
 	if err := ado.initRSAPrivateKey(dotFiles); err != nil {
+		logger.Error(err, "Error initializing RSA private key")
 		return err
 	}
 
 	if err := ado.initAzureDevOpsTaskAgent(ctx, dotFiles, append(agentLabelsBase, labels...)); err != nil {
+		logger.Error(err, "Error initializing Azure DevOps task agent")
 		return err
 	}
 
 	if err := ado.initAzureDevOpsBridgeConnection(ctx, dotFiles); err != nil {
+		logger.Error(err, "Error initializing Azure DevOps bridge connection")
 		return err
 	}
 
 	if err := ado.initAzureDevOpsBridgeTaskAgentClient(ctx); err != nil {
+		logger.Error(err, "Error initializing Azure DevOps bridge task agent client")
 		return err
 	}
 
