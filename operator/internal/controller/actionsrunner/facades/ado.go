@@ -325,10 +325,28 @@ func (ado *AzureDevOps) initAzureDevOpsBridgeConnection(ctx context.Context, dot
 	//	return errors.New(".credentials == nil")
 	//}
 
+	logger := log.FromContext(ctx)
+
+	runnerJson, err := json.Marshal(dotFiles.Runner)
+	if err != nil {
+		logger.Error(err, "Error marshalling dotFiles.Runner")
+	}
+	credentialsJson, err := json.Marshal(dotFiles.Credentials)
+	if err != nil {
+		logger.Error(err, "Error marshalling dotFiles.Credentials")
+	}
+
+	logger.Info("dotFiles")
+	logger.Info(string(runnerJson))
+	logger.Info(string(credentialsJson))
+
 	assertion, err := util.ClientAssertion(dotFiles.Credentials.Data.ClientId, dotFiles.Credentials.Data.AuthorizationURL, ado.RSAPrivateKey)
 	if err != nil {
 		return err
 	}
+
+	logger.Info("assertion")
+	logger.Info(assertion)
 
 	token, err := util.AccessToken(ctx, dotFiles.Credentials.Data.OAuthEndpointURL, assertion)
 	if err != nil {
