@@ -103,7 +103,7 @@ var (
 	githubRegistrationTokens       = cache.New(20*time.Minute, 20*time.Minute)
 	githubRegistrationTokensMutext sync.Mutex
 
-	githubRemoveTokens       = cache.New(20*time.Minute, 20*time.Minute))
+	githubRemoveTokens       = cache.New(20*time.Minute, 20*time.Minute)
 	githubRemoveTokensMutext sync.Mutex
 
 	githubTenantCredentials       = cache.New(time.Hour, time.Hour)
