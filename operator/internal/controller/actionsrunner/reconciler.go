@@ -197,6 +197,26 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
+	desiredConfigMap, err := util.ToConfigMap(w.DotFiles, &actionsRunner, r.Scheme)
+	if err != nil {
+		logger.Info("Failed to build desired ConfigMap")
+		return ctrl.Result{}, err
+	}
+	if err := r.Update(ctx, desiredConfigMap, controllers.UpdateOpts...); err != nil {
+		logger.Error(err, "Failed to update ConfigMap")
+		return ctrl.Result{}, err
+	}
+
+	desiredSecret, err := util.ToSecret(w.DotFiles, &actionsRunner, r.Scheme)
+	if err != nil {
+		logger.Info("Failed to build desired Secret")
+		return ctrl.Result{}, err
+	}
+	if err := r.Update(ctx, desiredSecret, controllers.UpdateOpts...); err != nil {
+		logger.Error(err, "Failed to update Secret")
+		return ctrl.Result{}, err
+	}
+
 	var podDisruptionBudget policyv1.PodDisruptionBudget
 	if err := r.Get(ctx, req.NamespacedName, &podDisruptionBudget); client.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to get PodDisruptionBudget")
