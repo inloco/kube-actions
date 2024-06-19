@@ -41,7 +41,7 @@ RUN set -Eeux && \
     $CURL https://cli.github.com/packages/githubcli-archive-keyring.gpg | apt-key add - && \
     add-apt-repository 'deb [arch=amd64] https://cli.github.com/packages stable main' && \
     \
-    apt-get install -y busybox gettext-base git iputils-ping jq make parallel ripgrep python3 python3-distutils ssh sudo zstd docker-ce-cli gh && \
+    apt-get install -y busybox gettext-base git iputils-ping jq make parallel ripgrep python3 python3-distutils ssh sudo zstd docker-ce-cli docker-compose-plugin gh && \
     busybox --install && \
     latest_version() { \
         URL=$($CURL "${1}/${2}/" | rg -o "<a.*>(${2}_${3}.*_(amd64|all).deb)</a>" -r '$1' | sort -r | head -n 1); \
