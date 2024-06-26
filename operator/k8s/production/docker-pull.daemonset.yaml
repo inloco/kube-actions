@@ -38,3 +38,10 @@ spec:
             - dlv
           args:
             - version
+      tolerations:
+        - key: node-role.incognia.com/ci
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      nodeSelector:
+        node-role.incognia.com/ci: true
