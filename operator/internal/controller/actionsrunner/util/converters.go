@@ -386,9 +386,18 @@ func ToPod(actionsRunner *inlocov1alpha1.ActionsRunner, actionsRunnerJob *inloco
 					{Name: "net.ipv4.ping_group_range", Value: "0 2147483647"},
 				},
 			},
-			Affinity:     withRuntimeAffinity(actionsRunner.Spec.Affinity),
-			Tolerations:  actionsRunner.Spec.Tolerations,
-			NodeSelector: actionsRunner.Spec.NodeSelector,
+			Affinity: withRuntimeAffinity(actionsRunner.Spec.Affinity),
+			Tolerations: []corev1.Toleration{
+				{
+					Key:      "node-role.incognia.com/ci",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+			NodeSelector: map[string]string{
+				"node-role.incognia.com/ci": "true",
+			},
 		},
 	}
 
