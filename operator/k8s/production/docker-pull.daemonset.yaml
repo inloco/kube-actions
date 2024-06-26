@@ -44,4 +44,4 @@ spec:
           value: "true"
           effect: NoSchedule
       nodeSelector:
-        node-role.incognia.com/ci: true
+        node-role.incognia.com/ci: "true"
