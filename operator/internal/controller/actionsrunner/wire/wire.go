@@ -263,9 +263,11 @@ func (w *Wire) Listen() {
 
 			taMessage, err := w.adoFacade.GetMessage(ctx, lastMessageId)
 			if err != nil {
+				logger.Error(err, "Error while getting message")
 				panic(err)
 			}
 			if taMessage == nil {
+				logger.Info("No message received")
 				continue
 			}
 
@@ -273,6 +275,7 @@ func (w *Wire) Listen() {
 
 			message, err := toMessage(*taMessage)
 			if err != nil {
+				logger.Error(err, "Error while converting message")
 				panic(err)
 			}
 
