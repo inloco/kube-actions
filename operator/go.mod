@@ -76,6 +76,6 @@ require (
 
 replace (
 	github.com/google/go-github/v32 => github.com/inloco/go-github/v32 v32.0.0-20200716220920-8f1b474407bc
-	github.com/microsoft/azure-devops-go-api/azuredevops => github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20230505183803-d7fcadea03a0
+	github.com/microsoft/azure-devops-go-api/azuredevops => github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240701231142-9dd870441de2
 	go.mozilla.org/pkcs7 => github.com/inloco/pkcs7 v0.0.0-20220127055019-e6b9106331c4
 )
