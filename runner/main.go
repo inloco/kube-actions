@@ -41,6 +41,8 @@ const (
 
 	prometheusPushGatewayAddr = "prometheus-pushgateway.pushgateway.svc.cluster.local:9091"
 	prometheusPushJob         = "kubeactions_runner"
+
+	gitHubActionsRunnerArgsEnv = "GITHUB_ACTIONS_RUNNER_ARGS"
 )
 
 var (
@@ -353,8 +355,19 @@ func requestDindTermination() error {
 	return nil
 }
 
+func getGitHubActionsRunnerArgs() []string {
+	if argsRaw, ok := os.LookupEnv(gitHubActionsRunnerArgsEnv); ok {
+		if argsRaw == "" {
+			return []string{}
+		}
+		return strings.Split(argsRaw, ",")
+	}
+	return gitHubActionsRunnerArgs
+}
+
 func runGitHubActionsRunner() error {
-	if err := <-run(gitHubActionsRunnerPath, gitHubActionsRunnerArgs...); err != nil {
+	args := getGitHubActionsRunnerArgs()
+	if err := <-run(gitHubActionsRunnerPath, args...); err != nil {
 		return errors.Wrap(err, "Error waiting for GitHub Actions Runner process")
 	}
 
