@@ -449,6 +449,8 @@ func (ado *AzureDevOps) DeinitAzureDevOpsTaskAgentSession(ctx context.Context) e
 }
 
 func (ado *AzureDevOps) GetMessage(ctx context.Context, lastMessageId *uint64) (*taskagent.TaskAgentMessage, error) {
+	logger := log.FromContext(ctx)
+
 	if ado.TaskAgentBridgeClient == nil {
 		return nil, errors.New(".TaskAgentBridgeClient == nil")
 	}
@@ -457,6 +459,11 @@ func (ado *AzureDevOps) GetMessage(ctx context.Context, lastMessageId *uint64) (
 		return nil, errors.New(".TaskAgentSession == nil")
 	}
 
+	logger.Info("Getting message",
+		"PoolId", poolId,
+		"SessionId", ado.TaskAgentSession.SessionId,
+		"lastMessageId", lastMessageId,
+	)
 	message, err := ado.TaskAgentBridgeClient.GetMessage(ctx, taskagent.GetMessageArgs{
 		PoolId:        github.Int(poolId),
 		SessionId:     ado.TaskAgentSession.SessionId,
