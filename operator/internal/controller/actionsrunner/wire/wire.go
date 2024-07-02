@@ -219,8 +219,8 @@ func (w *Wire) Listen() {
 	}
 
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, runnerContextKey, w.GetRunnerName())
 	logger := log.FromContext(ctx, "runner", w.GetRunnerName())
+	ctx = log.IntoContext(ctx, logger)
 
 	w.loopClose = make(chan struct{})
 	logger.Info("Wire opened")
