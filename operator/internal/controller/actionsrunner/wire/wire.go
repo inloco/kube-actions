@@ -35,6 +35,12 @@ import (
 	"github.com/inloco/kube-actions/operator/metrics"
 )
 
+type contextKey string
+
+const (
+	runnerContextKey = contextKey("runner")
+)
+
 type Wire struct {
 	operatorNotifier chan<- event.GenericEvent
 
@@ -214,6 +220,7 @@ func (w *Wire) Listen() {
 
 	ctx := context.Background()
 	logger := log.FromContext(ctx, "runner", w.GetRunnerName())
+	ctx = log.IntoContext(ctx, logger)
 
 	w.loopClose = make(chan struct{})
 	logger.Info("Wire opened")
