@@ -954,6 +954,8 @@ github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703142544-f82a1fc5
 github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703142544-f82a1fc50d7f/go.mod h1:PoGiBqKSQK1vIfQ+yVaFcGjDySHvym6FM1cNYnwzbrY=
 github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703145734-5b31862fc7ee h1:E748atN0S/UZv8r79PsiDt+C465d+p/xB9UcJnOfBoQ=
 github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703145734-5b31862fc7ee/go.mod h1:PoGiBqKSQK1vIfQ+yVaFcGjDySHvym6FM1cNYnwzbrY=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703161400-62be79eb0f8d h1:mrWJRCD54V+EEJ6cDDHSDtkQbqaTyUuruJn3Xgh1Bcg=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703161400-62be79eb0f8d/go.mod h1:PoGiBqKSQK1vIfQ+yVaFcGjDySHvym6FM1cNYnwzbrY=
 github.com/inloco/go-github/v32 v32.0.0-20200716220920-8f1b474407bc h1:muZkeXP0Cwi1LqKgkBnDzAvw+hj2BuhuKZeQ3gcVRY0=
 github.com/inloco/go-github/v32 v32.0.0-20200716220920-8f1b474407bc/go.mod h1:rIEpZD9CTDQwDK9GDrtMTycQNA4JU3qBsCizh3q2WCI=
 github.com/inloco/pkcs7 v0.0.0-20220127055019-e6b9106331c4 h1:q8JLm+7Sl3P4r/z2t1hp2T/nlRARl/fm1Ijke8CNZQ0=
