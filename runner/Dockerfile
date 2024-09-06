@@ -36,11 +36,15 @@ RUN set -Eeux && \
     \
     apt-get update && \
     apt-get install -y apt-transport-https apt-utils software-properties-common ca-certificates curl gnupg-agent && \
-    $CURL https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
-    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
-    $CURL https://cli.github.com/packages/githubcli-archive-keyring.gpg | apt-key add - && \
-    add-apt-repository 'deb [arch=amd64] https://cli.github.com/packages stable main' && \
+    mkdir -p -m 755 /etc/apt/keyrings && \
+    $CURL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list && \
+    $CURL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli.gpg && \
+    chmod a+r /etc/apt/keyrings/githubcli.gpg && \
+    echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/githubcli.gpg] https://cli.github.com/packages stable main' | tee /etc/apt/sources.list.d/githubcli.list && \
     \
+    apt-get update && \
     apt-get install -y busybox gettext-base git iputils-ping jq make parallel ripgrep python3 python3-distutils ssh sudo zstd docker-ce-cli docker-compose-plugin gh && \
     busybox --install && \
     latest_version() { \
