@@ -950,6 +950,12 @@ github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANyt
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20230505183803-d7fcadea03a0 h1:9q1bmZxQm+5MZuYJa0UmaSpnAvi7lkIa6RHQxSHSq3o=
 github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20230505183803-d7fcadea03a0/go.mod h1:PoGiBqKSQK1vIfQ+yVaFcGjDySHvym6FM1cNYnwzbrY=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703142544-f82a1fc50d7f h1:uecjcZJ0viSFJ4rqri/AJomXXcy1j8V/PCVE/d7OI/8=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703142544-f82a1fc50d7f/go.mod h1:PoGiBqKSQK1vIfQ+yVaFcGjDySHvym6FM1cNYnwzbrY=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703145734-5b31862fc7ee h1:E748atN0S/UZv8r79PsiDt+C465d+p/xB9UcJnOfBoQ=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703145734-5b31862fc7ee/go.mod h1:PoGiBqKSQK1vIfQ+yVaFcGjDySHvym6FM1cNYnwzbrY=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703161400-62be79eb0f8d h1:mrWJRCD54V+EEJ6cDDHSDtkQbqaTyUuruJn3Xgh1Bcg=
+github.com/inloco/azure-devops-go-api/azuredevops v0.0.0-20240703161400-62be79eb0f8d/go.mod h1:PoGiBqKSQK1vIfQ+yVaFcGjDySHvym6FM1cNYnwzbrY=
 github.com/inloco/go-github/v32 v32.0.0-20200716220920-8f1b474407bc h1:muZkeXP0Cwi1LqKgkBnDzAvw+hj2BuhuKZeQ3gcVRY0=
 github.com/inloco/go-github/v32 v32.0.0-20200716220920-8f1b474407bc/go.mod h1:rIEpZD9CTDQwDK9GDrtMTycQNA4JU3qBsCizh3q2WCI=
 github.com/inloco/pkcs7 v0.0.0-20220127055019-e6b9106331c4 h1:q8JLm+7Sl3P4r/z2t1hp2T/nlRARl/fm1Ijke8CNZQ0=
